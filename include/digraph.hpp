@@ -184,7 +184,7 @@ class MarkovDigraph
         // ----------------------------------------------------- //
         //              EDGE-ADDING/GETTING METHODS              //
         // ----------------------------------------------------- //
-        void addEdge(std::string source_id, std::string target_id, T label = 0)
+        void addEdge(std::string source_id, std::string target_id, T label = 1.0)
         {
             /*
              * Add an edge between two nodes. If either ID does not 
@@ -196,7 +196,7 @@ class MarkovDigraph
             if (source == nullptr)
                 source = this->addNode(source_id);
             if (target == nullptr)
-                source = this->addNode(target_id);
+                target = this->addNode(target_id);
             Edge<T> edge = std::make_pair(source, target);
             this->edges[source].insert(target);
             this->labels[edge] = label;
@@ -410,8 +410,8 @@ class MarkovDigraph
              * relation of Chebotarev & Agaev for the k-th forest matrix
              * (Chebotarev & Agaev, Lin Alg Appl, 2002, Eqs. 17-18).
              */
-            // Get the Laplacian matrix
-            Matrix<T, Dynamic, Dynamic> laplacian = this->getLaplacian(); 
+            // Get the row Laplacian matrix
+            Matrix<T, Dynamic, Dynamic> laplacian = (-this->getLaplacian()).transpose(); 
 
             unsigned dim = this->nodes.size();
             Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(dim, dim);
@@ -430,9 +430,9 @@ class MarkovDigraph
             if (normalize)
             {
                 T norm = steady_state.sum();
-                return steady_state / norm;
+                return (steady_state / norm).array();
             }
-            return steady_state; 
+            return steady_state.array(); 
         }
 
         Array<T, Dynamic, 1> getSteadyStateFromPaths(bool normalize = true)
