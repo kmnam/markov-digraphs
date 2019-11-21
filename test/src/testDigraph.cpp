@@ -97,3 +97,26 @@ BOOST_AUTO_TEST_CASE(testSquareGraph)
     delete graph;
 }
 
+BOOST_AUTO_TEST_CASE(testSquareGraphRecurrence)
+{
+    /*
+     * Test that the Chebotarev-Agaev recurrence gives the steady-state
+     * vector for the Laplacian matrix of the square graph.
+     */
+    Graph* graph = square(rng);
+
+    // Compute the Laplacian of the graph
+    MatrixXd laplacian = graph->getLaplacian();
+
+    // Compute the unnormalized steady-state vector
+    VectorXd steady_state = graph->getSteadyStateFromRecurrence(false);
+    BOOST_TEST(((laplacian * steady_state.matrix()).array() < 1e-10).all());
+
+    // Compute the normalized steady-state vector
+    steady_state = graph->getSteadyStateFromRecurrence(true);
+    BOOST_TEST(steady_state.sum() == 1.0);
+    BOOST_TEST(((laplacian * steady_state.matrix()).array() < 1e-10).all());
+
+    delete graph;
+}
+
