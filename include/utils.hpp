@@ -19,8 +19,6 @@
  * Last updated:
  *     11/21/2019
  */
-const double two_pi = 2 * std::acos(-1);
-
 namespace utils {
 
 // ------------------------------------------------------ //
@@ -220,6 +218,7 @@ std::vector<std::complex<T> > rootsOfUnity(unsigned n)
      */
     using std::cos;
     using std::sin;
+    const double two_pi = 2 * std::acos(-1);
     std::vector<std::complex<T> > roots;
     for (unsigned i = 0; i < n; i++)
     {
