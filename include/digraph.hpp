@@ -139,14 +139,14 @@ class MarkovDigraph
         }
 
     public:
-        CopyNumberGraph()
+        MarkovDigraph()
         {
             /*
              * Empty constructor.
              */
         }
 
-        ~CopyNumberGraph()
+        ~MarkovDigraph()
         {
             /*
              * Destructor; de-allocates each microstate from heap memory.
@@ -296,14 +296,14 @@ class MarkovDigraph
         }
 
         template <typename U>
-        CopyNumberGraph<U>* copy() const
+        MarkovDigraph<U>* copy() const
         {
             /*
-             * Return pointer to a new CopyNumberGraph object, possibly
+             * Return pointer to a new MarkovDigraph object, possibly
              * with a different scalar type, with the same graph structure
              * and edge label values.
              */
-            CopyNumberGraph<U>* graph = new CopyNumberGraph<U>();
+            MarkovDigraph<U>* graph = new MarkovDigraph<U>();
 
             // Copy over nodes with the same IDs
             for (auto&& node : this->nodes)
@@ -321,10 +321,10 @@ class MarkovDigraph
         }
 
         template <typename U>
-        void copy(CopyNumberGraph<U>* graph) const
+        void copy(MarkovDigraph<U>* graph) const
         {
             /*
-             * Given pointer to an existing CopyNumberGraph object, possibly
+             * Given pointer to an existing MarkovDigraph object, possibly
              * with a different scalar type, copy over the graph details.  
              */
             // Clear the input graph's contents
