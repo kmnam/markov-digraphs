@@ -213,8 +213,8 @@ class MarkovDigraph
                 throw std::runtime_error("Specified source node does not exist");
             if (target == nullptr)
                 throw std::runtime_error("Specified target node does not exist");
-            auto it = this->edges[source].find(target);
-            if (it != this->edges[source].end())
+            auto it = this->edges.find(source)->second.find(target);
+            if (it != this->edges.find(source)->second.end())
                 return std::make_pair(source, *it);
             else    // Return pair of nullptrs if no edge exists
                 return std::make_pair(nullptr, nullptr);
