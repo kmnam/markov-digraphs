@@ -24,8 +24,6 @@
  *     11/21/2019
  */
 
-namespace graphs {
-
 // ----------------------------------------------------- //
 //                    NODES AND EDGES                    //
 // ----------------------------------------------------- //
@@ -33,8 +31,7 @@ template <typename T>
 struct Node
 {
     /*
-     * A minimal struct that represents a vertex or node in 
-     * a copy-number graph, representing a DNA microstate.
+     * A minimal struct that represents a vertex or node. 
      */
     std::string id;       // String identifier
 
@@ -55,22 +52,18 @@ struct Node
     }
 };
 
-}   // namespace graphs
-
 namespace std {
 
 template <typename T>
-struct hash<graphs::Node<T> >
+struct hash<Node<T> >
 {
-    std::size_t operator()(const graphs::Node<T>& node) const noexcept
+    std::size_t operator()(const Node<T>& node) const noexcept
     {
         return std::hash<std::string>{}(node.id);
     }
 };
 
 }   // namespace std
-
-namespace graphs {
 
 // An Edge is simply a pair of Node pointers
 template <typename T>
@@ -82,7 +75,7 @@ template <typename T>
 class MarkovDigraph
 {
     /*
-     * An implementation of a 1-D copy-number graph. 
+     * An implementation of a labeled digraph associated with a Markov process. 
      */
     protected:
         // ----------------------------------------------------- //
@@ -550,7 +543,5 @@ class MarkovDigraph
             }
         }
 };
-
-}   // namespace graphs
 
 #endif
