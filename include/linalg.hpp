@@ -170,7 +170,7 @@ Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dyna
         }
         else
         {
-            throw std::runtime_error("Nullspace was not successfully computed with 200-bit floats");
+            throw std::runtime_error("Nullspace was not successfully computed with 200-digit floats");
         }
     }
     return nullspace;
@@ -223,7 +223,7 @@ Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic
         }
         else
         {
-            throw std::runtime_error("Spanning tree weights were not successfully computed with 200-bit floats");
+            throw std::runtime_error("Spanning tree weights were not successfully computed with 200-digit floats");
         }
     }
     return weights;
