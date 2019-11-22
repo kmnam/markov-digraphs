@@ -219,7 +219,8 @@ Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dyna
 }
 
 template <typename T>
-Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian, T ztol)
+Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian,
+                                               T ztol, unsigned min_prec = 30)
 {
     /*
      * Use the recurrence of Chebotarev & Agaev (Lin Alg Appl, 2002, Eqs. 17-18)
@@ -232,10 +233,53 @@ Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic
     // Get the maximum precision of the given scalar type
     unsigned prec = std::numeric_limits<T>::max_digits10;
 
-    // Try obtaining the nullspace at the given precision
+    // Check that the precision of the given scalar type exceeds the minimum 
+    // required precision for the computation
     Matrix<T, Dynamic, 1> weights;
     T min_sqnorm;
-    std::tie(weights, min_sqnorm) = linalg_internal::spanningTreeWeightVector<T>(laplacian);
+    if (prec < min_prec)
+    {
+        if (min_prec <= 30)
+        {
+            prec = 30;
+            Matrix<mpfr_30, Dynamic, Dynamic> B = linalg_internal::convert<T, mpfr_30>(laplacian);
+            std::pair<Matrix<mpfr_30, Dynamic, 1>, mpfr_30> result = linalg_internal::spanningTreeWeightVector<mpfr_30>(B);
+            weights = result.first.template cast<T>();
+            min_sqnorm = result.second.convert_to<T>();
+        }
+        else if (min_prec <= 60)
+        {
+            prec = 60;
+            Matrix<mpfr_60, Dynamic, Dynamic> B = linalg_internal::convert<T, mpfr_60>(laplacian);
+            std::pair<Matrix<mpfr_60, Dynamic, 1>, mpfr_60> result = linalg_internal::spanningTreeWeightVector<mpfr_60>(B);
+            weights = result.first.template cast<T>();
+            min_sqnorm = result.second.convert_to<T>();
+        }
+        else if (min_prec <= 100)
+        {
+            prec = 100;
+            Matrix<mpfr_100, Dynamic, Dynamic> B = linalg_internal::convert<T, mpfr_100>(laplacian);
+            std::pair<Matrix<mpfr_100, Dynamic, 1>, mpfr_100> result = linalg_internal::spanningTreeWeightVector<mpfr_100>(B);
+            weights = result.first.template cast<T>();
+            min_sqnorm = result.second.convert_to<T>();
+        }
+        else if (min_prec <= 200)
+        {
+            prec = 200;
+            Matrix<mpfr_200, Dynamic, Dynamic> B = linalg_internal::convert<T, mpfr_200>(laplacian);
+            std::pair<Matrix<mpfr_200, Dynamic, 1>, mpfr_200> result = linalg_internal::spanningTreeWeightVector<mpfr_200>(B);
+            weights = result.first.template cast<T>();
+            min_sqnorm = result.second.convert_to<T>();
+        }
+        else
+        {
+            throw std::invalid_argument("Minimum precision exceeds 200 digits");
+        }
+    }
+    else
+    {
+        std::tie(weights, min_sqnorm) = linalg_internal::spanningTreeWeightVector<T>(laplacian);
+    }
 
     // While the nullspace was not successfully computed ...
     while (min_sqnorm >= ztol)
