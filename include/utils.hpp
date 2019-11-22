@@ -19,167 +19,8 @@
  * Last updated:
  *     11/21/2019
  */
-namespace utils {
-
-// ------------------------------------------------------ //
-//                    CUSTOM EXCEPTIONS                   //
-// ------------------------------------------------------ //
-struct NullspaceDimError : public std::runtime_error
-{
-    /*
-     * Custom exception to be thrown when a matrix has an unexpected
-     * nullspace dimension (number of singular values).
-     */
-    unsigned dim;
-    NullspaceDimError(std::string const& msg, unsigned dim_) : std::runtime_error(msg)
-    {
-        dim = dim_;
-    }
-};
-
-// ------------------------------------------------------ //
-//                 BASIC HELPER FUNCTIONS                 //
-// ------------------------------------------------------ //
-std::vector<std::vector<unsigned> > combinations(unsigned n, unsigned k)
-{
-    /*
-     * Return a vector of integer vectors encoding all k-combinations of
-     * indices up to n, i.e., {0, 1, ..., n-1}.
-     */
-    if (k > n)
-        throw std::invalid_argument("k-combinations of n items undefined for k > n");
-
-    std::vector<std::vector<unsigned> > combinations;    // Vector of combinations
-    std::vector<bool> range(n);                          // Binary indicators for each index
-    std::fill(range.end() - k, range.end(), true);
-    do
-    {
-        std::vector<unsigned> c;
-        for (unsigned i = 0; i < n; i++)
-        {
-            if (range[i]) c.push_back(i);
-        }
-        combinations.push_back(c);
-    } while (std::next_permutation(range.begin(), range.end()));
-
-    return combinations; 
-}
-
-std::vector<std::vector<unsigned> > powerset(unsigned n)
-{
-    /*
-     * Return a vector of integer vectors encoding the power set of 
-     * indices up to n, i.e., {0, 1, ..., n-1}. 
-     */
-    // Start with the empty set
-    std::vector<std::vector<unsigned> > powerset;
-    powerset.emplace_back(std::vector<unsigned>());
-
-    // Run through all k-combinations for increasing k
-    std::vector<std::vector<unsigned> > k_combinations;
-    for (unsigned k = 1; k <= n; k++)
-    {
-        k_combinations = combinations(n, k);
-        powerset.insert(
-            powerset.end(),
-            std::make_move_iterator(k_combinations.begin()),
-            std::make_move_iterator(k_combinations.end())
-        );
-    }
-
-    return powerset;
-}
-
-template <typename T>
-std::vector<std::vector<T> > combinations(std::vector<T> data, unsigned k)
-{
-    /*
-     * Return a vector of integer vectors encoding all k-combinations of
-     * an input vector of arbitrary-type elements.
-     */
-    unsigned n = data.size();
-    if (k > n)
-        throw std::invalid_argument("k-combinations of n items undefined for k > n");
-
-    std::vector<std::vector<T> > combinations;    // Vector of combinations
-    std::vector<bool> range(n);                   // Binary indicators for each index
-    std::fill(range.end() - k, range.end(), true);
-
-    do
-    {
-        std::vector<T> c;
-        for (unsigned i = 0; i < n; i++)
-        {
-            if (range[i]) c.push_back(data[i]);
-        }
-        combinations.push_back(c);
-    } while (std::next_permutation(range.begin(), range.end()));
-
-    return combinations; 
-}
-
-template <typename T>
-std::vector<std::vector<T> > powerset(std::vector<T> data)
-{
-    /*
-     * Return a vector of vectors encoding the power set of an 
-     * input vector of arbitrary-type elements. 
-     */
-    // Start with the empty set
-    std::vector<std::vector<T> > powerset;
-    powerset.emplace_back(std::vector<unsigned>());
-
-    // Run through all k-combinations for increasing k
-    std::vector<std::vector<T> > k_combinations;
-    for (unsigned k = 1; k <= data.size(); k++)
-    {
-        k_combinations = combinations(data, k);
-        powerset.insert(
-            powerset.end(),
-            std::make_move_iterator(k_combinations.begin()),
-            std::make_move_iterator(k_combinations.end())
-        );
-    }
-
-    return powerset;
-}
-
-std::string vectorToString(const std::vector<unsigned>& nums)
-{
-    /*
-     * Given a vector of (unsigned) integers, return a comma-delimited
-     * string containing the integers. 
-     */
-    std::ostringstream os;
-    if (!nums.empty())
-    {
-        std::copy(nums.begin(), nums.end() - 1, std::ostream_iterator<unsigned>(os, ","));
-        os << nums.back();
-    }
-    return os.str();    
-}
-
-std::vector<unsigned> stringToVector(const std::string& nums)
-{
-    /*
-     * Given a string of comma-delimited (unsigned) integers, return
-     * a vector of these integers.
-     */
-    std::vector<unsigned> out;
-    std::string num;
-    std::istringstream is(nums);
-    while (std::getline(is, num, ',')) out.push_back(std::stoul(num));
-    return out;
-}
-
-// ------------------------------------------------------ //
-//            MATH AND LINEAR ALGEBRA FUNCTIONS           //
-// ------------------------------------------------------ //
 using namespace Eigen;
 
-// ------------------------------------------------------ //
-//                INTERNAL HELPER FUNCTIONS               //
-// ------------------------------------------------------ //
 template <typename T>
 bool isclose(T a, T b, T tol)
 {
@@ -188,38 +29,6 @@ bool isclose(T a, T b, T tol)
      */
     T c = a - b;
     return ((c >= 0.0 && c < tol) || (c < 0.0 && -c < tol));
-}
-
-// ------------------------------------------------------ //
-//                   EXTERNAL FUNCTIONS                   //
-// ------------------------------------------------------ //
-template <typename T>
-std::vector<std::complex<T> > rootsOfUnity(unsigned n)
-{
-    /*
-     * Return the n-th roots of unity. 
-     */
-    using std::cos;
-    using std::sin;
-    const double two_pi = 2 * std::acos(-1);
-    std::vector<std::complex<T> > roots;
-    for (unsigned i = 0; i < n; i++)
-    {
-        T pi_times_i_by_n = two_pi * i / n;
-        T real = cos(pi_times_i_by_n);
-        T imag = sin(pi_times_i_by_n);
-        roots.emplace_back(std::complex<T>(real, imag));
-    }
-    return roots;
-}
-
-template <typename T>
-Matrix<T, Dynamic, 1> logSpaceVector(T lower, T upper, unsigned size)
-{
-    /*
-     * Return a logarithmically spaced vector from 10 ^ lower to 10 ^ upper.
-     */
-    return Eigen::pow(10.0, Array<T, Dynamic, 1>::LinSpaced(size, lower, upper)).matrix();
 }
 
 template <typename T>
@@ -251,18 +60,10 @@ Matrix<T, Dynamic, Dynamic> signedStirlingNumbersOfFirstKindByFactorial(unsigned
     return S.block(1, 1, n, n);
 }
 
-template <typename Derived1, typename Derived2>
-Matrix<typename Derived1::Scalar, Dynamic, Dynamic> solve(const MatrixBase<Derived1>& A,
-                                                          const MatrixBase<Derived2>& b)
-{
-    /*
-     * Return a vector x which satisfies A * x = b.
-     */
-    return A.colPivHouseholderQr().solve(b);
-}
+namespace utils_internal {
 
 template <typename T>
-Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, T singval_tol)
+Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, T sv_tol)
 {
     /*
      * Return a matrix whose columns form a basis for the nullspace of A.
@@ -271,16 +72,16 @@ Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dyna
     Eigen::BDCSVD<Matrix<T, Dynamic, Dynamic> > sv_decomp(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
 
     // Initialize nullspace basis matrix
-    MatrixType nullmat;
+    Matrix<T, Dynamic, Dynamic> nullmat;
     unsigned ncols = 0;
     unsigned nrows = A.cols();
 
     // Run through the singular values of A (in ascending order) ...
-    MatrixType S = sv_decomp.singularValues();
-    MatrixType V = sv_decomp.matrixV();
+    Matrix<T, Dynamic, Dynamic> S = sv_decomp.singularValues();
+    Matrix<T, Dynamic, Dynamic> V = sv_decomp.matrixV();
     unsigned nsingvals = S.rows();
     unsigned j = nsingvals - 1;
-    while (isclose<T>(S(j), 0.0, singval_tol) && j >= 0)
+    while (isclose<T>(S(j), 0.0, sv_tol) && j >= 0)
     {
         // ... and grab the columns of V that correspond to the zero
         // singular values
@@ -293,92 +94,63 @@ Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dyna
     return nullmat;
 }
 
-template <typename Derived1, typename Derived2>
-std::pair<Matrix<typename Derived1::Scalar, Dynamic, Dynamic>, Matrix<typename Derived1::Scalar, Dynamic, Dynamic> >
-    nullspace_diff(const MatrixBase<Derived1>& A, const MatrixBase<Derived2>& X, typename Derived1::Scalar zero_tol)
+}   // namespace utils_internal
+
+#include <boost/multiprecision/mpfr.hpp>
+#include <boost/multiprecision/eigen.hpp>
+using boost::multiprecision::number;
+using boost::multiprecision::mpfr_float_backend;
+typedef number<mpfr_float_backend<30> > mpfr_30;
+typedef number<mpfr_float_backend<60> > mpfr_60;
+typedef number<mpfr_float_backend<100> > mpfr_100;
+typedef number<mpfr_float_backend<200> > mpfr_200;
+
+template <typename T>
+Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, T sv_tol)
 {
     /*
-     * Given values of a matrix-valued analytic function A(t) and its 
-     * derivative A'(t) at a value of t0, compute:
-     *
-     * 1) a matrix N with columns forming a basis for the nullspace of A = A(t0), and
-     * 2) the derivative of the nullspace N (viewed as the value of a nullspace
-     *    function, evaluated at t0) at X = A'(t0).
+     * Return a matrix whose columns form a basis for the nullspace of A.
      */
-    using MatrixType = Matrix<typename Derived1::Scalar, Dynamic, Dynamic>;
+    // Get the maximum precision of the given scalar type
+    unsigned prec = std::numeric_limits<T>::max_digits10;
 
-    // Perform a full singular value decomposition of A
-    Eigen::BDCSVD<MatrixType> sv_decomp(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    // Try obtaining the nullspace at the given precision
+    Matrix<T, Dynamic, Dynamic> nullspace = utils_internal::nullspaceSVD<T>(A, sv_tol);
 
-    // Grab U, S, V
-    MatrixType S = sv_decomp.singularValues();
-    unsigned nsingvals = S.rows();
-    MatrixType U = sv_decomp.matrixU();
-    MatrixType V = sv_decomp.matrixV();
-
-    // Run through the singular values of A (in ascending order, i.e., 
-    // in descending order of index) ...
-    MatrixType nullmat;
-    unsigned ncols = 0;
-    unsigned nrows = A.cols();
-    std::vector<unsigned> nullidx;
-    unsigned j = nsingvals - 1;
-    while (isclose<typename Derived1::Scalar>(S(j), 0.0, zero_tol) && j >= 0)
+    // While the nullspace was not successfully computed ...
+    while (nullspace.cols() == 0)
     {
-        // ... and grab the columns of V that correspond to the zero
-        // singular values
-        ncols += 1;
-        nullmat.resize(nrows, ncols);
-        nullmat.col(ncols - 1) = V.col(j);
-        nullidx.push_back(j);
-        j--;
-    }
-
-    // Compute the differential of the singular value matrix
-    MatrixType Ut = U.transpose();
-    MatrixType Vt = V.transpose();
-    MatrixType Q = Ut * X * V;
-    MatrixType dS = Q.diagonal();
-
-    // Compute the differential of V (differential of U is not necessary)
-    MatrixType W;    // Define W = Vt * dV, which is antisymmetric
-                     // (Z = Ut * dU is not necessary)
-    W.resize(A.cols(), A.cols());
-    for (unsigned i = 0; i < nsingvals; i++)
-    {
-        for (unsigned j = 0; j < nsingvals; j++)
+        // Update the precision of the type and re-compute the nullspace
+        if (prec <= std::numeric_limits<double>::max_digits10)
         {
-            if (i > j)
-            {
-                // Solve the 2-by-2 system given by
-                //
-                // ( S(j)   S(i) ) ( T(0) = Z(i,j) ) = (  Q(i,j) =  (Ut * X * V)(i,j) )
-                // ( S(i)   S(j) ) ( T(1) = W(j,i) ) = ( -Q(j,i) = -(Ut * X * V)(j,i) ),
-                //
-                // which has a unique solution if and only if S(i)^2 != S(j)^2
-                // 
-                // Check that S(i)^2 != S(j)^2 for all i, j
-                if (abs(S(j) * S(j) - S(i) * S(i)) < zero_tol)
-                {
-                    std::cerr << "Degenerate singular values; derivative may "
-                              << "be unreliable\n";
-                }
-                // Compute only W(i,j) and W(j,i); Z is not necessary
-                W(j,i) = (-S(i) * Q(i,j) - S(j) * Q(j,i)) / (S(j) * S(j) - S(i) * S(i));
-                W(i,j) = -W(j,i);
-            }
+            prec = 30;
+            Matrix<mpfr_30, Dynamic, Dynamic> B = A.template cast<mpfr_30>();
+            nullspace = utils_internal::nullspaceSVD<mpfr_30>(B, sv_tol).template cast<T>();
+        }
+        else if (prec <= 30)
+        {
+            prec = 60;
+            Matrix<mpfr_60, Dynamic, Dynamic> B = A.template cast<mpfr_60>();
+            nullspace = utils_internal::nullspaceSVD<mpfr_60>(B, sv_tol).template cast<T>();
+        }
+        else if (prec <= 60)
+        {
+            prec = 100;
+            Matrix<mpfr_100, Dynamic, Dynamic> B = A.template cast<mpfr_100>();
+            nullspace = utils_internal::nullspaceSVD<mpfr_100>(B, sv_tol).template cast<T>();
+        }
+        else if (prec <= 100)
+        {
+            prec = 200;
+            Matrix<mpfr_200, Dynamic, Dynamic> B = A.template cast<mpfr_200>();
+            nullspace = utils_internal::nullspaceSVD<mpfr_200>(B, sv_tol).template cast<T>();
+        }
+        else
+        {
+            throw std::runtime_error("Nullspace was not successfully computed with 200-bit floats");
         }
     }
-    MatrixType dV = V * W;    // Compute dV (no need to compute dU)
-
-    // Compute nullspace derivative matrix 
-    MatrixType nulldiff(nullmat.rows(), nullmat.cols());
-    for (unsigned j = 0; j < nullidx.size(); j++)
-        nulldiff.col(j) = dV.col(nullidx[j]);
-
-    return std::make_pair(nullmat, nulldiff);
+    return nullspace;
 }
-
-}   // namespace utils
 
 #endif

@@ -377,7 +377,7 @@ class MarkovDigraph
             return laplacian;
         }
 
-        Array<T, Dynamic, 1> getSteadyStateFromSVD(T singval_tol, bool normalize = true)
+        Array<T, Dynamic, 1> getSteadyStateFromSVD(T sv_tol, bool normalize = true)
         {
             /*
              * Return a vector of steady-state probabilities for the 
@@ -387,7 +387,15 @@ class MarkovDigraph
             Matrix<T, Dynamic, Dynamic> laplacian = this->getLaplacian();
             
             // Obtain the nullspace matrix of the Laplacian matrix
-            Matrix<T, Dynamic, Dynamic> nullspace = utils::math::nullspace(laplacian, singval_tol);
+            Matrix<T, Dynamic, Dynamic> nullspace;
+            try
+            {
+                nullspace = nullspaceSVD(laplacian, sv_tol);
+            }
+            catch (const std::runtime_error& e)
+            {
+                throw;
+            }
 
             // Each column of the nullspace matrix corresponds to a basis
             // vector of the nullspace; each row corresponds to a single 
