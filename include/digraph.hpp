@@ -410,7 +410,7 @@ class MarkovDigraph
                 return steady_state;
         }
 
-        Array<T, Dynamic, 1> getSteadyStateFromRecurrence(bool normalize = true)
+        Array<T, Dynamic, 1> getSteadyStateFromRecurrence(bool normalize, T ztol)
         {
             /*
              * Return a vector of steady-state probabilities for the
@@ -425,7 +425,7 @@ class MarkovDigraph
             Matrix<T, Dynamic, 1> steady_state;
             try
             {
-                steady_state = spanningTreeWeightVector<T>(laplacian, 1e-10);
+                steady_state = spanningTreeWeightVector<T>(laplacian, ztol);
             }
             catch (const std::runtime_error& e)
             {

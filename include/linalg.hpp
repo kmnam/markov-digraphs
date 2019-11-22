@@ -1,7 +1,6 @@
 #ifndef LINALG_HPP
 #define LINALG_HPP
 
-#include <vector>
 #include <string>
 #include <sstream>
 #include <stdexcept>
@@ -9,6 +8,7 @@
 #include <tuple>
 #include <algorithm>
 #include <iterator>
+#include <random>
 #include <Eigen/Dense>
 
 /*
@@ -29,6 +29,21 @@ bool isclose(T a, T b, T tol)
      */
     T c = a - b;
     return ((c >= 0.0 && c < tol) || (c < 0.0 && -c < tol));
+}
+
+template <typename T>
+std::pair<Matrix<T, Dynamic, Dynamic>, PermutationMatrix<Dynamic, Dynamic> >
+    permuteRowsAndColumns(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, std::mt19937& rng)
+{
+    /*
+     * Permute the rows and columns of a matrix, and return the result 
+     * and the permutation matrix. 
+     */
+    unsigned n = A.rows();
+    PermutationMatrix<Dynamic, Dynamic> perm(n);
+    perm.setIdentity();
+    std::shuffle(perm.indices().data(), perm.indices().data() + perm.indices().size(), rng);
+    return std::make_pair(perm * A * perm, perm); 
 }
 
 template <typename T>
@@ -263,6 +278,7 @@ Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic
             throw std::runtime_error("Spanning tree weights were not successfully computed with 200-digit floats");
         }
     }
+
     return weights;
 }
 
