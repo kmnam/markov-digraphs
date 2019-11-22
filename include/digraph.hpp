@@ -390,7 +390,7 @@ class MarkovDigraph
             Matrix<T, Dynamic, Dynamic> nullspace;
             try
             {
-                nullspace = nullspaceSVD(laplacian, sv_tol);
+                nullspace = nullspaceSVD<T>(laplacian, sv_tol);
             }
             catch (const std::runtime_error& e)
             {
@@ -419,22 +419,18 @@ class MarkovDigraph
              * (Chebotarev & Agaev, Lin Alg Appl, 2002, Eqs. 17-18).
              */
             // Get the row Laplacian matrix
-            Matrix<T, Dynamic, Dynamic> laplacian = (-this->getLaplacian()).transpose(); 
+            Matrix<T, Dynamic, Dynamic> laplacian = (-this->getLaplacian()).transpose();
 
-            unsigned dim = this->nodes.size();
-            Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(dim, dim);
-
-            // Compute the (dim - 1)-th forest matrix
-            Matrix<T, Dynamic, Dynamic> weights = Matrix<T, Dynamic, Dynamic>::Identity(dim, dim);
-            for (unsigned k = 1; k < dim; ++k)
+            // Obtain the spanning tree weight vector from the row Laplacian matrix
+            Matrix<T, Dynamic, 1> steady_state;
+            try
             {
-                T sigma = (laplacian * weights).trace() / k;
-                weights = -laplacian * weights + sigma * identity;
+                steady_state = spanningTreeWeightVector<T>(laplacian, 1e-10);
             }
-
-            // Each row of the resulting forest matrix is proportional to 
-            // the steady-state vector
-            Matrix<T, Dynamic, 1> steady_state = weights.row(0);
+            catch (const std::runtime_error& e)
+            {
+                throw;
+            }
             if (normalize)
             {
                 T norm = steady_state.sum();

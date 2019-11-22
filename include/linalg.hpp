@@ -60,7 +60,7 @@ Matrix<T, Dynamic, Dynamic> signedStirlingNumbersOfFirstKindByFactorial(unsigned
     return S.block(1, 1, n, n);
 }
 
-namespace utils_internal {
+namespace linalg_internal {
 
 template <typename T>
 Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, T sv_tol)
@@ -94,7 +94,30 @@ Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dyna
     return nullmat;
 }
 
-}   // namespace utils_internal
+template <typename T>
+Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian)
+{
+    /*
+     * Use the recurrence of Chebotarev & Agaev (Lin Alg Appl, 2002, Eqs. 17-18)
+     * for the spanning tree weight vector of the given Laplacian matrix.
+     *
+     * This function does not check that the given matrix is indeed a
+     * valid row Laplacian matrix (zero row sums, positive diagonal,
+     * negative off-diagonal). 
+     */
+    unsigned dim = laplacian.rows();
+    Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(dim, dim);
+    Matrix<T, Dynamic, Dynamic> weights = Matrix<T, Dynamic, Dynamic>::Identity(dim, dim);
+    for (unsigned k = 1; k < dim; ++k)
+    {
+        T sigma = (laplacian * weights).trace() / k;
+        weights = -laplacian * weights + sigma * identity;
+    }
+    Matrix<T, Dynamic, 1> tree_weights = weights.row(0);
+    return tree_weights;
+}
+
+}   // namespace linalg_internal
 
 #include <boost/multiprecision/mpfr.hpp>
 #include <boost/multiprecision/eigen.hpp>
@@ -115,7 +138,7 @@ Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dyna
     unsigned prec = std::numeric_limits<T>::max_digits10;
 
     // Try obtaining the nullspace at the given precision
-    Matrix<T, Dynamic, Dynamic> nullspace = utils_internal::nullspaceSVD<T>(A, sv_tol);
+    Matrix<T, Dynamic, Dynamic> nullspace = linalg_internal::nullspaceSVD<T>(A, sv_tol);
 
     // While the nullspace was not successfully computed ...
     while (nullspace.cols() == 0)
@@ -125,25 +148,25 @@ Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dyna
         {
             prec = 30;
             Matrix<mpfr_30, Dynamic, Dynamic> B = A.template cast<mpfr_30>();
-            nullspace = utils_internal::nullspaceSVD<mpfr_30>(B, sv_tol).template cast<T>();
+            nullspace = linalg_internal::nullspaceSVD<mpfr_30>(B, sv_tol).template cast<T>();
         }
         else if (prec <= 30)
         {
             prec = 60;
             Matrix<mpfr_60, Dynamic, Dynamic> B = A.template cast<mpfr_60>();
-            nullspace = utils_internal::nullspaceSVD<mpfr_60>(B, sv_tol).template cast<T>();
+            nullspace = linalg_internal::nullspaceSVD<mpfr_60>(B, sv_tol).template cast<T>();
         }
         else if (prec <= 60)
         {
             prec = 100;
             Matrix<mpfr_100, Dynamic, Dynamic> B = A.template cast<mpfr_100>();
-            nullspace = utils_internal::nullspaceSVD<mpfr_100>(B, sv_tol).template cast<T>();
+            nullspace = linalg_internal::nullspaceSVD<mpfr_100>(B, sv_tol).template cast<T>();
         }
         else if (prec <= 100)
         {
             prec = 200;
             Matrix<mpfr_200, Dynamic, Dynamic> B = A.template cast<mpfr_200>();
-            nullspace = utils_internal::nullspaceSVD<mpfr_200>(B, sv_tol).template cast<T>();
+            nullspace = linalg_internal::nullspaceSVD<mpfr_200>(B, sv_tol).template cast<T>();
         }
         else
         {
@@ -151,6 +174,59 @@ Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dyna
         }
     }
     return nullspace;
+}
+
+template <typename T>
+Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian, T ztol)
+{
+    /*
+     * Use the recurrence of Chebotarev & Agaev (Lin Alg Appl, 2002, Eqs. 17-18)
+     * for the spanning tree weight vector of the given Laplacian matrix.
+     *
+     * This function does not check that the given matrix is indeed a
+     * valid row Laplacian matrix (zero row sums, positive diagonal,
+     * negative off-diagonal). 
+     */
+    // Get the maximum precision of the given scalar type
+    unsigned prec = std::numeric_limits<T>::max_digits10;
+
+    // Try obtaining the nullspace at the given precision
+    Matrix<T, Dynamic, 1> weights = linalg_internal::spanningTreeWeightVector<T>(laplacian);
+
+    // While the nullspace was not successfully computed ...
+    while (((-laplacian).transpose() * weights).squaredNorm() >= ztol)
+    {
+        // Update the precision of the type and re-compute the nullspace
+        if (prec <= std::numeric_limits<double>::max_digits10)
+        {
+            prec = 30;
+            Matrix<mpfr_30, Dynamic, Dynamic> B = laplacian.template cast<mpfr_30>();
+            weights = linalg_internal::spanningTreeWeightVector<mpfr_30>(B).template cast<T>();
+        }
+        else if (prec <= 30)
+        {
+            prec = 60;
+            Matrix<mpfr_60, Dynamic, Dynamic> B = laplacian.template cast<mpfr_60>();
+            weights = linalg_internal::spanningTreeWeightVector<mpfr_60>(B).template cast<T>();
+        }
+        else if (prec <= 60)
+        {
+            prec = 100;
+            Matrix<mpfr_100, Dynamic, Dynamic> B = laplacian.template cast<mpfr_100>();
+            weights = linalg_internal::spanningTreeWeightVector<mpfr_100>(B).template cast<T>();
+        }
+        else if (prec <= 100)
+        {
+            prec = 200;
+            Matrix<mpfr_200, Dynamic, Dynamic> B = laplacian.template cast<mpfr_200>();
+            weights = linalg_internal::spanningTreeWeightVector<mpfr_200>(B).template cast<T>();
+        }
+        else
+        {
+            throw std::runtime_error("Spanning tree weights were not successfully computed with 200-bit floats");
+        }
+    }
+    return weights;
 }
 
 #endif
