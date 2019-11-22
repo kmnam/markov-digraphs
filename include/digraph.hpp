@@ -12,7 +12,7 @@
 #include <random>
 #include <Eigen/Dense>
 #include <boost/container_hash/hash.hpp>
-#include "utils.hpp"
+#include "linalg.hpp"
 
 /*
  * An implementation of a digraph associated with a continuous-time 

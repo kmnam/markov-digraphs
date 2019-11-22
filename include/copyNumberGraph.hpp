@@ -10,7 +10,7 @@
 #include <boost/container_hash/hash.hpp>
 #include <boost/math/special_functions/binomial.hpp>
 #include "digraph.hpp"
-#include "utils.hpp"
+#include "linalg.hpp"
 
 /*
  * An implementation of a copy-number graph class (Nam, 2019) that inherits
@@ -216,7 +216,7 @@ class CopyNumberGraph : public MarkovDigraph<T>
             // by the production rate matrices
             // TODO Replace with Chebotarev-Agaev's recurrence
             Matrix<T, Dynamic, Dynamic> nullmat =
-                utils::math::nullspace(laplacian + production_matrix - production_diag, tol);
+                nullspaceSVD(laplacian + production_matrix - production_diag, tol);
 
             // Each column of the nullspace matrix corresponds to a basis
             // vector of the nullspace; each row corresponds to a single 
@@ -235,10 +235,8 @@ class CopyNumberGraph : public MarkovDigraph<T>
             Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(dim, dim); 
             for (unsigned j = 1; j < nmoments + 1; j++)
             {
-                binomial_moments.row(j) = utils::math::solve(
-                    production_diag - production_matrix - laplacian + j * identity,
-                    production_matrix * binomial_moments.row(j-1).transpose()
-                ).transpose();
+                binomial_moments.row(j) = (production_diag - production_matrix - laplacian + j * identity)
+                    .colPivHouseholderQr().solve(production_matrix * binomial_moments.row(j-1).transpose()).transpose();
             }
             
             // Compute non-central moments from the binomial moments, via the 
@@ -258,7 +256,7 @@ class CopyNumberGraph : public MarkovDigraph<T>
             Matrix<T, Dynamic, Dynamic> moments(nmoments+1, 1);
             moments(0) = 1.0;
             Matrix<T, Dynamic, Dynamic> S =
-                utils::math::signedStirlingNumbersOfFirstKindByFactorial<T>(nmoments);
+                signedStirlingNumbersOfFirstKindByFactorial<T>(nmoments);
             Matrix<T, Dynamic, Dynamic> binom_sums =
                 binomial_moments.block(1, 0, nmoments, dim).rowwise().sum();
             S.template triangularView<Eigen::Lower>().solveInPlace(binom_sums);
