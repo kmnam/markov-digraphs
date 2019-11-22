@@ -24,8 +24,6 @@ namespace utils {
 // ------------------------------------------------------ //
 //                    CUSTOM EXCEPTIONS                   //
 // ------------------------------------------------------ //
-namespace except {
-
 struct NullspaceDimError : public std::runtime_error
 {
     /*
@@ -39,13 +37,9 @@ struct NullspaceDimError : public std::runtime_error
     }
 };
 
-}   // namespace except
-
 // ------------------------------------------------------ //
 //                 BASIC HELPER FUNCTIONS                 //
 // ------------------------------------------------------ //
-namespace basic {
-
 std::vector<std::vector<unsigned> > combinations(unsigned n, unsigned k)
 {
     /*
@@ -178,23 +172,14 @@ std::vector<unsigned> stringToVector(const std::string& nums)
     return out;
 }
 
-}   // namespace basic
-
 // ------------------------------------------------------ //
 //            MATH AND LINEAR ALGEBRA FUNCTIONS           //
 // ------------------------------------------------------ //
-namespace math {
-
-using Eigen::Array;
-using Eigen::Matrix;
-using Eigen::MatrixBase;
-using Eigen::Dynamic;
+using namespace Eigen;
 
 // ------------------------------------------------------ //
 //                INTERNAL HELPER FUNCTIONS               //
 // ------------------------------------------------------ //
-namespace internal {
-
 template <typename T>
 bool isclose(T a, T b, T tol)
 {
@@ -204,8 +189,6 @@ bool isclose(T a, T b, T tol)
     T c = a - b;
     return ((c >= 0.0 && c < tol) || (c < 0.0 && -c < tol));
 }
-
-}   // namespace internal
 
 // ------------------------------------------------------ //
 //                   EXTERNAL FUNCTIONS                   //
@@ -278,17 +261,14 @@ Matrix<typename Derived1::Scalar, Dynamic, Dynamic> solve(const MatrixBase<Deriv
     return A.colPivHouseholderQr().solve(b);
 }
 
-template <typename Derived>
-Matrix<typename Derived::Scalar, Dynamic, Dynamic> nullspace(const MatrixBase<Derived>& A,
-                                                             typename Derived::Scalar zero_tol)
+template <typename T>
+Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, T singval_tol)
 {
     /*
      * Return a matrix whose columns form a basis for the nullspace of A.
      */
-    using MatrixType = Matrix<typename Derived::Scalar, Dynamic, Dynamic>;
-
     // Perform a full singular value decomposition of A
-    Eigen::BDCSVD<MatrixType> sv_decomp(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Eigen::BDCSVD<Matrix<T, Dynamic, Dynamic> > sv_decomp(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
 
     // Initialize nullspace basis matrix
     MatrixType nullmat;
@@ -300,7 +280,7 @@ Matrix<typename Derived::Scalar, Dynamic, Dynamic> nullspace(const MatrixBase<De
     MatrixType V = sv_decomp.matrixV();
     unsigned nsingvals = S.rows();
     unsigned j = nsingvals - 1;
-    while (internal::isclose<typename Derived::Scalar>(S(j), 0.0, zero_tol) && j >= 0)
+    while (isclose<T>(S(j), 0.0, singval_tol) && j >= 0)
     {
         // ... and grab the columns of V that correspond to the zero
         // singular values
@@ -323,7 +303,7 @@ std::pair<Matrix<typename Derived1::Scalar, Dynamic, Dynamic>, Matrix<typename D
      *
      * 1) a matrix N with columns forming a basis for the nullspace of A = A(t0), and
      * 2) the derivative of the nullspace N (viewed as the value of a nullspace
-     *    function, evaluated at t0) at X = A'(t0). 
+     *    function, evaluated at t0) at X = A'(t0).
      */
     using MatrixType = Matrix<typename Derived1::Scalar, Dynamic, Dynamic>;
 
@@ -343,7 +323,7 @@ std::pair<Matrix<typename Derived1::Scalar, Dynamic, Dynamic>, Matrix<typename D
     unsigned nrows = A.cols();
     std::vector<unsigned> nullidx;
     unsigned j = nsingvals - 1;
-    while (internal::isclose<typename Derived1::Scalar>(S(j), 0.0, zero_tol) && j >= 0)
+    while (isclose<typename Derived1::Scalar>(S(j), 0.0, zero_tol) && j >= 0)
     {
         // ... and grab the columns of V that correspond to the zero
         // singular values
@@ -398,8 +378,6 @@ std::pair<Matrix<typename Derived1::Scalar, Dynamic, Dynamic>, Matrix<typename D
 
     return std::make_pair(nullmat, nulldiff);
 }
-
-}   // namespace linalg
 
 }   // namespace utils
 
