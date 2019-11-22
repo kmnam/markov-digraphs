@@ -10,6 +10,10 @@
 #include <iterator>
 #include <random>
 #include <Eigen/Dense>
+#include <boost/multiprecision/mpfr.hpp>
+#include <boost/multiprecision/eigen.hpp>
+#include <dualMP.hpp>
+#include <duals-eigen/eigen.hpp>
 
 /*
  * Various linear algebra functions.
@@ -20,6 +24,14 @@
  *     11/22/2019
  */
 using namespace Eigen;
+using boost::multiprecision::number;
+using boost::multiprecision::mpfr_float_backend;
+typedef number<mpfr_float_backend<30> > mpfr_30;
+typedef number<mpfr_float_backend<60> > mpfr_60;
+typedef number<mpfr_float_backend<100> > mpfr_100;
+typedef number<mpfr_float_backend<200> > mpfr_200;
+using Duals::DualNumber;
+using Duals::DualMP;
 
 template <typename T>
 bool isclose(T a, T b, T tol)
@@ -99,6 +111,31 @@ Matrix<BoostMPFRType, Dynamic, Dynamic> convert(const Ref<const Matrix<StdType, 
     return B;
 }
 
+template <unsigned N>
+Matrix<DualMP<N>, Dynamic, Dynamic> convertDual(const Ref<const MatrixXDual>& A)
+{
+    /*
+     * Convert a matrix with DualNumber scalars into a matrix with DualMP types
+     * with the given precision.
+     */
+    Matrix<DualMP<N>, Dynamic, Dynamic> B(A.rows(), A.cols());
+    for (unsigned i = 0; i < A.rows(); ++i)
+    {
+        for (unsigned j = 0; j < A.cols(); ++j)
+        {
+            std::stringstream ssx, ssd;
+            ssx << std::setprecision(std::numeric_limits<double>::max_digits10);
+            ssd << std::setprecision(std::numeric_limits<double>::max_digits10);
+            ssx << A(i,j).x();
+            ssd << A(i,j).d();
+            number<mpfr_float_backend<N> > x(ssx.str());
+            number<mpfr_float_backend<N> > d(ssd.str());
+            B(i,j) = DualMP<N>(x, d);
+        }
+    }
+    return B;
+} 
+
 template <typename T>
 Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, T sv_tol)
 {
@@ -160,15 +197,6 @@ std::pair<Matrix<T, Dynamic, 1>, T> spanningTreeWeightVector(const Ref<const Mat
 }
 
 }   // namespace linalg_internal
-
-#include <boost/multiprecision/mpfr.hpp>
-#include <boost/multiprecision/eigen.hpp>
-using boost::multiprecision::number;
-using boost::multiprecision::mpfr_float_backend;
-typedef number<mpfr_float_backend<30> > mpfr_30;
-typedef number<mpfr_float_backend<60> > mpfr_60;
-typedef number<mpfr_float_backend<100> > mpfr_100;
-typedef number<mpfr_float_backend<200> > mpfr_200;
 
 template <typename T>
 Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, T sv_tol)
