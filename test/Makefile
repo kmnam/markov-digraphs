@@ -11,15 +11,15 @@ CXX = g++-8
 
 CXXFLAGS = --std=c++11 -frounding-math
 
-INCLUDES = -I/usr/local/Cellar/boost/1.71.0/include -I/usr/local/Cellar/eigen/3.3.7/include/eigen3 -I/anaconda3/include 
+INCLUDES = -I/usr/local/Cellar/boost/1.71.0/include -I/usr/local/Cellar/eigen/3.3.7/include/eigen3 -I/Users/kmnam/Dropbox/gene-regulation/projects/dual-numbers/include
 
 LDFLAGS = -L/usr/local/Cellar/boost/1.71.0/lib 
 
-LIBS = -lCGAL -lgmp -lboost_unit_test_framework
+LIBS = -lmpfr -lboost_unit_test_framework
 
 SRC_DIR = src
 
-SRC_FILES = src/testDigraph.cpp
+SRC_FILES = src/testLinAlg.cpp src/testDigraph.cpp
 
 BIN_DIR = bin
 
