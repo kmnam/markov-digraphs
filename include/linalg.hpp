@@ -368,9 +368,9 @@ Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic
     return weights;
 }
 
+template <expression_template_option ET = et_off>
 VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian,
-                                         double ztol, unsigned min_prec = 30,
-                                         expression_template_option ET = et_off)
+                                         double ztol, unsigned min_prec = 30)
 {
     /*
      * Use the recurrence of Chebotarev & Agaev (Lin Alg Appl, 2002, Eqs. 17-18)
@@ -398,9 +398,12 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                 = linalg_internal::spanningTreeWeightVector<DualMP<30, ET> >(B);
             for (unsigned i = 0; i < laplacian.rows(); ++i)
             {
-                weights(i) = DualNumber(result.first(i).x().convert_to<double>(), result.first(i).d().convert_to<double>());
+                weights(i) = DualNumber(
+                    result.first(i).x().template convert_to<double>(),
+                    result.first(i).d().template convert_to<double>()
+                );
             }
-            min_sqnorm = result.second.x().convert_to<double>();
+            min_sqnorm = result.second.x().template convert_to<double>();
         }
         else if (min_prec <= 60)
         {
@@ -410,9 +413,12 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                 = linalg_internal::spanningTreeWeightVector<DualMP<60, ET> >(B);
             for (unsigned i = 0; i < laplacian.rows(); ++i)
             {
-                weights(i) = DualNumber(result.first(i).x().convert_to<double>(), result.first(i).d().convert_to<double>());
+                weights(i) = DualNumber(
+                    result.first(i).x().template convert_to<double>(),
+                    result.first(i).d().template convert_to<double>()
+                );
             }
-            min_sqnorm = result.second.x().convert_to<double>();
+            min_sqnorm = result.second.x().template convert_to<double>();
         }
         else if (min_prec <= 100)
         {
@@ -422,9 +428,12 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                 = linalg_internal::spanningTreeWeightVector<DualMP<100, ET> >(B);
             for (unsigned i = 0; i < laplacian.rows(); ++i)
             {
-                weights(i) = DualNumber(result.first(i).x().convert_to<double>(), result.first(i).d().convert_to<double>());
+                weights(i) = DualNumber(
+                    result.first(i).x().template convert_to<double>(),
+                    result.first(i).d().template convert_to<double>()
+                );
             }
-            min_sqnorm = result.second.x().convert_to<double>();
+            min_sqnorm = result.second.x().template convert_to<double>();
         }
         else if (min_prec <= 200)
         {
@@ -434,9 +443,12 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                 = linalg_internal::spanningTreeWeightVector<DualMP<200, ET> >(B);
             for (unsigned i = 0; i < laplacian.rows(); ++i)
             {
-                weights(i) = DualNumber(result.first(i).x().convert_to<double>(), result.first(i).d().convert_to<double>());
+                weights(i) = DualNumber(
+                    result.first(i).x().template convert_to<double>(),
+                    result.first(i).d().template convert_to<double>()
+                );
             }
-            min_sqnorm = result.second.x().convert_to<double>();
+            min_sqnorm = result.second.x().template convert_to<double>();
         }
         else
         {
@@ -462,9 +474,12 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                 = linalg_internal::spanningTreeWeightVector<DualMP<30, ET> >(B);
             for (unsigned i = 0; i < laplacian.rows(); ++i)
             {
-                weights(i) = DualNumber(result.first(i).x().convert_to<double>(), result.first(i).d().convert_to<double>());
+                weights(i) = DualNumber(
+                    result.first(i).x().template convert_to<double>(),
+                    result.first(i).d().template convert_to<double>()
+                );
             }
-            min_sqnorm = result.second.x().convert_to<double>();
+            min_sqnorm = result.second.x().template convert_to<double>();
         }
         else if (prec <= 30)
         {
@@ -474,9 +489,12 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                 = linalg_internal::spanningTreeWeightVector<DualMP<60, ET> >(B);
             for (unsigned i = 0; i < laplacian.rows(); ++i)
             {
-                weights(i) = DualNumber(result.first(i).x().convert_to<double>(), result.first(i).d().convert_to<double>());
+                weights(i) = DualNumber(
+                    result.first(i).x().template convert_to<double>(),
+                    result.first(i).d().template convert_to<double>()
+                );
             }
-            min_sqnorm = result.second.x().convert_to<double>();
+            min_sqnorm = result.second.x().template convert_to<double>();
         }
         else if (prec <= 60)
         {
@@ -486,9 +504,12 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                 = linalg_internal::spanningTreeWeightVector<DualMP<100, ET> >(B);
             for (unsigned i = 0; i < laplacian.rows(); ++i)
             {
-                weights(i) = DualNumber(result.first(i).x().convert_to<double>(), result.first(i).d().convert_to<double>());
+                weights(i) = DualNumber(
+                    result.first(i).x().template convert_to<double>(),
+                    result.first(i).d().template convert_to<double>()
+                );
             }
-            min_sqnorm = result.second.x().convert_to<double>();
+            min_sqnorm = result.second.x().template convert_to<double>();
         }
         else if (prec <= 100)
         {
@@ -498,9 +519,12 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                 = linalg_internal::spanningTreeWeightVector<DualMP<200, ET> >(B);
             for (unsigned i = 0; i < laplacian.rows(); ++i)
             {
-                weights(i) = DualNumber(result.first(i).x().convert_to<double>(), result.first(i).d().convert_to<double>());
+                weights(i) = DualNumber(
+                    result.first(i).x().template convert_to<double>(),
+                    result.first(i).d().template convert_to<double>()
+                );
             }
-            min_sqnorm = result.second.x().convert_to<double>();
+            min_sqnorm = result.second.x().template convert_to<double>();
         }
         else
         {

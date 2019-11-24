@@ -11,10 +11,10 @@
 #include <boost/test/included/unit_test.hpp>
 #include <boost/test/data/test_case.hpp>
 #include <boost/test/data/monomorphic.hpp>
-#include <duals.hpp>
-#include <dualMP.hpp>
-#include <duals-eigen/eigen.hpp>
-#include "../../include/digraph.hpp"
+#include <duals/duals.hpp>
+#include <duals/dualMP.hpp>
+#include <duals/eigen.hpp>
+#include "../../include/linalg.hpp"
 
 /*
  * Test and timing module for the functions in include/linalg.hpp.
@@ -22,7 +22,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     11/23/2019
+ *     11/24/2019
  */
 std::mt19937 rng(1234567890);
 
@@ -30,8 +30,10 @@ using namespace Eigen;
 using namespace boost::unit_test;
 using boost::multiprecision::number;
 using boost::multiprecision::mpfr_float_backend;
+using boost::multiprecision::et_on;
+using boost::multiprecision::et_off;
 typedef number<mpfr_float_backend<30> > mpfr_30;
-typedef number<mpfr_float_backend<30>, boost::multiprecision::et_off> mpfr_30_noet;
+typedef number<mpfr_float_backend<30>, et_off> mpfr_30_noet;
 using Duals::DualNumber;
 using Duals::DualMP;
 
@@ -107,7 +109,7 @@ BOOST_AUTO_TEST_CASE(testConvertDual)
             A(i,j) = v;
         }
     }
-    Matrix<DualMP<30>, Dynamic, Dynamic> B = linalg_internal::convertDual<30>(A);
+    Matrix<DualMP<30, et_off>, Dynamic, Dynamic> B = linalg_internal::convertDual<30, et_off>(A);
     for (unsigned i = 0; i < 3; ++i)
     {
         for (unsigned j = 0; j < 3; ++j)
@@ -172,13 +174,23 @@ BOOST_DATA_TEST_CASE(timeMultiply, data::xrange(2, 10))
     std::cout << "DualNumber " << dim << "-by-" << dim << " matrix multiplication: "
               << elapsed.count() << " seconds" << std::endl;
 
-    // Do the same with DualMP<30> types
-    Matrix<DualMP<30>, Dynamic, Dynamic> J = linalg_internal::convertDual<30>(G);
-    Matrix<DualMP<30>, Dynamic, Dynamic> K = linalg_internal::convertDual<30>(H);
+    // Do the same with DualMP<30, et_on> types
+    Matrix<DualMP<30, et_on>, Dynamic, Dynamic> J = linalg_internal::convertDual<30, et_on>(G);
+    Matrix<DualMP<30, et_on>, Dynamic, Dynamic> K = linalg_internal::convertDual<30, et_on>(H);
     start = std::chrono::high_resolution_clock::now();
-    Matrix<DualMP<30>, Dynamic, Dynamic> L = J * K;
+    Matrix<DualMP<30, et_on>, Dynamic, Dynamic> L = J * K;
     end = std::chrono::high_resolution_clock::now();
     elapsed = end - start;
-    std::cout << "DualMP<30> " << dim << "-by-" << dim << " matrix multiplication: "
+    std::cout << "DualMP<30, et_on> " << dim << "-by-" << dim << " matrix multiplication: "
               << elapsed.count() << " seconds" << std::endl;
+
+    // Do the same with DualMP<30, et_off> types
+    Matrix<DualMP<30, et_off>, Dynamic, Dynamic> J2 = linalg_internal::convertDual<30, et_off>(G);
+    Matrix<DualMP<30, et_off>, Dynamic, Dynamic> K2 = linalg_internal::convertDual<30, et_off>(H);
+    start = std::chrono::high_resolution_clock::now();
+    Matrix<DualMP<30, et_off>, Dynamic, Dynamic> L2 = J2 * K2;
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cout << "DualMP<30, et_off> " << dim << "-by-" << dim << " matrix multiplication: "
+              << elapsed.count() << " seconds" << std::endl << std::endl;
 }
