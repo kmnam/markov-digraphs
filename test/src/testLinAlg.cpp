@@ -4,29 +4,34 @@
 #include <string>
 #include <utility>
 #include <random>
+#include <chrono>
 #include <Eigen/Dense>
 #include <boost/multiprecision/mpfr.hpp>
 #include <boost/multiprecision/eigen.hpp>
 #include <boost/test/included/unit_test.hpp>
+#include <boost/test/data/test_case.hpp>
+#include <boost/test/data/monomorphic.hpp>
 #include <duals.hpp>
 #include <dualMP.hpp>
 #include <duals-eigen/eigen.hpp>
 #include "../../include/digraph.hpp"
 
 /*
- * Test module for the functions in include/linalg.hpp.
+ * Test and timing module for the functions in include/linalg.hpp.
  *
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     11/22/2019
+ *     11/23/2019
  */
 std::mt19937 rng(1234567890);
 
 using namespace Eigen;
+using namespace boost::unit_test;
 using boost::multiprecision::number;
 using boost::multiprecision::mpfr_float_backend;
 typedef number<mpfr_float_backend<30> > mpfr_30;
+typedef number<mpfr_float_backend<30>, boost::multiprecision::et_off> mpfr_30_noet;
 using Duals::DualNumber;
 using Duals::DualMP;
 
@@ -116,4 +121,64 @@ BOOST_AUTO_TEST_CASE(testConvertDual)
             BOOST_TEST(abs(Aijd - B(i,j).d()) < 1e-17);
         }
     }
+}
+
+BOOST_DATA_TEST_CASE(timeMultiply, data::xrange(2, 10))
+{
+    /*
+     * Time matrix multiplication with double, boost::multiprecision, 
+     * DualNumber, and DualMP types.  
+     */
+    using std::pow;
+    unsigned dim = pow(2, sample);
+
+    // Start with double matrices
+    MatrixXd A = MatrixXd::Random(dim, dim);
+    MatrixXd B = MatrixXd::Random(dim, dim);
+    auto start = std::chrono::high_resolution_clock::now();
+    MatrixXd C = A * B;
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::cout << "Double " << dim << "-by-" << dim << " matrix multiplication: "
+              << elapsed.count() << " seconds" << std::endl;
+
+    // Do the same with boost::multiprecision::number types
+    Matrix<mpfr_30, Dynamic, Dynamic> D = linalg_internal::convert<double, mpfr_30>(A);
+    Matrix<mpfr_30, Dynamic, Dynamic> E = linalg_internal::convert<double, mpfr_30>(B);
+    start = std::chrono::high_resolution_clock::now();
+    Matrix<mpfr_30, Dynamic, Dynamic> F = D * E;
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cout << "mpfr_30 " << dim << "-by-" << dim << " matrix multiplication: "
+              << elapsed.count() << " seconds" << std::endl;
+
+    // Do the same with boost::multiprecision::number types without expression templates
+    Matrix<mpfr_30_noet, Dynamic, Dynamic> D2 = linalg_internal::convert<double, mpfr_30_noet>(A);
+    Matrix<mpfr_30_noet, Dynamic, Dynamic> E2 = linalg_internal::convert<double, mpfr_30_noet>(B);
+    start = std::chrono::high_resolution_clock::now();
+    Matrix<mpfr_30_noet, Dynamic, Dynamic> F2 = D2 * E2;
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cout << "mpfr_30_noet " << dim << "-by-" << dim << " matrix multiplication: "
+              << elapsed.count() << " seconds" << std::endl;
+
+    // Do the same with DualNumber types
+    MatrixXDual G = MatrixXDual::Random(dim, dim);
+    MatrixXDual H = MatrixXDual::Random(dim, dim);
+    start = std::chrono::high_resolution_clock::now();
+    MatrixXDual I = G * H;
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cout << "DualNumber " << dim << "-by-" << dim << " matrix multiplication: "
+              << elapsed.count() << " seconds" << std::endl;
+
+    // Do the same with DualMP<30> types
+    Matrix<DualMP<30>, Dynamic, Dynamic> J = linalg_internal::convertDual<30>(G);
+    Matrix<DualMP<30>, Dynamic, Dynamic> K = linalg_internal::convertDual<30>(H);
+    start = std::chrono::high_resolution_clock::now();
+    Matrix<DualMP<30>, Dynamic, Dynamic> L = J * K;
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cout << "DualMP<30> " << dim << "-by-" << dim << " matrix multiplication: "
+              << elapsed.count() << " seconds" << std::endl;
 }
