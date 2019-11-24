@@ -21,7 +21,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     11/21/2019
+ *     11/24/2019
  */
 
 // ----------------------------------------------------- //
@@ -375,6 +375,22 @@ class MarkovDigraph
                 laplacian(i,i) = -(laplacian.col(i).sum());
 
             return laplacian;
+        }
+
+        void setRatesFromLaplacian(Matrix<T, Dynamic, Dynamic> laplacian)
+        {
+            /*
+             * Given a Laplacian matrix of the appropriate size, set the 
+             * edge labels in the graph accordingly. 
+             */
+            unsigned dim = this->nodes.size();
+            for (unsigned j = 0; j < dim; ++j)
+            {
+                for (unsigned k = 0; k < dim; ++k)
+                {
+                    this->setEdgeLabel(this->nodes[j]->id, this->nodes[k]->id, laplacian(k,j)); 
+                }
+            }
         }
 
         Array<T, Dynamic, 1> getSteadyStateFromSVD(T sv_tol, bool normalize = true)
