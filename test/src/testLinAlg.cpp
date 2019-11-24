@@ -125,7 +125,7 @@ BOOST_AUTO_TEST_CASE(testConvertDual)
     }
 }
 
-BOOST_DATA_TEST_CASE(timeMultiply, data::xrange(2, 10))
+BOOST_DATA_TEST_CASE(timeMultiply, data::xrange(2, 7))
 {
     /*
      * Time matrix multiplication with double, boost::multiprecision, 
@@ -194,3 +194,4 @@ BOOST_DATA_TEST_CASE(timeMultiply, data::xrange(2, 10))
     std::cout << "DualMP<30, et_off> " << dim << "-by-" << dim << " matrix multiplication: "
               << elapsed.count() << " seconds" << std::endl << std::endl;
 }
+

@@ -9,7 +9,7 @@
 
 CXX = g++-8
 
-CXXFLAGS = --std=c++11 -frounding-math
+CXXFLAGS = --std=c++11 -frounding-math -march=native -fopenmp
 
 INCLUDES = -I/usr/local/Cellar/boost/1.71.0/include -I/usr/local/Cellar/eigen/3.3.7/include/eigen3 -I/Users/kmnam/Dropbox/gene-regulation/projects/dual-numbers/include
 
