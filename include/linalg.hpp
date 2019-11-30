@@ -289,7 +289,7 @@ Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dyna
 
 template <typename T>
 Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian,
-                                               T ztol, unsigned min_prec = 30)
+                                               T ztol, unsigned min_prec = 15)
 {
     /*
      * Use the recurrence of Chebotarev & Agaev (Lin Alg Appl, 2002, Eqs. 17-18)
@@ -397,7 +397,7 @@ Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic
 
 template <expression_template_option ET = et_off>
 VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian,
-                                         double ztol, unsigned min_prec = 30)
+                                         double ztol, unsigned min_prec = 15)
 {
     /*
      * Use the recurrence of Chebotarev & Agaev (Lin Alg Appl, 2002, Eqs. 17-18)
