@@ -15,6 +15,7 @@
 #include <duals/duals.hpp>
 #include <duals/dualMP.hpp>
 #include <duals/dualMatrix.hpp>
+#include <duals/dualMatrixMP.hpp>
 #include <duals/eigen.hpp>
 
 /*
@@ -35,13 +36,10 @@ typedef number<mpfr_float_backend<30>, et_on> mpfr_30;
 typedef number<mpfr_float_backend<60>, et_on> mpfr_60;
 typedef number<mpfr_float_backend<100>, et_on> mpfr_100;
 typedef number<mpfr_float_backend<200>, et_on> mpfr_200;
-typedef number<mpfr_float_backend<30>, et_off> mpfr_30_noet;
-typedef number<mpfr_float_backend<60>, et_off> mpfr_60_noet;
-typedef number<mpfr_float_backend<100>, et_off> mpfr_100_noet;
-typedef number<mpfr_float_backend<200>, et_off> mpfr_200_noet;
 using Duals::DualNumber;
 using Duals::DualMP;
 using Duals::DualMatrix;
+using Duals::DualMatrixMP;
 
 template <typename T>
 bool isclose(T a, T b, T tol)
@@ -234,8 +232,38 @@ std::pair<DualMatrix, double> spanningTreeWeightVector(const DualMatrix& laplaci
     {
         if (sqnorm(i) < sqnorm(min_i)) min_i = i;
     }
-    return std::make_pair(weights.row(min_i), sqnorm(min_i));
+    return std::make_pair(weights.row(min_i).transpose(), sqnorm(min_i));
 }
+
+template <unsigned N, expression_template_option ET>
+std::pair<DualMatrixMP<N, ET>, number<mpfr_float_backend<N>, ET> > spanningTreeWeightVector(const DualMatrixMP<N, ET>& laplacian)
+{
+    /*
+     * Use the recurrence of Chebotarev & Agaev (Lin Alg Appl, 2002, Eqs. 17-18)
+     * for the spanning tree weight vector of the given Laplacian matrix. 
+     *
+     * This function does not check that the given matrix is indeed a
+     * valid row Laplacian matrix (zero row sums, positive diagonal, 
+     * negative off-diagonal).
+     */
+    unsigned dim = laplacian.rows();
+    DualMatrixMP<N, ET> identity = Duals::Identity<N, ET>(dim);
+    DualMatrixMP<N, ET> weights = Duals::IdentityZeroDerivative<N, ET>(dim);
+    for (unsigned k = 1; k < dim; ++k)
+        weights = -laplacian * weights + (identity.multiplyByTrace(laplacian * weights)) / k;
+
+    // Return the row of the weight matrix whose product with the (negative transpose of)
+    // Laplacian matrix has the smallest norm
+    Matrix<number<mpfr_float_backend<N>, ET>, Dynamic, 1> sqnorm
+        = (weights.X() * (-laplacian.X())).rowwise().squaredNorm();
+    unsigned min_i = 0;
+    for (unsigned i = 1; i < sqnorm.size(); ++i)
+    {
+        if (sqnorm(i) < sqnorm(min_i)) min_i = i;
+    }
+    return std::make_pair(weights.row(min_i).transpose(), sqnorm(min_i));
+}
+
 
 }   // namespace linalg_internal
 
@@ -552,6 +580,191 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                 );
             }
             min_sqnorm = result.second.x().template convert_to<double>();
+        }
+        else
+        {
+            throw std::runtime_error("Spanning tree weights were not successfully computed with 200-digit floats");
+        }
+    }
+    return weights;
+}
+
+template <expression_template_option ET = et_off>
+VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
+                                         double ztol, unsigned min_prec = 15)
+{
+    /*
+     * Use the recurrence of Chebotarev & Agaev (Lin Alg Appl, 2002, Eqs. 17-18)
+     * for the spanning tree weight vector of the given Laplacian matrix,
+     * which is specified in dual numbers. 
+     *
+     * This function does not check that the given matrix is indeed a
+     * valid row Laplacian matrix (zero row sums, positive diagonal,
+     * negative off-diagonal). 
+     */
+    // Get the maximum precision of the given scalar type
+    unsigned prec = std::numeric_limits<double>::max_digits10;
+
+    // Check that the precision of the given scalar type exceeds the minimum 
+    // required precision for the computation
+    VectorXDual weights(laplacian.rows());
+    double min_sqnorm;
+    if (prec < min_prec)
+    {
+        if (min_prec <= 30)
+        {
+            prec = 30;
+            Matrix<DualMP<30, ET>, Dynamic, Dynamic> B = linalg_internal::convertDual<30, ET>(laplacian.X());
+            Matrix<DualMP<30, ET>, Dynamic, Dynamic> D = linalg_internal::convertDual<30, ET>(laplacian.D());
+            DualMatrixMP<30, ET> laplacian_dual(B, D);
+            std::pair<DualMatrixMP<30, ET>, number<mpfr_float_backend<30>, ET> > result
+                = linalg_internal::spanningTreeWeightVector(laplacian_dual);
+            for (unsigned i = 0; i < laplacian.rows(); ++i)
+            {
+                weights(i) = DualNumber(
+                    result.first.X()(i).template convert_to<double>(),
+                    result.first.D()(i).template convert_to<double>()
+                );
+            }
+            min_sqnorm = result.second.template convert_to<double>();
+        }
+        else if (min_prec <= 60)
+        {
+            prec = 60;
+            Matrix<DualMP<60, ET>, Dynamic, Dynamic> B = linalg_internal::convertDual<60, ET>(laplacian.X());
+            Matrix<DualMP<60, ET>, Dynamic, Dynamic> D = linalg_internal::convertDual<60, ET>(laplacian.D());
+            DualMatrixMP<60, ET> laplacian_dual(B, D);
+            std::pair<DualMatrixMP<60, ET>, number<mpfr_float_backend<60>, ET> > result
+                = linalg_internal::spanningTreeWeightVector(laplacian_dual);
+            for (unsigned i = 0; i < laplacian.rows(); ++i)
+            {
+                weights(i) = DualNumber(
+                    result.first.X()(i).template convert_to<double>(),
+                    result.first.D()(i).template convert_to<double>()
+                );
+            }
+            min_sqnorm = result.second.template convert_to<double>();
+        }
+        else if (min_prec <= 100)
+        {
+            prec = 100;
+            Matrix<DualMP<100, ET>, Dynamic, Dynamic> B = linalg_internal::convertDual<100, ET>(laplacian.X());
+            Matrix<DualMP<100, ET>, Dynamic, Dynamic> D = linalg_internal::convertDual<100, ET>(laplacian.D());
+            DualMatrixMP<100, ET> laplacian_dual(B, D);
+            std::pair<DualMatrixMP<100, ET>, number<mpfr_float_backend<100>, ET> > result
+                = linalg_internal::spanningTreeWeightVector(laplacian_dual);
+            for (unsigned i = 0; i < laplacian.rows(); ++i)
+            {
+                weights(i) = DualNumber(
+                    result.first.X()(i).template convert_to<double>(),
+                    result.first.D()(i).template convert_to<double>()
+                );
+            }
+            min_sqnorm = result.second.template convert_to<double>();
+        }
+        else if (min_prec <= 200)
+        {
+            prec = 200;
+            Matrix<DualMP<200, ET>, Dynamic, Dynamic> B = linalg_internal::convertDual<200, ET>(laplacian.X());
+            Matrix<DualMP<200, ET>, Dynamic, Dynamic> D = linalg_internal::convertDual<200, ET>(laplacian.D());
+            DualMatrixMP<200, ET> laplacian_dual(B, D);
+            std::pair<DualMatrixMP<200, ET>, number<mpfr_float_backend<200>, ET> > result
+                = linalg_internal::spanningTreeWeightVector(laplacian_dual);
+            for (unsigned i = 0; i < laplacian.rows(); ++i)
+            {
+                weights(i) = DualNumber(
+                    result.first.X()(i).template convert_to<double>(),
+                    result.first.D()(i).template convert_to<double>()
+                );
+            }
+            min_sqnorm = result.second.template convert_to<double>();
+        }
+        else
+        {
+            throw std::invalid_argument("Minimum precision exceeds 200 digits");
+        }
+    }
+    else
+    {
+        std::pair<DualMatrix, double> result = linalg_internal::spanningTreeWeightVector(laplacian);
+        for (unsigned i = 0; i < laplacian.rows(); ++i)
+        {
+            weights(i) = DualNumber(result.first.X()(i), result.first.D()(i));
+        }
+        min_sqnorm = result.second;
+    }
+
+    // While the nullspace was not successfully computed ...
+    while (min_sqnorm >= ztol)
+    {
+        // Update the precision of the type and re-compute the nullspace
+        if (prec <= std::numeric_limits<double>::max_digits10)
+        {
+            prec = 30;
+            Matrix<DualMP<30, ET>, Dynamic, Dynamic> B = linalg_internal::convertDual<30, ET>(laplacian.X());
+            Matrix<DualMP<30, ET>, Dynamic, Dynamic> D = linalg_internal::convertDual<30, ET>(laplacian.D());
+            DualMatrixMP<30, ET> laplacian_dual(B, D);
+            std::pair<DualMatrixMP<30, ET>, number<mpfr_float_backend<30>, ET> > result
+                = linalg_internal::spanningTreeWeightVector(laplacian_dual);
+            for (unsigned i = 0; i < laplacian.rows(); ++i)
+            {
+                weights(i) = DualNumber(
+                    result.first.X()(i).template convert_to<double>(),
+                    result.first.D()(i).template convert_to<double>()
+                );
+            }
+            min_sqnorm = result.second.template convert_to<double>();
+        }
+        else if (prec <= 30)
+        {
+            prec = 60;
+            Matrix<DualMP<60, ET>, Dynamic, Dynamic> B = linalg_internal::convertDual<60, ET>(laplacian.X());
+            Matrix<DualMP<60, ET>, Dynamic, Dynamic> D = linalg_internal::convertDual<60, ET>(laplacian.D());
+            DualMatrixMP<60, ET> laplacian_dual(B, D);
+            std::pair<DualMatrixMP<60, ET>, number<mpfr_float_backend<60>, ET> > result
+                = linalg_internal::spanningTreeWeightVector(laplacian_dual);
+            for (unsigned i = 0; i < laplacian.rows(); ++i)
+            {
+                weights(i) = DualNumber(
+                    result.first.X()(i).template convert_to<double>(),
+                    result.first.D()(i).template convert_to<double>()
+                );
+            }
+            min_sqnorm = result.second.template convert_to<double>();
+        }
+        else if (prec <= 60)
+        {
+            prec = 100;
+            Matrix<DualMP<100, ET>, Dynamic, Dynamic> B = linalg_internal::convertDual<100, ET>(laplacian.X());
+            Matrix<DualMP<100, ET>, Dynamic, Dynamic> D = linalg_internal::convertDual<100, ET>(laplacian.D());
+            DualMatrixMP<100, ET> laplacian_dual(B, D);
+            std::pair<DualMatrixMP<100, ET>, number<mpfr_float_backend<100>, ET> > result
+                = linalg_internal::spanningTreeWeightVector(laplacian_dual);
+            for (unsigned i = 0; i < laplacian.rows(); ++i)
+            {
+                weights(i) = DualNumber(
+                    result.first.X()(i).template convert_to<double>(),
+                    result.first.D()(i).template convert_to<double>()
+                );
+            }
+            min_sqnorm = result.second.template convert_to<double>();
+        }
+        else if (prec <= 100)
+        {
+            prec = 200;
+            Matrix<DualMP<200, ET>, Dynamic, Dynamic> B = linalg_internal::convertDual<200, ET>(laplacian.X());
+            Matrix<DualMP<200, ET>, Dynamic, Dynamic> D = linalg_internal::convertDual<200, ET>(laplacian.D());
+            DualMatrixMP<200, ET> laplacian_dual(B, D);
+            std::pair<DualMatrixMP<200, ET>, number<mpfr_float_backend<200>, ET> > result
+                = linalg_internal::spanningTreeWeightVector(laplacian_dual);
+            for (unsigned i = 0; i < laplacian.rows(); ++i)
+            {
+                weights(i) = DualNumber(
+                    result.first.X()(i).template convert_to<double>(),
+                    result.first.D()(i).template convert_to<double>()
+                );
+            }
+            min_sqnorm = result.second.template convert_to<double>();
         }
         else
         {
