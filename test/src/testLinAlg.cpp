@@ -22,7 +22,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     11/24/2019
+ *     11/29/2019
  */
 std::mt19937 rng(1234567890);
 
@@ -36,6 +36,7 @@ typedef number<mpfr_float_backend<30> > mpfr_30;
 typedef number<mpfr_float_backend<30>, et_off> mpfr_30_noet;
 using Duals::DualNumber;
 using Duals::DualMP;
+using Duals::DualMatrix;
 
 BOOST_AUTO_TEST_CASE(testPermuteRowsAndColumns)
 {
@@ -125,6 +126,58 @@ BOOST_AUTO_TEST_CASE(testConvertDual)
     }
 }
 
+BOOST_AUTO_TEST_CASE(testSpanningTreeWeightVector)
+{
+    /*
+     * Given a Laplacian matrix, compute the spanning tree weight
+     * vector with the two functions. 
+     */
+    // Define a Laplacian matrix for a 3-state graph (nullspace: [4, 2, 1])
+    MatrixXd laplacian(3, 3);
+    laplacian <<  1, -1,  0,
+                 -2,  3, -1,
+                  0, -2,  2;
+
+    // Compute the spanning tree weight vector with doubles
+    std::pair<VectorXd, double> r1 = linalg_internal::spanningTreeWeightVector<double>(laplacian);
+    BOOST_TEST(r1.first(0) == 4);
+    BOOST_TEST(r1.first(1) == 2);
+    BOOST_TEST(r1.first(2) == 1);
+
+    // Compute the spanning tree weight vector with DualNumbers
+    MatrixXDual laplacian_dual(3, 3);
+    laplacian_dual(0, 0) = DualNumber(1, 1);
+    laplacian_dual(0, 1) = DualNumber(-1, -1);
+    laplacian_dual(0, 2) = DualNumber(0, 0);
+    laplacian_dual(1, 0) = DualNumber(-2, 0);
+    laplacian_dual(1, 1) = DualNumber(3, 0);
+    laplacian_dual(1, 2) = DualNumber(-1, 0);
+    laplacian_dual(2, 0) = DualNumber(0, 0);
+    laplacian_dual(2, 1) = DualNumber(-2, 0);
+    laplacian_dual(2, 2) = DualNumber(2, 0);
+    std::pair<VectorXDual, DualNumber> r2 = linalg_internal::spanningTreeWeightVector<DualNumber>(laplacian_dual);
+    BOOST_TEST(r2.first(0).x() == 4);
+    BOOST_TEST(r2.first(1).x() == 2);
+    BOOST_TEST(r2.first(2).x() == 1);
+    BOOST_TEST(r2.first(0).d() == 0);
+    BOOST_TEST(r2.first(1).d() == 2);
+    BOOST_TEST(r2.first(2).d() == 1);
+
+    // Compute the spanning tree weight vector with DualMatrix
+    MatrixXd derivative(3, 3);
+    derivative << 1, -1, 0,
+                  0,  0, 0,
+                  0,  0, 0;
+    DualMatrix laplacian_dualm(laplacian, derivative);
+    std::pair<DualMatrix, double> r3 = linalg_internal::spanningTreeWeightVector(laplacian_dualm);
+    BOOST_TEST(r3.first.X()(0) == 4);
+    BOOST_TEST(r3.first.X()(1) == 2);
+    BOOST_TEST(r3.first.X()(2) == 1);
+    BOOST_TEST(r3.first.D()(0) == 0);
+    BOOST_TEST(r3.first.D()(1) == 2);
+    BOOST_TEST(r3.first.D()(2) == 1);
+}
+
 BOOST_DATA_TEST_CASE(timeMultiply, data::xrange(2, 7))
 {
     /*
@@ -192,6 +245,37 @@ BOOST_DATA_TEST_CASE(timeMultiply, data::xrange(2, 7))
     end = std::chrono::high_resolution_clock::now();
     elapsed = end - start;
     std::cout << "DualMP<30, et_off> " << dim << "-by-" << dim << " matrix multiplication: "
+              << elapsed.count() << " seconds" << std::endl;
+
+    // Do the same with DualMatrix types
+    DualMatrix M(A, B);
+    DualMatrix N(B, A);
+    start = std::chrono::high_resolution_clock::now();
+    DualMatrix O = M * N;
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cout << "DualMatrix " << dim << "-by-" << dim << " matrix multiplication: "
+              << elapsed.count() << " seconds" << std::endl;
+
+    // Do the same with DualMatrixMP<30, et_on> types
+    DualMatrixMP<30, et_on> P(D, E);
+    DualMatrixMP<30, et_on> Q(E, D);
+    start = std::chrono::high_resolution_clock::now();
+    DualMatrixMP<30, et_on> R = P * Q;
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cout << "DualMatrixMP<30, et_on> " << dim << "-by-" << dim << " matrix multiplication: "
+              << elapsed.count() << " seconds" << std::endl;
+
+    // Do the same with DualMatrixMP<30, et_off> types
+    DualMatrixMP<30, et_off> P2(D2, E2);
+    DualMatrixMP<30, et_off> Q2(E2, D2);
+    start = std::chrono::high_resolution_clock::now();
+    DualMatrixMP<30, et_off> R2 = P2 * Q2;
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cout << "DualMatrixMP<30, et_off> " << dim << "-by-" << dim << " matrix multiplication: "
               << elapsed.count() << " seconds" << std::endl << std::endl;
+
 }
 
