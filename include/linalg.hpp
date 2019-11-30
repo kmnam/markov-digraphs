@@ -14,6 +14,7 @@
 #include <boost/multiprecision/eigen.hpp>
 #include <duals/duals.hpp>
 #include <duals/dualMP.hpp>
+#include <duals/dualMatrix.hpp>
 #include <duals/eigen.hpp>
 
 /*
@@ -22,7 +23,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     11/24/2019
+ *     11/29/2019
  */
 using namespace Eigen;
 using boost::multiprecision::number;
@@ -40,6 +41,7 @@ typedef number<mpfr_float_backend<100>, et_off> mpfr_100_noet;
 typedef number<mpfr_float_backend<200>, et_off> mpfr_200_noet;
 using Duals::DualNumber;
 using Duals::DualMP;
+using Duals::DualMatrix;
 
 template <typename T>
 bool isclose(T a, T b, T tol)
@@ -199,9 +201,34 @@ std::pair<Matrix<T, Dynamic, 1>, T> spanningTreeWeightVector(const Ref<const Mat
 
     // Return the row of the weight matrix whose product with the (negative transpose of)
     // Laplacian matrix has the smallest norm
-    //MatrixXd::Index min_i;
     Matrix<T, Dynamic, 1> sqnorm = (weights * (-laplacian)).rowwise().squaredNorm();
-    //sqnorm.template cast<double>().minCoeff(&min_i);
+    unsigned min_i = 0;
+    for (unsigned i = 1; i < sqnorm.size(); ++i)
+    {
+        if (sqnorm(i) < sqnorm(min_i)) min_i = i;
+    }
+    return std::make_pair(weights.row(min_i), sqnorm(min_i));
+}
+
+std::pair<DualMatrix, double> spanningTreeWeightVector(const DualMatrix& laplacian)
+{
+    /*
+     * Use the recurrence of Chebotarev & Agaev (Lin Alg Appl, 2002, Eqs. 17-18)
+     * for the spanning tree weight vector of the given Laplacian matrix. 
+     *
+     * This function does not check that the given matrix is indeed a
+     * valid row Laplacian matrix (zero row sums, positive diagonal, 
+     * negative off-diagonal).
+     */
+    unsigned dim = laplacian.rows();
+    DualMatrix identity = Duals::Identity(dim);
+    DualMatrix weights = Duals::IdentityZeroDerivative(dim);
+    for (unsigned k = 1; k < dim; ++k)
+        weights = -laplacian * weights + (identity.multiplyByTrace(laplacian * weights)) / k;
+
+    // Return the row of the weight matrix whose product with the (negative transpose of)
+    // Laplacian matrix has the smallest norm
+    VectorXd sqnorm = (weights.X() * (-laplacian.X())).rowwise().squaredNorm();
     unsigned min_i = 0;
     for (unsigned i = 1; i < sqnorm.size(); ++i)
     {
