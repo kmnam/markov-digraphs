@@ -614,8 +614,10 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
         if (min_prec <= 30)
         {
             prec = 30;
-            Matrix<DualMP<30, ET>, Dynamic, Dynamic> B = linalg_internal::convertDual<30, ET>(laplacian.X());
-            Matrix<DualMP<30, ET>, Dynamic, Dynamic> D = linalg_internal::convertDual<30, ET>(laplacian.D());
+            Matrix<number<mpfr_float_backend<30>, ET>, Dynamic, Dynamic> B
+                = linalg_internal::convert<double, number<mpfr_float_backend<30>, ET> >(laplacian.X());
+            Matrix<number<mpfr_float_backend<30>, ET>, Dynamic, Dynamic> D
+                = linalg_internal::convert<double, number<mpfr_float_backend<30>, ET> >(laplacian.D());
             DualMatrixMP<30, ET> laplacian_dual(B, D);
             std::pair<DualMatrixMP<30, ET>, number<mpfr_float_backend<30>, ET> > result
                 = linalg_internal::spanningTreeWeightVector(laplacian_dual);
@@ -631,8 +633,10 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
         else if (min_prec <= 60)
         {
             prec = 60;
-            Matrix<DualMP<60, ET>, Dynamic, Dynamic> B = linalg_internal::convertDual<60, ET>(laplacian.X());
-            Matrix<DualMP<60, ET>, Dynamic, Dynamic> D = linalg_internal::convertDual<60, ET>(laplacian.D());
+            Matrix<number<mpfr_float_backend<60>, ET>, Dynamic, Dynamic> B
+                = linalg_internal::convert<double, number<mpfr_float_backend<60>, ET> >(laplacian.X());
+            Matrix<number<mpfr_float_backend<60>, ET>, Dynamic, Dynamic> D
+                = linalg_internal::convert<double, number<mpfr_float_backend<60>, ET> >(laplacian.D());
             DualMatrixMP<60, ET> laplacian_dual(B, D);
             std::pair<DualMatrixMP<60, ET>, number<mpfr_float_backend<60>, ET> > result
                 = linalg_internal::spanningTreeWeightVector(laplacian_dual);
@@ -648,8 +652,10 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
         else if (min_prec <= 100)
         {
             prec = 100;
-            Matrix<DualMP<100, ET>, Dynamic, Dynamic> B = linalg_internal::convertDual<100, ET>(laplacian.X());
-            Matrix<DualMP<100, ET>, Dynamic, Dynamic> D = linalg_internal::convertDual<100, ET>(laplacian.D());
+            Matrix<number<mpfr_float_backend<100>, ET>, Dynamic, Dynamic> B
+                = linalg_internal::convert<double, number<mpfr_float_backend<100>, ET> >(laplacian.X());
+            Matrix<number<mpfr_float_backend<100>, ET>, Dynamic, Dynamic> D
+                = linalg_internal::convert<double, number<mpfr_float_backend<100>, ET> >(laplacian.D());
             DualMatrixMP<100, ET> laplacian_dual(B, D);
             std::pair<DualMatrixMP<100, ET>, number<mpfr_float_backend<100>, ET> > result
                 = linalg_internal::spanningTreeWeightVector(laplacian_dual);
@@ -665,8 +671,10 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
         else if (min_prec <= 200)
         {
             prec = 200;
-            Matrix<DualMP<200, ET>, Dynamic, Dynamic> B = linalg_internal::convertDual<200, ET>(laplacian.X());
-            Matrix<DualMP<200, ET>, Dynamic, Dynamic> D = linalg_internal::convertDual<200, ET>(laplacian.D());
+            Matrix<number<mpfr_float_backend<200>, ET>, Dynamic, Dynamic> B
+                = linalg_internal::convert<double, number<mpfr_float_backend<200>, ET> >(laplacian.X());
+            Matrix<number<mpfr_float_backend<200>, ET>, Dynamic, Dynamic> D
+                = linalg_internal::convert<double, number<mpfr_float_backend<200>, ET> >(laplacian.D());
             DualMatrixMP<200, ET> laplacian_dual(B, D);
             std::pair<DualMatrixMP<200, ET>, number<mpfr_float_backend<200>, ET> > result
                 = linalg_internal::spanningTreeWeightVector(laplacian_dual);
@@ -701,8 +709,10 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
         if (prec <= std::numeric_limits<double>::max_digits10)
         {
             prec = 30;
-            Matrix<DualMP<30, ET>, Dynamic, Dynamic> B = linalg_internal::convertDual<30, ET>(laplacian.X());
-            Matrix<DualMP<30, ET>, Dynamic, Dynamic> D = linalg_internal::convertDual<30, ET>(laplacian.D());
+            Matrix<number<mpfr_float_backend<30>, ET>, Dynamic, Dynamic> B
+                = linalg_internal::convert<double, number<mpfr_float_backend<30>, ET> >(laplacian.X());
+            Matrix<number<mpfr_float_backend<30>, ET>, Dynamic, Dynamic> D
+                = linalg_internal::convert<double, number<mpfr_float_backend<30>, ET> >(laplacian.D());
             DualMatrixMP<30, ET> laplacian_dual(B, D);
             std::pair<DualMatrixMP<30, ET>, number<mpfr_float_backend<30>, ET> > result
                 = linalg_internal::spanningTreeWeightVector(laplacian_dual);
@@ -718,8 +728,10 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
         else if (prec <= 30)
         {
             prec = 60;
-            Matrix<DualMP<60, ET>, Dynamic, Dynamic> B = linalg_internal::convertDual<60, ET>(laplacian.X());
-            Matrix<DualMP<60, ET>, Dynamic, Dynamic> D = linalg_internal::convertDual<60, ET>(laplacian.D());
+            Matrix<number<mpfr_float_backend<60>, ET>, Dynamic, Dynamic> B
+                = linalg_internal::convert<double, number<mpfr_float_backend<60>, ET> >(laplacian.X());
+            Matrix<number<mpfr_float_backend<60>, ET>, Dynamic, Dynamic> D
+                = linalg_internal::convert<double, number<mpfr_float_backend<60>, ET> >(laplacian.D());
             DualMatrixMP<60, ET> laplacian_dual(B, D);
             std::pair<DualMatrixMP<60, ET>, number<mpfr_float_backend<60>, ET> > result
                 = linalg_internal::spanningTreeWeightVector(laplacian_dual);
@@ -735,8 +747,10 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
         else if (prec <= 60)
         {
             prec = 100;
-            Matrix<DualMP<100, ET>, Dynamic, Dynamic> B = linalg_internal::convertDual<100, ET>(laplacian.X());
-            Matrix<DualMP<100, ET>, Dynamic, Dynamic> D = linalg_internal::convertDual<100, ET>(laplacian.D());
+            Matrix<number<mpfr_float_backend<100>, ET>, Dynamic, Dynamic> B
+                = linalg_internal::convert<double, number<mpfr_float_backend<100>, ET> >(laplacian.X());
+            Matrix<number<mpfr_float_backend<100>, ET>, Dynamic, Dynamic> D
+                = linalg_internal::convert<double, number<mpfr_float_backend<100>, ET> >(laplacian.D());
             DualMatrixMP<100, ET> laplacian_dual(B, D);
             std::pair<DualMatrixMP<100, ET>, number<mpfr_float_backend<100>, ET> > result
                 = linalg_internal::spanningTreeWeightVector(laplacian_dual);
@@ -752,8 +766,10 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
         else if (prec <= 100)
         {
             prec = 200;
-            Matrix<DualMP<200, ET>, Dynamic, Dynamic> B = linalg_internal::convertDual<200, ET>(laplacian.X());
-            Matrix<DualMP<200, ET>, Dynamic, Dynamic> D = linalg_internal::convertDual<200, ET>(laplacian.D());
+            Matrix<number<mpfr_float_backend<200>, ET>, Dynamic, Dynamic> B
+                = linalg_internal::convert<double, number<mpfr_float_backend<200>, ET> >(laplacian.X());
+            Matrix<number<mpfr_float_backend<200>, ET>, Dynamic, Dynamic> D
+                = linalg_internal::convert<double, number<mpfr_float_backend<200>, ET> >(laplacian.D());
             DualMatrixMP<200, ET> laplacian_dual(B, D);
             std::pair<DualMatrixMP<200, ET>, number<mpfr_float_backend<200>, ET> > result
                 = linalg_internal::spanningTreeWeightVector(laplacian_dual);
