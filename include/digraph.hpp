@@ -193,11 +193,12 @@ class MarkovDigraph
              * Return a vector of all the edges in the graph.
              */
             std::vector<Edge<T> > edges;
-            for (auto&& v : this->edges)
+            for (auto&& v : this->nodes)
             {
-                for (auto&& w : v.second)
+                for (auto&& w : this->edges.find(v)->second)
                 {
-                    edges.emplace_back(std::make_pair(v, w));
+                    Edge<T> e = std::make_pair(v, w);
+                    edges.push_back(e);
                 }
             }
             return edges;
