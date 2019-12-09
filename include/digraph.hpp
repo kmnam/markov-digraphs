@@ -140,6 +140,14 @@ class MarkovDigraph
             return nullptr;    // Return nullptr if no matching node exists
         }
 
+        std::vector<Node<T>*> getNodes() const
+        {
+            /*
+             * Return the vector of nodes. 
+             */
+            return this->nodes; 
+        }
+
         // ----------------------------------------------------- //
         //              EDGE-ADDING/GETTING METHODS              //
         // ----------------------------------------------------- //
@@ -177,6 +185,22 @@ class MarkovDigraph
                 return std::make_pair(source, *it);
             else    // Return pair of nullptrs if no edge exists
                 return std::make_pair(nullptr, nullptr);
+        }
+
+        std::vector<Edge<T> > getEdges() const
+        {
+            /*
+             * Return a vector of all the edges in the graph.
+             */
+            std::vector<Edge<T> > edges;
+            for (auto&& v : this->edges)
+            {
+                for (auto&& w : v.second)
+                {
+                    edges.push_back(std::make_pair(v, w));
+                }
+            }
+            return edges;
         }
 
         T getEdgeLabel(std::string source_id, std::string target_id)
