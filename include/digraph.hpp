@@ -21,7 +21,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     11/24/2019
+ *     12/9/2019
  */
 
 // ----------------------------------------------------- //
@@ -93,7 +93,7 @@ class MarkovDigraph
         // ----------------------------------------------------- //
         //                     PRIVATE METHODS                   //
         // ----------------------------------------------------- //
-        std::vector<Edge<T> > getSpanningTreeFromRoot(Node<T>* root)
+        std::vector<Edge<T> > getSpanningTreeFromDFS(Node<T>* root)
         {
             /*
              * Obtain a vector of edges in a single spanning tree, with  
@@ -492,7 +492,7 @@ class MarkovDigraph
                 // Obtain a spanning tree of all accessible nodes from
                 // the first unvisited node (note that all such nodes 
                 // should also be unvisited)
-                std::vector<Edge<T> > tree = this->getSpanningTreeFromRoot(curr_node);
+                std::vector<Edge<T> > tree = this->getSpanningTreeFromDFS(curr_node);
 
                 // Propagate ratios of forward/reverse edge label values
                 // down the tree in log-scale
@@ -533,6 +533,14 @@ class MarkovDigraph
             }
             else              // Otherwise, simply exponentiate and return
                 return steady_state.exp();
+        }
+
+        T twoRootSpanningForestWeight(Node<T>* root1, Node<T>* root2)
+        {
+            /*
+             * Get the weight of all spanning forests rooted at root1
+             * and root2.
+             */
         }
 
         void randomizeFree(T param_lower, T param_upper, std::mt19937& rng)
