@@ -535,14 +535,6 @@ class MarkovDigraph
                 return steady_state.exp();
         }
 
-        T twoRootSpanningForestWeight(Node<T>* root1, Node<T>* root2)
-        {
-            /*
-             * Get the weight of all spanning forests rooted at root1
-             * and root2.
-             */
-        }
-
         void randomizeFree(T param_lower, T param_upper, std::mt19937& rng)
         {
             /*
