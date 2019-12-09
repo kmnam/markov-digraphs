@@ -16,7 +16,8 @@ bool isBackEdge(const std::vector<Edge<T> >& tree, const Edge<T>& edge)
 {
     /*
      * Determines whether the given edge is a "back edge" with respect to a
-     * given tree (i.e., if its target vertex has a path to its source vertex in the tree).
+     * given tree (i.e., if its target vertex has a path to its source vertex
+     * in the tree).
      */
     Node<T>* source = edge.first;
     Node<T>* target = edge.second;
@@ -26,16 +27,20 @@ bool isBackEdge(const std::vector<Edge<T> >& tree, const Edge<T>& edge)
 
     // Try to draw a path of edges in the tree from target to source
     Node<T>* curr = target;
-    unsigned nvisited = 1;
-    while (nvisited < nvertices)
+    bool at_root = false;
+    while (!at_root)
     {
+        // Get the unique edge in the tree leaving curr 
         auto found = std::find_if(
             tree.begin(), tree.end(),
             [curr](const Edge<T>& e){ return (curr == e.first); }
         );
-        curr = found->second;
-        nvisited++;
-        if (curr == source) return true;
+        if (found == tree.end()) at_root = true;
+        else
+        {
+            curr = found->second;
+            if (curr == source) return true;
+        }
     }
     return false;
 }
@@ -81,7 +86,7 @@ void enumSpanningTreesIter(const std::vector<Edge<T> >& parent_tree,
 
     // Find the least edge (with respect to source index) that is in 
     // tree0 and not in the parent tree
-    Edge<T> min_edge_not_in_parent_tree = std::find_if(
+    Edge<T> min_edge_not_in_parent_tree = *std::find_if(
         edges.begin(), edges.end(), [tree0, parent_tree](const Edge<T>& e)
         {
             return (
@@ -94,37 +99,34 @@ void enumSpanningTreesIter(const std::vector<Edge<T> >& parent_tree,
     // Find each valid non-back edge with respect to the parent tree 
     for (auto&& e : nonback_edges)
     {
-        if (e.first < min_edge_not_in_parent_tree.first)
+        // Add the nonback edge and find the edge with the source vertex 
+        // of the nonback edge
+        Edge<T> to_be_removed = edge_with_source(parent_tree, e.first);
+        auto it = std::find(parent_tree.begin(), parent_tree.end(), to_be_removed);
+        unsigned i = it - parent_tree.begin();
+        std::vector<Edge<T> > child_tree(parent_tree);
+        child_tree[i] = e;
+
+        // Classify all edges *not* in the new child tree as either back
+        // or non-back edges with respect to the child tree
+        std::vector<Edge<T> > new_back_edges;
+        std::vector<Edge<T> > new_nonback_edges;
+        for (auto&& e : edges)
         {
-            // Add the nonback edge and find the edge with the source vertex 
-            // of the nonback edge
-            Edge<T> to_be_removed = edge_with_source(parent_tree, e.first);
-            auto it = std::find(parent_tree.begin(), parent_tree.end(), to_be_removed);
-            unsigned i = it - parent_tree.begin();
-            std::vector<Edge<T> > child_tree(parent_tree);
-            child_tree[i] = e;
-
-            // Classify all edges *not* in the new child tree as either back
-            // or non-back edges with respect to the child tree
-            std::vector<Edge<T> > new_back_edges;
-            std::vector<Edge<T> > new_nonback_edges;
-            for (auto&& e : edges)
+            if (std::find(child_tree.begin(), child_tree.end(), e) == child_tree.end())
             {
-                if (std::find(child_tree.begin(), child_tree.end(), e) == child_tree.end())
-                {
-                    if (isBackEdge(child_tree, e)) new_back_edges.push_back(e);
-                    else                           new_nonback_edges.push_back(e);
-                }
-                // Note that these edge sets should already be sorted with 
-                // respect to source index 
+                if (isBackEdge(child_tree, e)) new_back_edges.push_back(e);
+                else                           new_nonback_edges.push_back(e);
             }
-
-            // Add the child tree and call the function recursively on the child tree
-            trees.push_back(child_tree);
-            enumSpanningTreesIter(
-                child_tree, tree0, edges, new_back_edges, new_nonback_edges, trees
-            );
+            // Note that these edge sets should already be sorted with 
+            // respect to source index 
         }
+
+        // Add the child tree and call the function recursively on the child tree
+        trees.push_back(child_tree);
+        enumSpanningTreesIter(
+            child_tree, tree0, edges, new_back_edges, new_nonback_edges, trees
+        );
     }
 }
 
@@ -138,6 +140,20 @@ std::vector<std::vector<Edge<T> > > enumSpanningTrees(MarkovDigraph<T>* graph)
     // Initialize a vector of spanning trees
     std::vector<std::vector<Edge<T> > > trees; 
 
+    // Get all the edges in the graph and sort them by source index
+    std::vector<Edge<T> > edges = graph->getEdges();
+    std::sort(
+        edges.begin(), edges.end(), [](const Edge<T>& left, const Edge<T>& right)
+        {
+            return left.first < left.first; 
+        }
+    );
+    for (auto&& e : edges)
+    {
+        std::cout << "(" << e.first->id << " " << e.second->id << ") ";
+    }
+    std::cout << std::endl;
+
     // Get a DFS spanning tree emanating from each root vertex
     std::vector<Node<T>*> nodes = graph->getNodes();
     for (auto&& node : nodes)
@@ -150,15 +166,11 @@ std::vector<std::vector<Edge<T> > > enumSpanningTrees(MarkovDigraph<T>* graph)
         for (auto&& e : tree_dfs)
             tree0.push_back(std::make_pair(e.second, e.first));
         trees.push_back(tree0);
-
-        // Get all the edges in the graph and sort them by source index
-        std::vector<Edge<T> > edges = graph->getEdges();
-        std::sort(
-            edges.begin(), edges.end(), [](const Edge<T>& left, const Edge<T>& right)
-            {
-                return left.first < left.first; 
-            }
-        );
+        for (auto&& e : tree0)
+        {
+            std::cout << "(" << e.first->id << " " << e.second->id << ") ";
+        }
+        std::cout << std::endl;
 
         // Classify all edges *not* in tree0 as either back or non-back 
         // edges with respect to tree0 
@@ -174,6 +186,16 @@ std::vector<std::vector<Edge<T> > > enumSpanningTrees(MarkovDigraph<T>* graph)
             // Note that these edge sets should already be sorted with 
             // respect to source index 
         }
+        for (auto&& e : nonback_edges)
+        {
+            std::cout << "(" << e.first->id << " " << e.second->id << ") ";
+        }
+        std::cout << std::endl;
+
+        // Call recursive function
+        enumSpanningTreesIter(
+            tree0, tree0, edges, back_edges, nonback_edges, trees
+        );
     }
 
     return trees;
