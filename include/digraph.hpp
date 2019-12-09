@@ -197,7 +197,7 @@ class MarkovDigraph
             {
                 for (auto&& w : v.second)
                 {
-                    edges.push_back(std::make_pair(v, w));
+                    edges.emplace_back(std::make_pair(v, w));
                 }
             }
             return edges;

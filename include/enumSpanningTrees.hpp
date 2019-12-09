@@ -11,6 +11,7 @@
  *     12/9/2019
  */
 
+template <typename T>
 bool isBackEdge(const std::vector<Edge<T> >& tree, const Edge<T>& edge)
 {
     /*
@@ -45,7 +46,7 @@ void enumSpanningTreesIter(const std::vector<Edge<T> >& parent_tree,
                            const std::vector<Edge<T> >& edges,
                            const std::vector<Edge<T> >& back_edges,
                            const std::vector<Edge<T> >& nonback_edges,
-                           std::vector<std::vector<Edge<T> >& trees)
+                           std::vector<std::vector<Edge<T> > >& trees)
 {
     /*
      * Recursive function to be called as part of Uno's algorithm. 
@@ -128,7 +129,7 @@ void enumSpanningTreesIter(const std::vector<Edge<T> >& parent_tree,
 }
 
 template <typename T>
-void enumSpanningTrees(MarkovDigraph<T>* graph)
+std::vector<std::vector<Edge<T> > > enumSpanningTrees(MarkovDigraph<T>* graph)
 {
     /*
      * Perform Uno's algorithm for enumerating the spanning trees on 
@@ -151,7 +152,7 @@ void enumSpanningTrees(MarkovDigraph<T>* graph)
         trees.push_back(tree0);
 
         // Get all the edges in the graph and sort them by source index
-        std::vector<Edge<T> > edges = this->getEdges();
+        std::vector<Edge<T> > edges = graph->getEdges();
         std::sort(
             edges.begin(), edges.end(), [](const Edge<T>& left, const Edge<T>& right)
             {
@@ -174,6 +175,8 @@ void enumSpanningTrees(MarkovDigraph<T>* graph)
             // respect to source index 
         }
     }
+
+    return trees;
 }
 
 #endif
