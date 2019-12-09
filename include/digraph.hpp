@@ -90,47 +90,6 @@ class MarkovDigraph
         // All edge labels in the graph, stored as a hash table    
         std::unordered_map<Edge<T>, T, boost::hash<Edge<T> > > labels;
 
-        // ----------------------------------------------------- //
-        //                     PRIVATE METHODS                   //
-        // ----------------------------------------------------- //
-        std::vector<Edge<T> > getSpanningTreeFromDFS(Node<T>* root)
-        {
-            /*
-             * Obtain a vector of edges in a single spanning tree, with  
-             * the edges ordered via a topological sort on the second
-             * index (i.e., for any two edges (i, j) and (k, l) in the
-             * vector such that (j, l) is an edge, (i, j) precedes (k, l)).
-             */
-            std::vector<Edge<T> > tree;
-            std::stack<Edge<T> > stack;
-            std::unordered_set<Node<T>*> visited;
-
-            // Initiate depth-first search from the root
-            visited.insert(root);
-            for (auto&& neighbor : this->edges[root])
-                stack.push(std::make_pair(root, neighbor));
-
-            // Run until stack is empty
-            while (!stack.empty())
-            {
-                // Pop topmost microstate from the stack ...
-                Edge<T> curr_edge = stack.top();
-                stack.pop();
-                tree.push_back(curr_edge);
-                Node<T>* curr_node = curr_edge.second;
-                visited.insert(curr_node);
-
-                // ... and push its unvisited neighbors onto the stack
-                for (auto&& neighbor : this->edges[curr_node])
-                {
-                    if (visited.find(neighbor) == visited.end())
-                        stack.push(std::make_pair(curr_node, neighbor));
-                }
-            }
-
-            return tree;
-        }
-
     public:
         MarkovDigraph()
         {
@@ -391,6 +350,44 @@ class MarkovDigraph
                     this->setEdgeLabel(this->nodes[j]->id, this->nodes[k]->id, laplacian(k,j)); 
                 }
             }
+        }
+
+        std::vector<Edge<T> > getSpanningTreeFromDFS(Node<T>* root)
+        {
+            /*
+             * Obtain a vector of edges in a single spanning tree, with  
+             * the edges ordered via a topological sort on the second
+             * index (i.e., for any two edges (i, j) and (k, l) in the
+             * vector such that (j, l) is an edge, (i, j) precedes (k, l)).
+             */
+            std::vector<Edge<T> > tree;
+            std::stack<Edge<T> > stack;
+            std::unordered_set<Node<T>*> visited;
+
+            // Initiate depth-first search from the root
+            visited.insert(root);
+            for (auto&& neighbor : this->edges[root])
+                stack.push(std::make_pair(root, neighbor));
+
+            // Run until stack is empty
+            while (!stack.empty())
+            {
+                // Pop topmost microstate from the stack ...
+                Edge<T> curr_edge = stack.top();
+                stack.pop();
+                tree.push_back(curr_edge);
+                Node<T>* curr_node = curr_edge.second;
+                visited.insert(curr_node);
+
+                // ... and push its unvisited neighbors onto the stack
+                for (auto&& neighbor : this->edges[curr_node])
+                {
+                    if (visited.find(neighbor) == visited.end())
+                        stack.push(std::make_pair(curr_node, neighbor));
+                }
+            }
+
+            return tree;
         }
 
         Array<T, Dynamic, 1> getSteadyStateFromSVD(T sv_tol, bool normalize = true)
