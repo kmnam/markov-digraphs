@@ -386,29 +386,29 @@ class MarkovDigraph
              * vector such that (j, l) is an edge, (i, j) precedes (k, l)).
              */
             std::vector<Edge<T> > tree;
-            std::stack<Edge<T> > stack;
+            std::stack<Node<T>*> stack;
             std::unordered_set<Node<T>*> visited;
 
             // Initiate depth-first search from the root
             visited.insert(root);
-            for (auto&& neighbor : this->edges[root])
-                stack.push(std::make_pair(root, neighbor));
+            stack.push(root);
 
             // Run until stack is empty
             while (!stack.empty())
             {
-                // Pop topmost microstate from the stack ...
-                Edge<T> curr_edge = stack.top();
+                // Pop topmost vertex from the stack ...
+                Node<T>* curr = stack.top();
                 stack.pop();
-                tree.push_back(curr_edge);
-                Node<T>* curr_node = curr_edge.second;
-                visited.insert(curr_node);
 
                 // ... and push its unvisited neighbors onto the stack
-                for (auto&& neighbor : this->edges[curr_node])
+                for (auto&& neighbor : this->edges[curr])
                 {
                     if (visited.find(neighbor) == visited.end())
-                        stack.push(std::make_pair(curr_node, neighbor));
+                    {
+                        tree.push_back(std::make_pair(curr, neighbor));
+                        stack.push(neighbor);
+                        visited.insert(neighbor);
+                    }
                 }
             }
 
