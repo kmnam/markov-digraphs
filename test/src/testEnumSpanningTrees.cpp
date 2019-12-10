@@ -73,15 +73,8 @@ BOOST_AUTO_TEST_CASE(testTriangleGraphSpanningTrees)
      * Test that the square graph has the correct set of vertices and edges.
      */
     Graph* graph = triangle(rng);
-    std::vector<std::vector<Edge<double> > > trees = enumSpanningTrees<double>(graph);
-    for (auto&& tree : trees)
-    {
-        for (auto&& e : tree)
-        {
-            std::cout << "(" << e.first->id << " " << e.second->id << ") ";
-        }
-        std::cout << std::endl;
-    }
+    std::vector<std::vector<Edge<double> > > trees = enumAllSpanningTrees<double>(graph);
+    BOOST_TEST(trees.size() == 9);
     delete graph;
 }
 
@@ -91,14 +84,7 @@ BOOST_AUTO_TEST_CASE(testSquareGraphSpanningTrees)
      * Test that the square graph has the correct set of vertices and edges.
      */
     Graph* graph = square(rng);
-    std::vector<std::vector<Edge<double> > > trees = enumSpanningTrees<double>(graph);
-    for (auto&& tree : trees)
-    {
-        for (auto&& e : tree)
-        {
-            std::cout << "(" << e.first->id << " " << e.second->id << ") ";
-        }
-        std::cout << std::endl;
-    }
+    std::vector<std::vector<Edge<double> > > trees = enumAllSpanningTrees<double>(graph);
+    BOOST_TEST(trees.size() == 16);
     delete graph;
 }

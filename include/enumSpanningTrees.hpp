@@ -141,62 +141,79 @@ void enumSpanningTreesIter(const std::vector<Edge<T> >& parent_tree,
 }
 
 template <typename T>
-std::vector<std::vector<Edge<T> > > enumSpanningTrees(MarkovDigraph<T>* graph)
+std::vector<std::vector<Edge<T> > > enumSpanningTrees(MarkovDigraph<T>* graph, Node<T>* root)
 {
     /*
      * Perform Uno's algorithm for enumerating the spanning trees on 
-     * the given graph.
+     * the given graph rooted at the given node. 
      */
     // Initialize a vector of spanning trees
     std::vector<std::vector<Edge<T> > > trees; 
 
+    // Get a DFS spanning tree emanating from each root vertex
+    std::vector<Edge<T> > tree_dfs = graph->getSpanningTreeFromDFS(root);
+
+    // Order the nodes with respect to the DFS traversal 
+    std::vector<Node<T>*> order;
+    order.push_back(root);
+    for (auto&& e : tree_dfs) order.push_back(e.second);
+
+    // Reverse the edges in the DFS spanning tree to get a spanning 
+    // tree of the graph 
+    std::vector<Edge<T> > tree0;
+    for (auto&& e : tree_dfs)
+        tree0.push_back(std::make_pair(e.second, e.first));
+    trees.push_back(tree0);
+
+    // Get all the edges in the graph and sort them by w.r.t to 
+    // DFS traversal 
+    std::vector<Edge<T> > edges = graph->getEdges();
+    std::sort(
+        edges.begin(), edges.end(), [order](const Edge<T>& left, const Edge<T>& right)
+        {
+            return std::find(order.begin(), order.end(), left.first) < std::find(order.begin(), order.end(), right.first);
+        }
+    );
+
+    // Classify all edges *not* in tree0 as either back or non-back 
+    // edges with respect to tree0 
+    std::vector<Edge<T> > back_edges;
+    std::vector<Edge<T> > nonback_edges;
+    for (auto&& e : edges)
+    {
+        if (std::find(tree0.begin(), tree0.end(), e) == tree0.end())
+        {
+            if (isBackEdge(tree0, e)) back_edges.push_back(e);
+            else                      nonback_edges.push_back(e);
+        }
+        // Note that these edge sets should already be sorted with 
+        // respect to source index 
+    }
+
+    // Call recursive function
+    enumSpanningTreesIter(
+        tree0, tree0, edges, back_edges, nonback_edges, order, trees
+    );
+
+    return trees;
+}
+
+template <typename T>
+std::vector<std::vector<Edge<T> > > enumAllSpanningTrees(MarkovDigraph<T>* graph)
+{
+    /*
+     * Perform Uno's algorithm to enumerate all the spanning trees on 
+     * the given graph. 
+     */
+    // Initialize a vector of spanning trees
+    std::vector<std::vector<Edge<T> > > trees; 
+
+    // Run Uno's algorithm for each node in the tree 
     std::vector<Node<T>*> nodes = graph->getNodes();
     for (auto&& node : nodes)
     {
-        // Get a DFS spanning tree emanating from each root vertex
-        std::vector<Edge<T> > tree_dfs = graph->getSpanningTreeFromDFS(node);
-
-        // Order the nodes with respect to the DFS traversal 
-        std::vector<Node<T>*> order;
-        order.push_back(node);
-        for (auto&& e : tree_dfs) order.push_back(e.second);
-
-        // Reverse the edges in the DFS spanning tree to get a spanning 
-        // tree of the graph 
-        std::vector<Edge<T> > tree0;
-        for (auto&& e : tree_dfs)
-            tree0.push_back(std::make_pair(e.second, e.first));
-        trees.push_back(tree0);
-
-        // Get all the edges in the graph and sort them by w.r.t to 
-        // DFS traversal 
-        std::vector<Edge<T> > edges = graph->getEdges();
-        std::sort(
-            edges.begin(), edges.end(), [order](const Edge<T>& left, const Edge<T>& right)
-            {
-                return std::find(order.begin(), order.end(), left.first) < std::find(order.begin(), order.end(), right.first);
-            }
-        );
-
-        // Classify all edges *not* in tree0 as either back or non-back 
-        // edges with respect to tree0 
-        std::vector<Edge<T> > back_edges;
-        std::vector<Edge<T> > nonback_edges;
-        for (auto&& e : edges)
-        {
-            if (std::find(tree0.begin(), tree0.end(), e) == tree0.end())
-            {
-                if (isBackEdge(tree0, e)) back_edges.push_back(e);
-                else                      nonback_edges.push_back(e);
-            }
-            // Note that these edge sets should already be sorted with 
-            // respect to source index 
-        }
-
-        // Call recursive function
-        enumSpanningTreesIter(
-            tree0, tree0, edges, back_edges, nonback_edges, order, trees
-        );
+        std::vector<std::vector<Edge<T> > > trees_rooted_at_node = enumSpanningTrees(graph, node);
+        for (auto&& tree : trees_rooted_at_node) trees.push_back(tree);
     }
 
     return trees;
