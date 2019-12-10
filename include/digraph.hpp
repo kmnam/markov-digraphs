@@ -76,6 +76,182 @@ struct hash<Node<T> >
 template <typename T>
 using Edge = std::pair<Node<T>*, Node<T>*>;
 
+// Pairs of strings are used for outputting edges
+typedef std::pair<std::string, std::string> StrPair;
+
+// ------------------------------------------------------- //
+//                     HELPER FUNCTIONS                    //
+// ------------------------------------------------------- //
+template <typename T>
+bool isBackEdge(const std::vector<Edge<T> >& tree, const Edge<T>& edge)
+{
+    /*
+     * Determines whether the given edge is a "back edge" with respect to a
+     * given tree (i.e., if its target vertex has a path to its source vertex
+     * in the tree).
+     */
+    Node<T>* source = edge.first;
+    Node<T>* target = edge.second;
+
+    // Try to draw a path of edges in the tree from target to source
+    Node<T>* curr = target;
+    bool at_root = false;
+    while (!at_root)
+    {
+        // Get the unique edge in the tree leaving curr 
+        auto found = std::find_if(
+            tree.begin(), tree.end(),
+            [curr](const Edge<T>& e){ return (curr == e.first); }
+        );
+        if (found == tree.end()) at_root = true;
+        else
+        {
+            curr = found->second;
+            if (curr == source) return true;
+        }
+    }
+    return false;
+}
+
+template <typename T>
+std::vector<std::vector<T> > combinations(std::vector<T> data, unsigned k)
+{
+    /*
+     * Return a vector of integer vectors encoding all k-combinations of
+     * an input vector of arbitrary-type elements.
+     */
+    unsigned n = data.size();
+    if (k > n)
+        throw std::invalid_argument("k-combinations of n items undefined for k > n");
+
+    std::vector<std::vector<T> > combinations;    // Vector of combinations
+    std::vector<bool> range(n);                   // Binary indicators for each index
+    std::fill(range.end() - k, range.end(), true);
+
+    do
+    {
+        std::vector<T> c;
+        for (unsigned i = 0; i < n; i++)
+        {
+            if (range[i]) c.push_back(data[i]);
+        }
+        combinations.push_back(c);
+    } while (std::next_permutation(range.begin(), range.end()));
+
+    return combinations; 
+}
+
+template <typename T>
+std::vector<std::vector<T> > powerset(std::vector<T> data)
+{
+    /*
+     * Return a vector of vectors encoding the power set of an 
+     * input vector of arbitrary-type elements. 
+     */
+    // Start with the empty set
+    std::vector<std::vector<T> > powerset;
+    powerset.emplace_back(std::vector<T>());
+
+    // Run through all k-combinations for increasing k
+    std::vector<std::vector<T> > k_combinations;
+    for (unsigned k = 1; k <= data.size(); k++)
+    {
+        k_combinations = combinations<T>(data, k);
+        powerset.insert(
+            powerset.end(),
+            std::make_move_iterator(k_combinations.begin()),
+            std::make_move_iterator(k_combinations.end())
+        );
+    }
+
+    return powerset;
+}
+
+template <typename T>
+void enumSpanningTreesIter(const std::vector<Edge<T> >& parent_tree,
+                           const std::vector<Edge<T> >& tree0,
+                           const std::vector<Edge<T> >& edges,
+                           const std::vector<Edge<T> >& back_edges,
+                           const std::vector<Edge<T> >& nonback_edges,
+                           const std::vector<Node<T>*>& order, 
+                           std::vector<std::vector<StrPair> >& trees)
+{
+    /*
+     * Recursive function to be called as part of Uno's algorithm. 
+     */
+    // Define function for obtaining the edge in a given tree with source
+    // given by the input vertex
+    std::function<Edge<T>(const std::vector<Edge<T> >&, const Node<T>*)> edge_with_source
+        = [](const std::vector<Edge<T> >& tree, const Node<T>* node)
+    {
+        return *std::find_if(
+            tree.begin(), tree.end(),
+            [node](const Edge<T>& e){ return (node == e.first); }
+        );
+    };
+
+    // Find the least edge (with respect to source index) that is in 
+    // tree0 and not in the parent tree
+    Edge<T> min_edge_not_in_parent_tree;
+    auto ite = std::find_if(
+        edges.begin(), edges.end(), [tree0, parent_tree](const Edge<T>& e)
+        {
+            return (
+                std::find(tree0.begin(), tree0.end(), e) != tree0.end() &&
+                std::find(parent_tree.begin(), parent_tree.end(), e) == parent_tree.end()
+            );
+        }
+    );
+    if (ite == edges.end())
+        min_edge_not_in_parent_tree = std::make_pair(nullptr, nullptr);
+    else
+        min_edge_not_in_parent_tree = *ite;
+    
+    // Find each valid non-back edge with respect to the parent tree 
+    for (auto&& e : nonback_edges)
+    {
+        if (min_edge_not_in_parent_tree.first == nullptr ||
+            std::find(order.begin(), order.end(), e.first) < std::find(order.begin(), order.end(), min_edge_not_in_parent_tree.first))
+        {
+            // Add the nonback edge and find the edge with the source vertex 
+            // of the nonback edge
+            Edge<T> to_be_removed = edge_with_source(parent_tree, e.first);
+            auto it = std::find(parent_tree.begin(), parent_tree.end(), to_be_removed);
+            unsigned i = it - parent_tree.begin();
+            std::vector<Edge<T> > child_tree(parent_tree);
+            child_tree[i] = e;
+
+            // Classify all edges *not* in the new child tree as either back
+            // or non-back edges with respect to the child tree
+            std::vector<Edge<T> > new_back_edges;
+            std::vector<Edge<T> > new_nonback_edges;
+            for (auto&& e : edges)
+            {
+                if (std::find(child_tree.begin(), child_tree.end(), e) == child_tree.end())
+                {
+                    if (isBackEdge<T>(child_tree, e)) new_back_edges.push_back(e);
+                    else                              new_nonback_edges.push_back(e);
+                }
+                // Note that these edge sets should already be sorted with 
+                // respect to source index 
+            }
+
+            // Add the child tree and call the function recursively on the child tree
+            std::vector<StrPair> child_tree_out;
+            for (auto&& e : child_tree) 
+            {
+                std::string v(e.first->id);
+                std::string w(e.second->id);
+                child_tree_out.push_back(std::make_pair(v, w));
+            }
+            trees.push_back(child_tree_out);
+            enumSpanningTreesIter(
+                child_tree, tree0, edges, new_back_edges, new_nonback_edges, order, trees
+            );
+        }
+    }
+}
+
 using namespace Eigen;
 
 template <typename T>
@@ -496,6 +672,160 @@ class MarkovDigraph
             }
 
             return tree;
+        }
+
+        std::vector<std::vector<StrPair> > enumSpanningTrees(std::string id)
+        {
+            /*
+             * Perform Uno's algorithm for enumerating the spanning trees 
+             * rooted at the given node. 
+             */
+            // Initialize a vector of spanning trees
+            std::vector<std::vector<StrPair> > trees; 
+
+            // Get a DFS spanning tree at the root vertex
+            Node<T>* root = this->getNode(id);
+            std::vector<Edge<T> > tree0 = this->getSpanningTreeFromDFS(root);
+            std::vector<StrPair> tree0_out;
+            for (auto&& e : tree0)
+            {
+                std::string v(e.first->id);
+                std::string w(e.second->id);
+                tree0_out.push_back(std::make_pair(v, w));
+            }
+            trees.push_back(tree0_out);
+
+            // Order the nodes with respect to the DFS traversal 
+            std::vector<Node<T>*> order;
+            order.push_back(root);
+            for (auto&& e : tree0) order.push_back(e.second);
+
+            // Get all the edges in the graph and sort them by w.r.t to 
+            // DFS traversal 
+            std::vector<Edge<T> > edges = this->getEdges();
+            if (order.size() == 1)    // If the graph has a single vertex, return the empty tree
+            {
+                return trees;
+            }
+            std::sort(
+                edges.begin(), edges.end(), [order](const Edge<T>& left, const Edge<T>& right)
+                {
+                    return std::find(order.begin(), order.end(), left.first) < std::find(order.begin(), order.end(), right.first);
+                }
+            );
+
+            // Classify all edges *not* in tree0 as either back or non-back 
+            // edges with respect to tree0 
+            std::vector<Edge<T> > back_edges;
+            std::vector<Edge<T> > nonback_edges;
+            for (auto&& e : edges)
+            {
+                if (std::find(tree0.begin(), tree0.end(), e) == tree0.end())
+                {
+                    if (isBackEdge<T>(tree0, e)) back_edges.push_back(e);
+                    else                         nonback_edges.push_back(e);
+                }
+                // Note that these edge sets should already be sorted with 
+                // respect to source index 
+            }
+
+            // Call recursive function
+            enumSpanningTreesIter(
+                tree0, tree0, edges, back_edges, nonback_edges, order, trees
+            );
+
+            return trees;
+        }
+
+        std::vector<std::vector<StrPair> > enumAllSpanningTrees()
+        {
+            /*
+             * Perform Uno's algorithm to enumerate all the spanning trees on 
+             * the given graph. 
+             */
+            // Initialize a vector of spanning trees
+            std::vector<std::vector<StrPair> > trees; 
+
+            // Run Uno's algorithm for each node in the tree 
+            std::vector<Node<T>*> nodes = this->getNodes();
+            for (auto&& node : nodes)
+            {
+                std::vector<std::vector<StrPair> > trees_rooted_at_node = this->enumSpanningTrees(node->id);
+                for (auto&& tree : trees_rooted_at_node) trees.push_back(tree);
+            }
+
+            return trees;
+        }
+
+        std::vector<std::vector<StrPair> > enumDoubleSpanningForests(std::string id1, std::string id2)
+        {
+            /*
+             * Enumerate the two-component spanning forests of the given graph at 
+             * the two given root nodes, by partitioning the nodes into all possible
+             * pairs of subsets and performing Uno's algorithm on each induced 
+             * subgraph. 
+             */
+            // Initialize a vector of spanning forests
+            std::vector<std::vector<StrPair> > forests;
+            Node<T>* root1 = this->getNode(id1);
+            Node<T>* root2 = this->getNode(id2);
+
+            // Get the nodes in the graph
+            std::vector<Node<T>*> nodes = this->getNodes();
+            std::vector<Node<T>*> nonroot;
+            for (auto&& v : nodes)
+            {
+                if (v != root1 && v != root2) nonroot.push_back(v);
+            }
+
+            // Get all subsets of nodes containing root1 and not root2
+            std::vector<std::vector<Node<T>*> > subsets = powerset<Node<T>*>(nonroot);
+            std::vector<std::vector<Node<T>*> > subsets1;
+            for (auto&& subset : subsets)
+            {
+                std::vector<Node<T>*> subset1(subset);
+                subset1.push_back(root1);
+                subsets1.push_back(subset1);
+            }
+
+            // Run Uno's algorithm on each pair of induced subgraphs
+            for (auto&& subset1 : subsets1)
+            {
+                std::vector<Node<T>*> subset2;
+                for (auto&& v : nonroot)
+                {
+                    if (std::find(subset1.begin(), subset1.end(), v) == subset1.end())
+                        subset2.push_back(v);
+                }
+                subset2.push_back(root2);
+                MarkovDigraph<T>* subgraph1 = this->subgraph(subset1);
+                MarkovDigraph<T>* subgraph2 = this->subgraph(subset2);
+                for (auto&& v : subset1) std::cout << v->id << " "; std::cout << "| ";
+                for (auto&& v : subset2) std::cout << v->id << " "; std::cout << std::endl;
+                std::vector<std::vector<StrPair> > trees1 = subgraph1->enumSpanningTrees(id1);
+                std::vector<std::vector<StrPair> > trees2 = subgraph2->enumSpanningTrees(id2);
+
+                // Concatenate each pair of trees to get the desired forests 
+                for (auto&& t1 : trees1)
+                {
+                    for (auto&& t2 : trees2)
+                    {
+                        std::vector<StrPair> forest;
+                        for (auto&& e : t1) forest.push_back(e);
+                        for (auto&& e : t2) forest.push_back(e);
+                        if (forest.size() == nodes.size() - 2)
+                        {
+                            forests.push_back(forest);
+                        }
+                    }
+                }
+
+                // Make sure that dynamically allocated memory is freed!
+                delete subgraph1;
+                delete subgraph2;
+            }
+
+            return forests;
         }
 
         Array<T, Dynamic, 1> getSteadyStateFromSVD(T sv_tol, bool normalize = true)
