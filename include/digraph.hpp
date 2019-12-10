@@ -258,6 +258,33 @@ class MarkovDigraph
                 throw std::runtime_error("Specified edge does not exist");
         }
 
+        // ----------------------------------------------------- //
+        //                     OTHER METHODS                     //
+        // ----------------------------------------------------- //
+        MarkovDigraph<T>* subgraph(std::vector<Node<T>*> nodes) const
+        {
+            /*
+             * Return the subgraph induced by the given vector of nodes.
+             */
+            MarkovDigraph<T>* graph = new MarkovDigraph<T>();
+
+            // Add each edge which lies between two of the given nodes
+            // to the subgraph
+            for (auto&& v : nodes)
+            {
+                for (auto&& w : this->edges.find(v)->second)
+                {
+                    if (std::find(nodes.begin(), nodes.end(), w) != nodes.end())
+                    {
+                        Edge<T> edge = std::make_pair(v, w);
+                        graph->addEdge(v, w, this->labels.find(edge)->second);
+                    }
+                }
+            }
+
+            return graph; 
+        }
+        
         void clear()
         {
             /* 
