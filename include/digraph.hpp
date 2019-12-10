@@ -272,6 +272,11 @@ class MarkovDigraph
             // to the subgraph
             for (auto&& v : nodes)
             {
+                try    // Try adding the node (will throw runtime_error if it already was added)
+                {
+                    graph->addNode(v->id);
+                }
+                catch (const std::runtime_error& e) { }
                 for (auto&& w : this->edges.find(v)->second)
                 {
                     if (std::find(nodes.begin(), nodes.end(), w) != nodes.end())

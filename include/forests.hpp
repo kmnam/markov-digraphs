@@ -169,7 +169,7 @@ std::vector<std::vector<Edge<T> > > enumSpanningTrees(MarkovDigraph<T>* graph, N
     // Get all the edges in the graph and sort them by w.r.t to 
     // DFS traversal 
     std::vector<Edge<T> > edges = graph->getEdges();
-    if (edges.size() == 0)    // If the graph has no edges, return the empty tree
+    if (order.size() == 1)    // If the graph has a single vertex, return the empty tree
     {
         return trees;
     }
@@ -344,7 +344,10 @@ std::vector<std::vector<Edge<T> > > enumDoubleSpanningForests(MarkovDigraph<T>* 
                 {
                     forest.push_back(graph->getEdge(e.first->id, e.second->id));
                 }
-                forests.push_back(forest);
+                if (forest.size() == nodes.size() - 2)
+                {
+                    forests.push_back(forest);
+                }
             }
         }
 
