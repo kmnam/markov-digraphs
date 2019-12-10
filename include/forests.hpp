@@ -171,8 +171,6 @@ std::vector<std::vector<Edge<T> > > enumSpanningTrees(MarkovDigraph<T>* graph, N
     std::vector<Edge<T> > edges = graph->getEdges();
     if (edges.size() == 0)    // If the graph has no edges, return the empty tree
     {
-        std::vector<Edge<T> > empty;
-        trees.push_back(empty);
         return trees;
     }
     std::sort(
