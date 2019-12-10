@@ -1,5 +1,5 @@
-#ifndef ENUM_SPANNING_TREES_HPP
-#define ENUM_SPANNING_TREES_HPP
+#ifndef SPANNING_FORESTS_HPP
+#define SPANNING_FORESTS_HPP
 #include <vector>
 #include <algorithm>
 #include <iterator>
