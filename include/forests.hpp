@@ -23,9 +23,6 @@ bool isBackEdge(const std::vector<Edge<T> >& tree, const Edge<T>& edge)
     Node<T>* source = edge.first;
     Node<T>* target = edge.second;
 
-    // Get number of vertices in the graph (tree)
-    unsigned nvertices = tree.size() + 1;
-
     // Try to draw a path of edges in the tree from target to source
     Node<T>* curr = target;
     bool at_root = false;
@@ -58,23 +55,6 @@ void enumSpanningTreesIter(const std::vector<Edge<T> >& parent_tree,
     /*
      * Recursive function to be called as part of Uno's algorithm. 
      */
-    // Define function for obtaining the least edge in the complement 
-    // of a given tree w.r.t tree0 (i.e., tree0 - tree)
-    std::function<Edge<T>(const std::vector<Edge<T> >&)> least_edge_not_in_tree
-        = [edges, tree0](const std::vector<Edge<T> >& tree)
-    {
-        return *std::find_if(
-            edges.begin(), edges.end(),
-            [tree, tree0](const Edge<T>& e)
-            {
-                return (
-                    std::find(tree0.begin(), tree0.end(), e) != tree0.end() &&
-                    std::find(tree.begin(), tree.end(), e) == tree.end()
-                );
-            }
-        );
-    };
-
     // Define function for obtaining the edge in a given tree with source
     // given by the input vertex
     std::function<Edge<T>(const std::vector<Edge<T> >&, const Node<T>*)> edge_with_source
@@ -151,20 +131,14 @@ std::vector<std::vector<Edge<T> > > enumSpanningTrees(MarkovDigraph<T>* graph, N
     // Initialize a vector of spanning trees
     std::vector<std::vector<Edge<T> > > trees; 
 
-    // Get a DFS spanning tree emanating from each root vertex
-    std::vector<Edge<T> > tree_dfs = graph->getSpanningTreeFromDFS(root);
+    // Get a DFS spanning tree at the root vertex
+    std::vector<Edge<T> > tree0 = graph->getSpanningTreeFromDFS(root);
+    trees.push_back(tree0);
 
     // Order the nodes with respect to the DFS traversal 
     std::vector<Node<T>*> order;
     order.push_back(root);
-    for (auto&& e : tree_dfs) order.push_back(e.second);
-
-    // Reverse the edges in the DFS spanning tree to get a spanning 
-    // tree of the graph 
-    std::vector<Edge<T> > tree0;
-    for (auto&& e : tree_dfs)
-        tree0.push_back(std::make_pair(e.second, e.first));
-    trees.push_back(tree0);
+    for (auto&& e : tree0) order.push_back(e.second);
 
     // Get all the edges in the graph and sort them by w.r.t to 
     // DFS traversal 

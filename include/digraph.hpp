@@ -43,6 +43,13 @@ struct Node
         this->id = id;
     }
 
+    ~Node()
+    {
+        /*
+         * Trivial destructor. 
+         */
+    }
+
     bool operator==(const Node& other) const
     {
         /*
@@ -412,7 +419,51 @@ class MarkovDigraph
         std::vector<Edge<T> > getSpanningTreeFromDFS(Node<T>* root)
         {
             /*
-             * Obtain a vector of edges in a single spanning tree, with  
+             * Obtain a vector of edges in a single spanning in-tree, with  
+             * the edges ordered via a topological sort on the second
+             * index (i.e., for any two edges (i, j) and (k, l) in the
+             * vector such that (j, l) is an edge, (i, j) precedes (k, l)).
+             */
+            std::vector<Edge<T> > tree;
+            std::stack<Node<T>*> stack;
+            std::unordered_set<Node<T>*> visited;
+
+            // Initiate depth-first search from the root
+            visited.insert(root);
+            stack.push(root);
+
+            // Run until stack is empty
+            while (!stack.empty())
+            {
+                // Pop topmost vertex from the stack ...
+                Node<T>* curr = stack.top();
+                stack.pop();
+
+                // ... and push its unvisited neighbors onto the stack
+                std::vector<Node<T>*> neighbors;
+                for (auto&& v : this->edges)
+                {
+                    if (std::find(v.second.begin(), v.second.end(), curr) != v.second.end())
+                        neighbors.push_back(v.first);
+                }
+                for (auto&& neighbor : neighbors)
+                {
+                    if (visited.find(neighbor) == visited.end())
+                    {
+                        tree.push_back(std::make_pair(neighbor, curr));
+                        stack.push(neighbor);
+                        visited.insert(neighbor);
+                    }
+                }
+            }
+
+            return tree;
+        }
+
+        std::vector<Edge<T> > getOutwardTreeFromDFS(Node<T>* root)
+        {
+            /*
+             * Obtain a vector of edges in a single spanning out-tree, with  
              * the edges ordered via a topological sort on the second
              * index (i.e., for any two edges (i, j) and (k, l) in the
              * vector such that (j, l) is an edge, (i, j) precedes (k, l)).
@@ -546,7 +597,7 @@ class MarkovDigraph
                 // Obtain a spanning tree of all accessible nodes from
                 // the first unvisited node (note that all such nodes 
                 // should also be unvisited)
-                std::vector<Edge<T> > tree = this->getSpanningTreeFromDFS(curr_node);
+                std::vector<Edge<T> > tree = this->getOutwardTreeFromDFS(curr_node);
 
                 // Propagate ratios of forward/reverse edge label values
                 // down the tree in log-scale
