@@ -592,7 +592,7 @@ class MarkovDigraph
             }
         }
 
-        std::vector<Edge<T> > getSpanningTreeFromDFS(Node<T>* root)
+        std::vector<Edge<T> > getSpanningTreeFromDFS(std::string id)
         {
             /*
              * Obtain a vector of edges in a single spanning in-tree, with  
@@ -605,6 +605,7 @@ class MarkovDigraph
             std::unordered_set<Node<T>*> visited;
 
             // Initiate depth-first search from the root
+            Node<T>* root = this->getNode(id);
             visited.insert(root);
             stack.push(root);
 
@@ -685,7 +686,7 @@ class MarkovDigraph
 
             // Get a DFS spanning tree at the root vertex
             Node<T>* root = this->getNode(id);
-            std::vector<Edge<T> > tree0 = this->getSpanningTreeFromDFS(root);
+            std::vector<Edge<T> > tree0 = this->getSpanningTreeFromDFS(id);
             std::vector<StrPair> tree0_out;
             for (auto&& e : tree0)
             {
@@ -800,22 +801,28 @@ class MarkovDigraph
                 subset2.push_back(root2);
                 MarkovDigraph<T>* subgraph1 = this->subgraph(subset1);
                 MarkovDigraph<T>* subgraph2 = this->subgraph(subset2);
-                for (auto&& v : subset1) std::cout << v->id << " "; std::cout << "| ";
-                for (auto&& v : subset2) std::cout << v->id << " "; std::cout << std::endl;
-                std::vector<std::vector<StrPair> > trees1 = subgraph1->enumSpanningTrees(id1);
-                std::vector<std::vector<StrPair> > trees2 = subgraph2->enumSpanningTrees(id2);
-
-                // Concatenate each pair of trees to get the desired forests 
-                for (auto&& t1 : trees1)
+                
+                // Compute a spanning tree of the two subgraphs and ensure 
+                // that they are connected
+                std::vector<Edge<T> > tree1 = subgraph1->getSpanningTreeFromDFS(id1);
+                std::vector<Edge<T> > tree2 = subgraph2->getSpanningTreeFromDFS(id2);
+                if (tree1.size() == subset1.size() - 1 && tree2.size() == subset2.size() - 1)
                 {
-                    for (auto&& t2 : trees2)
+                    std::vector<std::vector<StrPair> > trees1 = subgraph1->enumSpanningTrees(id1);
+                    std::vector<std::vector<StrPair> > trees2 = subgraph2->enumSpanningTrees(id2);
+
+                    // Concatenate each pair of trees to get the desired forests 
+                    for (auto&& t1 : trees1)
                     {
-                        std::vector<StrPair> forest;
-                        for (auto&& e : t1) forest.push_back(e);
-                        for (auto&& e : t2) forest.push_back(e);
-                        if (forest.size() == nodes.size() - 2)
+                        for (auto&& t2 : trees2)
                         {
-                            forests.push_back(forest);
+                            std::vector<StrPair> forest;
+                            for (auto&& e : t1) forest.push_back(e);
+                            for (auto&& e : t2) forest.push_back(e);
+                            if (forest.size() == nodes.size() - 2)
+                            {
+                                forests.push_back(forest);
+                            }
                         }
                     }
                 }

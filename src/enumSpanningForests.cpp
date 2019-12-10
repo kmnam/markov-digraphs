@@ -6,7 +6,6 @@
 #include <stdexcept>
 #include <algorithm>
 #include "../include/digraph.hpp"
-#include "../include/forests.hpp"
 
 /*
  * Authors:
@@ -57,34 +56,15 @@ int main(int argc, char** argv)
     // Compute the spanning forests rooted at the given pair of nodes
     std::string root1 = argv[2];
     std::string root2 = argv[3];
-    std::vector<Node<double>*> nodes = graph->getNodes();
-    auto found_root1 = std::find_if(
-        nodes.begin(), nodes.end(), [root1](const Node<double>* v){ return v->id == root1; }
-    );
-    auto found_root2 = std::find_if(
-        nodes.begin(), nodes.end(), [root2](const Node<double>* v){ return v->id == root2; }
-    );
-    if (found_root1 == nodes.end())
-    {
-        std::stringstream ss;
-        ss << "Input node is not a node in the graph: " << root1;
-        throw std::runtime_error(ss.str());
-    }
-    if (found_root2 == nodes.end())
-    {
-        std::stringstream ss;
-        ss << "Input node is not a node in the graph: " << root2;
-        throw std::runtime_error(ss.str());
-    }
-    std::vector<std::vector<Edge<double> > > forests
-        = enumDoubleSpanningForests<double>(graph, *found_root1, *found_root2);
+    std::vector<std::vector<std::pair<std::string, std::string> > > forests
+        = graph->enumDoubleSpanningForests(root1, root2);
 
     // Output forests to stdout
     for (auto&& forest : forests)
     {
         for (auto&& e : forest)
         {
-            std::cout << e.first->id << "," << e.second->id << "\t";
+            std::cout << e.first << "," << e.second << "\t";
         }
         std::cout << std::endl;
     }
