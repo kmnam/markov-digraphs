@@ -26,6 +26,29 @@ typedef MarkovDigraph<double> Graph;
 std::mt19937 rng(1234567890);
 std::uniform_real_distribution<> dist(0, 1);
 
+Graph* single()
+{
+    /*
+     * Return a single-vertex graph.
+     */
+    Graph* graph = new Graph();
+    graph->addNode("1");
+    return graph;
+}
+
+Graph* pair()
+{
+    /*
+     * Return a two-vertex graph.
+     */
+    Graph* graph = new Graph();
+    graph->addNode("1");
+    graph->addNode("2");
+    graph->addEdge("1", "2", 1);
+    graph->addEdge("2", "1", 1);
+    return graph;
+}
+
 Graph* triangle(std::mt19937& rng)
 {
     /*
@@ -67,10 +90,32 @@ Graph* square(std::mt19937& rng)
     return graph;
 }
 
+BOOST_AUTO_TEST_CASE(testSingleGraphSpanningTree)
+{
+    /*
+     * Compute the spanning tree of the one-vertex graph.
+     */
+    Graph* graph = single();
+    std::vector<std::vector<Edge<double> > > trees = enumAllSpanningTrees<double>(graph);
+    BOOST_TEST(trees.size() == 1);
+    delete graph;
+}
+
+BOOST_AUTO_TEST_CASE(testPairGraphSpanningTree)
+{
+    /*
+     * Compute the spanning trees of the two-vertex graph.
+     */
+    Graph* graph = pair();
+    std::vector<std::vector<Edge<double> > > trees = enumAllSpanningTrees<double>(graph);
+    BOOST_TEST(trees.size() == 2);
+    delete graph;
+}
+
 BOOST_AUTO_TEST_CASE(testTriangleGraphSpanningTrees)
 {
     /*
-     * Test that the square graph has the correct set of vertices and edges.
+     * Compute the spanning trees of the triangle graph. 
      */
     Graph* graph = triangle(rng);
     std::vector<std::vector<Edge<double> > > trees = enumAllSpanningTrees<double>(graph);
@@ -78,10 +123,21 @@ BOOST_AUTO_TEST_CASE(testTriangleGraphSpanningTrees)
     delete graph;
 }
 
+BOOST_AUTO_TEST_CASE(testTriangleGraphSpanningForests)
+{
+    /*
+     * Compute the spanning forests of the triangle graph rooted at 1 and 2.
+     */
+    Graph* graph = triangle(rng);
+    std::vector<Node<double>*> nodes = graph->getNodes();
+    enumDoubleSpanningForests<double>(graph, nodes[0], nodes[1]);
+    delete graph;
+}
+
 BOOST_AUTO_TEST_CASE(testSquareGraphSpanningTrees)
 {
     /*
-     * Test that the square graph has the correct set of vertices and edges.
+     * Compute the spanning trees of the square graph. 
      */
     Graph* graph = square(rng);
     std::vector<std::vector<Edge<double> > > trees = enumAllSpanningTrees<double>(graph);
