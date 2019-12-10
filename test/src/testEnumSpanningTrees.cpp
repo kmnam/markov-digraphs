@@ -6,7 +6,7 @@
 #include <Eigen/Dense>
 #include <boost/test/included/unit_test.hpp>
 #include "../../include/digraph.hpp"
-#include "../../include/enumSpanningTrees.hpp"
+#include "../../include/forests.hpp"
 
 /*
  * Test module for the implementation of Uno's algorithm.
@@ -130,7 +130,7 @@ BOOST_AUTO_TEST_CASE(testTriangleGraphSpanningForests)
      */
     Graph* graph = triangle(rng);
     std::vector<Node<double>*> nodes = graph->getNodes();
-    enumDoubleSpanningForests<double>(graph, nodes[0], nodes[1]);
+    std::vector<std::vector<Edge<double> > > forests = enumDoubleSpanningForests<double>(graph, nodes[0], nodes[1]);
     delete graph;
 }
 
