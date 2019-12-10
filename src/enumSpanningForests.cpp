@@ -17,6 +17,14 @@
 
 int main(int argc, char** argv)
 {
+    // Check that the command-line arguments have been specified
+    if (argc != 4)
+    {
+        std::cout << "Invalid call signature\n\nHelp:\n\n"
+                  << "    ./enumSpanningForests.cpp [INPUT FILE] [ROOT 1] [ROOT 2]\n\n";
+        return -1;
+    }
+
     // Parse the graph given in the input file
     std::ifstream infile(argv[1]);
     MarkovDigraph<double>* graph = new MarkovDigraph<double>();
@@ -37,8 +45,14 @@ int main(int argc, char** argv)
             }
             graph->addEdge(tokens[0], tokens[1], 1.0);
         }
+        infile.close();
     }
-    infile.close();
+    else
+    {
+        std::stringstream ss; 
+        ss << "Input file cannot be opened: " << argv[1];
+        throw std::runtime_error(ss.str());
+    }
 
     // Compute the spanning forests rooted at the given pair of nodes
     std::string root1 = argv[2];
@@ -64,6 +78,8 @@ int main(int argc, char** argv)
     }
     std::vector<std::vector<Edge<double> > > forests
         = enumDoubleSpanningForests<double>(graph, *found_root1, *found_root2);
+
+    // Output forests to stdout
     for (auto&& forest : forests)
     {
         for (auto&& e : forest)
