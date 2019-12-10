@@ -277,7 +277,7 @@ class MarkovDigraph
                     if (std::find(nodes.begin(), nodes.end(), w) != nodes.end())
                     {
                         Edge<T> edge = std::make_pair(v, w);
-                        graph->addEdge(v, w, this->labels.find(edge)->second);
+                        graph->addEdge(v->id, w->id, this->labels.find(edge)->second);
                     }
                 }
             }
