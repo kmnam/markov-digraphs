@@ -2,6 +2,7 @@
 #define ENUM_SPANNING_TREES_HPP
 #include <vector>
 #include <algorithm>
+#include <iterator>
 #include "digraph.hpp"
 
 /*
@@ -168,6 +169,12 @@ std::vector<std::vector<Edge<T> > > enumSpanningTrees(MarkovDigraph<T>* graph, N
     // Get all the edges in the graph and sort them by w.r.t to 
     // DFS traversal 
     std::vector<Edge<T> > edges = graph->getEdges();
+    if (edges.size() == 0)    // If the graph has no edges, return the empty tree
+    {
+        std::vector<Edge<T> > empty;
+        trees.push_back(empty);
+        return trees;
+    }
     std::sort(
         edges.begin(), edges.end(), [order](const Edge<T>& left, const Edge<T>& right)
         {
@@ -217,6 +224,128 @@ std::vector<std::vector<Edge<T> > > enumAllSpanningTrees(MarkovDigraph<T>* graph
     }
 
     return trees;
+}
+
+template <typename T>
+std::vector<std::vector<T> > combinations(std::vector<T> data, unsigned k)
+{
+    /*
+     * Return a vector of integer vectors encoding all k-combinations of
+     * an input vector of arbitrary-type elements.
+     */
+    unsigned n = data.size();
+    if (k > n)
+        throw std::invalid_argument("k-combinations of n items undefined for k > n");
+
+    std::vector<std::vector<T> > combinations;    // Vector of combinations
+    std::vector<bool> range(n);                   // Binary indicators for each index
+    std::fill(range.end() - k, range.end(), true);
+
+    do
+    {
+        std::vector<T> c;
+        for (unsigned i = 0; i < n; i++)
+        {
+            if (range[i]) c.push_back(data[i]);
+        }
+        combinations.push_back(c);
+    } while (std::next_permutation(range.begin(), range.end()));
+
+    return combinations; 
+}
+
+template <typename T>
+std::vector<std::vector<T> > powerset(std::vector<T> data)
+{
+    /*
+     * Return a vector of vectors encoding the power set of an 
+     * input vector of arbitrary-type elements. 
+     */
+    // Start with the empty set
+    std::vector<std::vector<T> > powerset;
+    powerset.emplace_back(std::vector<T>());
+
+    // Run through all k-combinations for increasing k
+    std::vector<std::vector<T> > k_combinations;
+    for (unsigned k = 1; k <= data.size(); k++)
+    {
+        k_combinations = combinations(data, k);
+        powerset.insert(
+            powerset.end(),
+            std::make_move_iterator(k_combinations.begin()),
+            std::make_move_iterator(k_combinations.end())
+        );
+    }
+
+    return powerset;
+}
+
+template <typename T>
+std::vector<std::vector<Edge<T> > > enumDoubleSpanningForests(MarkovDigraph<T>* graph,
+                                                              Node<T>* root1, Node<T>* root2)
+{
+    /*
+     * Enumerate the two-component spanning forests of the given graph at 
+     * the two given root nodes, by partitioning the nodes into all possible
+     * pairs of subsets and performing Uno's algorithm on each induced 
+     * subgraph. 
+     */
+    // Initialize a vector of spanning forests
+    std::vector<std::vector<Edge<T> > > forests;
+
+    // Get the nodes in the graph
+    std::vector<Node<T>*> nodes = graph->getNodes();
+    std::vector<Node<T>*> nonroot;
+    for (auto&& v : nodes)
+    {
+        if (v != root1 && v != root2) nonroot.push_back(v);
+    }
+
+    // Get all subsets of nodes containing root1 and not root2
+    std::vector<std::vector<Node<T>*> > subsets = powerset<Node<T>*>(nonroot);
+    std::vector<std::vector<Node<T>*> > subsets1;
+    for (auto&& subset : subsets)
+    {
+        std::vector<Node<T>*> subset1(subset);
+        subset1.push_back(root1);
+        subsets1.push_back(subset1);
+    }
+
+    // Run Uno's algorithm on each pair of induced subgraphs
+    for (auto&& subset1 : subsets1)
+    {
+        std::vector<Node<T>*> subset2;
+        for (auto&& v : nonroot)
+        {
+            if (std::find(subset1.begin(), subset1.end(), v) == subset1.end())
+                subset2.push_back(v);
+        }
+        subset2.push_back(root2);
+        for (auto&& v : subset1) std::cout << v->id << " "; std::cout << "| ";
+        for (auto&& v : subset2) std::cout << v->id << " "; std::cout << std::endl;
+        MarkovDigraph<T>* subgraph1 = graph->subgraph(subset1);
+        MarkovDigraph<T>* subgraph2 = graph->subgraph(subset2);
+        std::vector<std::vector<Edge<T> > > trees1 = enumSpanningTrees(subgraph1, root1);
+        std::vector<std::vector<Edge<T> > > trees2 = enumSpanningTrees(subgraph2, root2);
+
+        // Concatenate each pair of trees to get the desired forests 
+        for (auto&& t1 : trees1)
+        {
+            for (auto&& t2 : trees2)
+            {
+                std::vector<Edge<T> > forest;
+                for (auto&& e : t1) forest.push_back(e);
+                for (auto&& e : t2) forest.push_back(e);
+                forests.push_back(forest);
+                for (auto&& e : forest) std::cout << e.first->id << "," << e.second->id << " ";
+                std::cout << std::endl;
+            }
+        }
+
+        // Make sure that dynamically allocated memory is freed!
+        delete subgraph1;
+        delete subgraph2;
+    }
 }
 
 #endif
