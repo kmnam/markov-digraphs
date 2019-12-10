@@ -319,12 +319,16 @@ std::vector<std::vector<Edge<T> > > enumDoubleSpanningForests(MarkovDigraph<T>* 
                 subset2.push_back(v);
         }
         subset2.push_back(root2);
-        for (auto&& v : subset1) std::cout << v->id << " "; std::cout << "| ";
-        for (auto&& v : subset2) std::cout << v->id << " "; std::cout << std::endl;
         MarkovDigraph<T>* subgraph1 = graph->subgraph(subset1);
         MarkovDigraph<T>* subgraph2 = graph->subgraph(subset2);
-        std::vector<std::vector<Edge<T> > > trees1 = enumSpanningTrees(subgraph1, root1);
-        std::vector<std::vector<Edge<T> > > trees2 = enumSpanningTrees(subgraph2, root2);
+        std::vector<Node<T>*> nodes1 = subgraph1->getNodes();
+        std::vector<Node<T>*> nodes2 = subgraph2->getNodes();
+        auto it1 = std::find_if(nodes1.begin(), nodes1.end(), [root1](const Node<T>* v){ return v->id == root1->id; });
+        auto it2 = std::find_if(nodes2.begin(), nodes2.end(), [root2](const Node<T>* v){ return v->id == root2->id; });
+        Node<T>* root1sub = *it1;
+        Node<T>* root2sub = *it2;
+        std::vector<std::vector<Edge<T> > > trees1 = enumSpanningTrees<T>(subgraph1, root1sub);
+        std::vector<std::vector<Edge<T> > > trees2 = enumSpanningTrees<T>(subgraph2, root2sub);
 
         // Concatenate each pair of trees to get the desired forests 
         for (auto&& t1 : trees1)
@@ -332,11 +336,15 @@ std::vector<std::vector<Edge<T> > > enumDoubleSpanningForests(MarkovDigraph<T>* 
             for (auto&& t2 : trees2)
             {
                 std::vector<Edge<T> > forest;
-                for (auto&& e : t1) forest.push_back(e);
-                for (auto&& e : t2) forest.push_back(e);
+                for (auto&& e : t1)
+                {
+                    forest.push_back(graph->getEdge(e.first->id, e.second->id));
+                }
+                for (auto&& e : t2)
+                {
+                    forest.push_back(graph->getEdge(e.first->id, e.second->id));
+                }
                 forests.push_back(forest);
-                for (auto&& e : forest) std::cout << e.first->id << "," << e.second->id << " ";
-                std::cout << std::endl;
             }
         }
 
@@ -344,6 +352,8 @@ std::vector<std::vector<Edge<T> > > enumDoubleSpanningForests(MarkovDigraph<T>* 
         delete subgraph1;
         delete subgraph2;
     }
+
+    return forests;
 }
 
 #endif
