@@ -21,7 +21,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     12/9/2019
+ *     1/23/2020
  */
 
 // ----------------------------------------------------- //
@@ -561,8 +561,8 @@ class MarkovDigraph
                         if (it != this->labels.end())
                         {
                             laplacian(i,j) = it->second;
-                            if (laplacian(i,j) <= 0)
-                                throw std::runtime_error("Non-positive value specified for edge");
+                            if (laplacian(i,j) < 0)
+                                throw std::runtime_error("Negative value specified for edge");
                         }
                     }
                 }
