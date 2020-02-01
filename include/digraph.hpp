@@ -9,7 +9,7 @@
 #include <unordered_set>
 #include <utility>
 #include <algorithm>
-#include <random>
+#include <boost/random.hpp>
 #include <Eigen/Dense>
 #include <boost/container_hash/hash.hpp>
 #include "linalg.hpp"
@@ -21,7 +21,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     1/23/2020
+ *     2/1/2020
  */
 
 // ----------------------------------------------------- //
@@ -977,7 +977,8 @@ class MarkovDigraph
                 return steady_state.exp();
         }
 
-        void randomizeFree(T param_lower, T param_upper, std::mt19937& rng)
+        void randomizeFree(T param_lower, T param_upper, boost::random::mt19937& rng,
+                           boost::random::uniform_real_distribution<T> dist)
         {
             /*
              * Randomly sample new values from a logarithmic distribution
@@ -985,9 +986,6 @@ class MarkovDigraph
              * parameters without any constraints.
              */
             using std::pow;
-
-            // Uniform distribution over [0, 1)
-            std::uniform_real_distribution<T> dist;
 
             // Iterate over all edges ...
             T rand, value;
