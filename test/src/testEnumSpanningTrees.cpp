@@ -6,7 +6,6 @@
 #include <Eigen/Dense>
 #include <boost/test/included/unit_test.hpp>
 #include "../../include/digraph.hpp"
-#include "../../include/forests.hpp"
 
 /*
  * Test module for the implementation of Uno's algorithm.
@@ -96,7 +95,7 @@ BOOST_AUTO_TEST_CASE(testSingleGraphSpanningTree)
      * Compute the spanning tree of the one-vertex graph.
      */
     Graph* graph = single();
-    std::vector<std::vector<Edge<double> > > trees = enumAllSpanningTrees<double>(graph);
+    std::vector<std::vector<std::pair<std::string, std::string> > > trees = graph->enumAllSpanningTrees();
     BOOST_TEST(trees.size() == 1);
     delete graph;
 }
@@ -107,7 +106,7 @@ BOOST_AUTO_TEST_CASE(testPairGraphSpanningTree)
      * Compute the spanning trees of the two-vertex graph.
      */
     Graph* graph = pair();
-    std::vector<std::vector<Edge<double> > > trees = enumAllSpanningTrees<double>(graph);
+    std::vector<std::vector<std::pair<std::string, std::string> > > trees = graph->enumAllSpanningTrees();
     BOOST_TEST(trees.size() == 2);
     delete graph;
 }
@@ -118,19 +117,8 @@ BOOST_AUTO_TEST_CASE(testTriangleGraphSpanningTrees)
      * Compute the spanning trees of the triangle graph. 
      */
     Graph* graph = triangle(rng);
-    std::vector<std::vector<Edge<double> > > trees = enumAllSpanningTrees<double>(graph);
+    std::vector<std::vector<std::pair<std::string, std::string> > > trees = graph->enumAllSpanningTrees();
     BOOST_TEST(trees.size() == 9);
-    delete graph;
-}
-
-BOOST_AUTO_TEST_CASE(testTriangleGraphSpanningForests)
-{
-    /*
-     * Compute the spanning forests of the triangle graph rooted at 1 and 2.
-     */
-    Graph* graph = triangle(rng);
-    std::vector<Node<double>*> nodes = graph->getNodes();
-    std::vector<std::vector<Edge<double> > > forests = enumDoubleSpanningForests<double>(graph, nodes[0], nodes[1]);
     delete graph;
 }
 
@@ -140,7 +128,7 @@ BOOST_AUTO_TEST_CASE(testSquareGraphSpanningTrees)
      * Compute the spanning trees of the square graph. 
      */
     Graph* graph = square(rng);
-    std::vector<std::vector<Edge<double> > > trees = enumAllSpanningTrees<double>(graph);
+    std::vector<std::vector<std::pair<std::string, std::string> > > trees = graph->enumAllSpanningTrees();
     BOOST_TEST(trees.size() == 16);
     delete graph;
 }
