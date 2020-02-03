@@ -1,14 +1,14 @@
-#define BOOST_TEST_MODULE testDigraph
+#define BOOST_TEST_MODULE testCopyNumberGraph
 #define BOOST_TEST_DYN_LINK
 #include <iostream>
 #include <string>
 #include <Eigen/Dense>
 #include <boost/random.hpp>
 #include <boost/test/included/unit_test.hpp>
-#include "../../include/digraph.hpp"
+#include "../../include/copyNumberGraph.hpp"
 
 /*
- * Test module for the MarkovDigraph class.
+ * Test module for the CopyNumberGraph class.
  *
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
@@ -19,7 +19,7 @@
 using namespace Eigen;
 
 // Use double scalars
-typedef MarkovDigraph<double> Graph;
+typedef CopyNumberGraph<double> Graph;
 
 // Initialize random number generator and uniform distribution
 boost::random::mt19937 rng(1234567890);

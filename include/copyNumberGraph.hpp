@@ -19,7 +19,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     11/21/2019
+ *     2/3/2020
  */
 using namespace Eigen;
 
@@ -214,7 +214,8 @@ class CopyNumberGraph : public MarkovDigraph<T>
 
             // Obtain the nullspace matrix of the Laplacian matrix, modified
             // by the production rate matrices
-            // TODO Replace with Chebotarev-Agaev's recurrence
+            // TODO Replace with Chebotarev-Agaev's recurrence for graphs with 
+            // fewer than 10 vertices 
             Matrix<T, Dynamic, Dynamic> nullmat =
                 nullspaceSVD(laplacian + production_matrix - production_diag, tol);
 
@@ -232,7 +233,9 @@ class CopyNumberGraph : public MarkovDigraph<T>
             unsigned dim = this->nodes.size();
             Matrix<T, Dynamic, Dynamic> binomial_moments(nmoments+1, dim);
             binomial_moments.row(0) = steady_state.matrix().transpose();
-            Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(dim, dim); 
+            Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(dim, dim);
+            // TODO Replace with an algorithm based on the Chebotarev-Agaev recurrence
+            // for graphs with fewer than 10 vertices 
             for (unsigned j = 1; j < nmoments + 1; j++)
             {
                 binomial_moments.row(j) = (production_diag - production_matrix - laplacian + j * identity)
