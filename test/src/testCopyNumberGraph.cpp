@@ -109,11 +109,11 @@ BOOST_AUTO_TEST_CASE(testSquareGraphRecurrence)
     MatrixXd laplacian = graph->getLaplacian();
 
     // Compute the unnormalized steady-state vector
-    VectorXd steady_state = graph->getSteadyStateFromRecurrence(false, 1e-20);
+    VectorXd steady_state = graph->getSteadyStateFromRecurrence(false, 1e-10);
     BOOST_TEST(((laplacian * steady_state.matrix()).array() < 1e-10).all());
 
     // Compute the normalized steady-state vector
-    steady_state = graph->getSteadyStateFromRecurrence(true, 1e-20);
+    steady_state = graph->getSteadyStateFromRecurrence(true, 1e-10);
     BOOST_TEST(steady_state.sum() == 1.0);
     BOOST_TEST(((laplacian * steady_state.matrix()).array() < 1e-10).all());
 
