@@ -24,7 +24,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     11/29/2019
+ *     2/3/2020
  */
 using namespace Eigen;
 using boost::multiprecision::number;
@@ -199,13 +199,13 @@ std::pair<Matrix<T, Dynamic, 1>, T> spanningTreeWeightVector(const Ref<const Mat
 
     // Return the row of the weight matrix whose product with the (negative transpose of)
     // Laplacian matrix has the smallest norm
-    Matrix<T, Dynamic, 1> sqnorm = (weights * (-laplacian)).rowwise().squaredNorm();
+    Matrix<T, Dynamic, 1> norm = (weights * (-laplacian)).rowwise().norm();
     unsigned min_i = 0;
-    for (unsigned i = 1; i < sqnorm.size(); ++i)
+    for (unsigned i = 1; i < norm.size(); ++i)
     {
-        if (sqnorm(i) < sqnorm(min_i)) min_i = i;
+        if (norm(i) < norm(min_i)) min_i = i;
     }
-    return std::make_pair(weights.row(min_i), sqnorm(min_i));
+    return std::make_pair(weights.row(min_i), norm(min_i));
 }
 
 std::pair<DualMatrix, double> spanningTreeWeightVector(const DualMatrix& laplacian)
@@ -226,13 +226,13 @@ std::pair<DualMatrix, double> spanningTreeWeightVector(const DualMatrix& laplaci
 
     // Return the row of the weight matrix whose product with the (negative transpose of)
     // Laplacian matrix has the smallest norm
-    VectorXd sqnorm = (weights.X() * (-laplacian.X())).rowwise().squaredNorm();
+    VectorXd norm = (weights.X() * (-laplacian.X())).rowwise().norm();
     unsigned min_i = 0;
-    for (unsigned i = 1; i < sqnorm.size(); ++i)
+    for (unsigned i = 1; i < norm.size(); ++i)
     {
-        if (sqnorm(i) < sqnorm(min_i)) min_i = i;
+        if (norm(i) < norm(min_i)) min_i = i;
     }
-    return std::make_pair(weights.row(min_i).transpose(), sqnorm(min_i));
+    return std::make_pair(weights.row(min_i).transpose(), norm(min_i));
 }
 
 template <unsigned N, expression_template_option ET>
@@ -254,14 +254,14 @@ std::pair<DualMatrixMP<N, ET>, number<mpfr_float_backend<N>, ET> > spanningTreeW
 
     // Return the row of the weight matrix whose product with the (negative transpose of)
     // Laplacian matrix has the smallest norm
-    Matrix<number<mpfr_float_backend<N>, ET>, Dynamic, 1> sqnorm
-        = (weights.X() * (-laplacian.X())).rowwise().squaredNorm();
+    Matrix<number<mpfr_float_backend<N>, ET>, Dynamic, 1> norm
+        = (weights.X() * (-laplacian.X())).rowwise().norm();
     unsigned min_i = 0;
-    for (unsigned i = 1; i < sqnorm.size(); ++i)
+    for (unsigned i = 1; i < norm.size(); ++i)
     {
-        if (sqnorm(i) < sqnorm(min_i)) min_i = i;
+        if (norm(i) < norm(min_i)) min_i = i;
     }
-    return std::make_pair(weights.row(min_i).transpose(), sqnorm(min_i));
+    return std::make_pair(weights.row(min_i).transpose(), norm(min_i));
 }
 
 
@@ -333,7 +333,7 @@ Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic
     // Check that the precision of the given scalar type exceeds the minimum 
     // required precision for the computation
     Matrix<T, Dynamic, 1> weights;
-    T min_sqnorm;
+    T min_norm;
     if (prec < min_prec)
     {
         if (min_prec <= 30)
@@ -342,7 +342,7 @@ Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic
             Matrix<mpfr_30, Dynamic, Dynamic> B = linalg_internal::convert<T, mpfr_30>(laplacian);
             std::pair<Matrix<mpfr_30, Dynamic, 1>, mpfr_30> result = linalg_internal::spanningTreeWeightVector<mpfr_30>(B);
             weights = result.first.template cast<T>();
-            min_sqnorm = result.second.convert_to<T>();
+            min_norm = result.second.convert_to<T>();
         }
         else if (min_prec <= 60)
         {
@@ -350,7 +350,7 @@ Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic
             Matrix<mpfr_60, Dynamic, Dynamic> B = linalg_internal::convert<T, mpfr_60>(laplacian);
             std::pair<Matrix<mpfr_60, Dynamic, 1>, mpfr_60> result = linalg_internal::spanningTreeWeightVector<mpfr_60>(B);
             weights = result.first.template cast<T>();
-            min_sqnorm = result.second.convert_to<T>();
+            min_norm = result.second.convert_to<T>();
         }
         else if (min_prec <= 100)
         {
@@ -358,7 +358,7 @@ Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic
             Matrix<mpfr_100, Dynamic, Dynamic> B = linalg_internal::convert<T, mpfr_100>(laplacian);
             std::pair<Matrix<mpfr_100, Dynamic, 1>, mpfr_100> result = linalg_internal::spanningTreeWeightVector<mpfr_100>(B);
             weights = result.first.template cast<T>();
-            min_sqnorm = result.second.convert_to<T>();
+            min_norm = result.second.convert_to<T>();
         }
         else if (min_prec <= 200)
         {
@@ -366,7 +366,7 @@ Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic
             Matrix<mpfr_200, Dynamic, Dynamic> B = linalg_internal::convert<T, mpfr_200>(laplacian);
             std::pair<Matrix<mpfr_200, Dynamic, 1>, mpfr_200> result = linalg_internal::spanningTreeWeightVector<mpfr_200>(B);
             weights = result.first.template cast<T>();
-            min_sqnorm = result.second.convert_to<T>();
+            min_norm = result.second.convert_to<T>();
         }
         else
         {
@@ -375,11 +375,11 @@ Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic
     }
     else
     {
-        std::tie(weights, min_sqnorm) = linalg_internal::spanningTreeWeightVector<T>(laplacian);
+        std::tie(weights, min_norm) = linalg_internal::spanningTreeWeightVector<T>(laplacian);
     }
 
     // While the nullspace was not successfully computed ...
-    while (min_sqnorm >= ztol)
+    while (min_norm >= ztol)
     {
         // Update the precision of the type and re-compute the nullspace
         if (prec <= std::numeric_limits<double>::max_digits10)
@@ -388,7 +388,7 @@ Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic
             Matrix<mpfr_30, Dynamic, Dynamic> B = linalg_internal::convert<T, mpfr_30>(laplacian);
             std::pair<Matrix<mpfr_30, Dynamic, 1>, mpfr_30> result = linalg_internal::spanningTreeWeightVector<mpfr_30>(B);
             weights = result.first.template cast<T>();
-            min_sqnorm = result.second.convert_to<T>();
+            min_norm = result.second.convert_to<T>();
         }
         else if (prec <= 30)
         {
@@ -396,7 +396,7 @@ Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic
             Matrix<mpfr_60, Dynamic, Dynamic> B = linalg_internal::convert<T, mpfr_60>(laplacian);
             std::pair<Matrix<mpfr_60, Dynamic, 1>, mpfr_60> result = linalg_internal::spanningTreeWeightVector<mpfr_60>(B);
             weights = result.first.template cast<T>();
-            min_sqnorm = result.second.convert_to<T>();
+            min_norm = result.second.convert_to<T>();
         }
         else if (prec <= 60)
         {
@@ -404,7 +404,7 @@ Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic
             Matrix<mpfr_100, Dynamic, Dynamic> B = linalg_internal::convert<T, mpfr_100>(laplacian);
             std::pair<Matrix<mpfr_100, Dynamic, 1>, mpfr_100> result = linalg_internal::spanningTreeWeightVector<mpfr_100>(B);
             weights = result.first.template cast<T>();
-            min_sqnorm = result.second.convert_to<T>();
+            min_norm = result.second.convert_to<T>();
         }
         else if (prec <= 100)
         {
@@ -412,7 +412,7 @@ Matrix<T, Dynamic, 1> spanningTreeWeightVector(const Ref<const Matrix<T, Dynamic
             Matrix<mpfr_200, Dynamic, Dynamic> B = linalg_internal::convert<T, mpfr_200>(laplacian);
             std::pair<Matrix<mpfr_200, Dynamic, 1>, mpfr_200> result = linalg_internal::spanningTreeWeightVector<mpfr_200>(B);
             weights = result.first.template cast<T>();
-            min_sqnorm = result.second.convert_to<T>();
+            min_norm = result.second.convert_to<T>();
         }
         else
         {
@@ -442,7 +442,7 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
     // Check that the precision of the given scalar type exceeds the minimum 
     // required precision for the computation
     VectorXDual weights(laplacian.rows());
-    double min_sqnorm;
+    double min_norm;
     if (prec < min_prec)
     {
         if (min_prec <= 30)
@@ -458,7 +458,7 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                     result.first(i).d().template convert_to<double>()
                 );
             }
-            min_sqnorm = result.second.x().template convert_to<double>();
+            min_norm = result.second.x().template convert_to<double>();
         }
         else if (min_prec <= 60)
         {
@@ -473,7 +473,7 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                     result.first(i).d().template convert_to<double>()
                 );
             }
-            min_sqnorm = result.second.x().template convert_to<double>();
+            min_norm = result.second.x().template convert_to<double>();
         }
         else if (min_prec <= 100)
         {
@@ -488,7 +488,7 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                     result.first(i).d().template convert_to<double>()
                 );
             }
-            min_sqnorm = result.second.x().template convert_to<double>();
+            min_norm = result.second.x().template convert_to<double>();
         }
         else if (min_prec <= 200)
         {
@@ -503,7 +503,7 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                     result.first(i).d().template convert_to<double>()
                 );
             }
-            min_sqnorm = result.second.x().template convert_to<double>();
+            min_norm = result.second.x().template convert_to<double>();
         }
         else
         {
@@ -514,11 +514,11 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
     {
         std::pair<VectorXDual, DualNumber> result = linalg_internal::spanningTreeWeightVector<DualNumber>(laplacian);
         weights = result.first;
-        min_sqnorm = result.second.x();
+        min_norm = result.second.x();
     }
 
     // While the nullspace was not successfully computed ...
-    while (min_sqnorm >= ztol)
+    while (min_norm >= ztol)
     {
         // Update the precision of the type and re-compute the nullspace
         if (prec <= std::numeric_limits<double>::max_digits10)
@@ -534,7 +534,7 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                     result.first(i).d().template convert_to<double>()
                 );
             }
-            min_sqnorm = result.second.x().template convert_to<double>();
+            min_norm = result.second.x().template convert_to<double>();
         }
         else if (prec <= 30)
         {
@@ -549,7 +549,7 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                     result.first(i).d().template convert_to<double>()
                 );
             }
-            min_sqnorm = result.second.x().template convert_to<double>();
+            min_norm = result.second.x().template convert_to<double>();
         }
         else if (prec <= 60)
         {
@@ -564,7 +564,7 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                     result.first(i).d().template convert_to<double>()
                 );
             }
-            min_sqnorm = result.second.x().template convert_to<double>();
+            min_norm = result.second.x().template convert_to<double>();
         }
         else if (prec <= 100)
         {
@@ -579,7 +579,7 @@ VectorXDual spanningTreeWeightVectorDual(const Ref<const MatrixXDual>& laplacian
                     result.first(i).d().template convert_to<double>()
                 );
             }
-            min_sqnorm = result.second.x().template convert_to<double>();
+            min_norm = result.second.x().template convert_to<double>();
         }
         else
         {
@@ -608,7 +608,7 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
     // Check that the precision of the given scalar type exceeds the minimum 
     // required precision for the computation
     VectorXDual weights(laplacian.rows());
-    double min_sqnorm;
+    double min_norm;
     if (prec < min_prec)
     {
         if (min_prec <= 30)
@@ -628,7 +628,7 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
                     result.first.D()(i).template convert_to<double>()
                 );
             }
-            min_sqnorm = result.second.template convert_to<double>();
+            min_norm = result.second.template convert_to<double>();
         }
         else if (min_prec <= 60)
         {
@@ -647,7 +647,7 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
                     result.first.D()(i).template convert_to<double>()
                 );
             }
-            min_sqnorm = result.second.template convert_to<double>();
+            min_norm = result.second.template convert_to<double>();
         }
         else if (min_prec <= 100)
         {
@@ -666,7 +666,7 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
                     result.first.D()(i).template convert_to<double>()
                 );
             }
-            min_sqnorm = result.second.template convert_to<double>();
+            min_norm = result.second.template convert_to<double>();
         }
         else if (min_prec <= 200)
         {
@@ -685,7 +685,7 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
                     result.first.D()(i).template convert_to<double>()
                 );
             }
-            min_sqnorm = result.second.template convert_to<double>();
+            min_norm = result.second.template convert_to<double>();
         }
         else
         {
@@ -699,11 +699,11 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
         {
             weights(i) = DualNumber(result.first.X()(i), result.first.D()(i));
         }
-        min_sqnorm = result.second;
+        min_norm = result.second;
     }
 
     // While the nullspace was not successfully computed ...
-    while (min_sqnorm >= ztol)
+    while (min_norm >= ztol)
     {
         // Update the precision of the type and re-compute the nullspace
         if (prec <= std::numeric_limits<double>::max_digits10)
@@ -723,7 +723,7 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
                     result.first.D()(i).template convert_to<double>()
                 );
             }
-            min_sqnorm = result.second.template convert_to<double>();
+            min_norm = result.second.template convert_to<double>();
         }
         else if (prec <= 30)
         {
@@ -742,7 +742,7 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
                     result.first.D()(i).template convert_to<double>()
                 );
             }
-            min_sqnorm = result.second.template convert_to<double>();
+            min_norm = result.second.template convert_to<double>();
         }
         else if (prec <= 60)
         {
@@ -761,7 +761,7 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
                     result.first.D()(i).template convert_to<double>()
                 );
             }
-            min_sqnorm = result.second.template convert_to<double>();
+            min_norm = result.second.template convert_to<double>();
         }
         else if (prec <= 100)
         {
@@ -780,7 +780,7 @@ VectorXDual spanningTreeWeightVectorDual(const DualMatrix& laplacian,
                     result.first.D()(i).template convert_to<double>()
                 );
             }
-            min_sqnorm = result.second.template convert_to<double>();
+            min_norm = result.second.template convert_to<double>();
         }
         else
         {
