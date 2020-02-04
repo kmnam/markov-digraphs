@@ -189,7 +189,7 @@ class CopyNumberGraph : public MarkovDigraph<T>
             }
         }
 
-        Matrix<T, Dynamic, Dynamic> getCopyNumberMoments(unsigned nmoments, T tol)
+        Matrix<T, Dynamic, 1> getCopyNumberMoments(unsigned nmoments, T tol)
         {
             /*
              * Compute the steady-state moments of the copy-number distribution.
@@ -207,9 +207,9 @@ class CopyNumberGraph : public MarkovDigraph<T>
             // Obtain the nullspace matrix of the Laplacian matrix, modified
             // by the production rate matrices
             // TODO Replace with Chebotarev-Agaev's recurrence for graphs with 
-            // fewer than 10 vertices 
-            Matrix<T, Dynamic, Dynamic> nullmat =
-                nullspaceSVD(laplacian + production_matrix - production_diag, tol);
+            // fewer than 10 vertices
+            Matrix<T, Dynamic, Dynamic> A = laplacian + production_matrix - production_diag;
+            Matrix<T, Dynamic, Dynamic> nullmat = nullspaceSVD<T>(A, tol);
 
             // Each column of the nullspace matrix corresponds to a basis
             // vector of the nullspace; each row corresponds to a single 
@@ -258,7 +258,7 @@ class CopyNumberGraph : public MarkovDigraph<T>
             moments.block(1, 0, nmoments, 1) = binom_sums;
 
             // Compute standardized moments from the non-central moments
-            Matrix<T, Dynamic, Dynamic> standard_moments(nmoments, 1);
+            Matrix<T, Dynamic, 1> standard_moments(nmoments);
             standard_moments(0) = moments(1);                         // Mean
             standard_moments(1) = moments(2) - pow(moments(1), 2.0);  // Variance
             for (unsigned i = 2; i < nmoments; i++)
