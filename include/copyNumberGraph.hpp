@@ -41,14 +41,6 @@ class CopyNumberGraph : public MarkovDigraph<T>
              */
         }
 
-        ~CopyNumberGraph()
-        {
-            /*
-             * Destructor; de-allocates each microstate from heap memory.
-             */
-            for (auto&& node : this->nodes) delete node;
-        }
-
         void addProductionEdge(std::string source_id, std::string target_id, T label)
         {
             /*
