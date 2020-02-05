@@ -51,50 +51,6 @@ bool isclose(T a, T b, T tol)
     return ((c >= 0.0 && c < tol) || (c < 0.0 && -c < tol));
 }
 
-template <typename T>
-std::pair<Matrix<T, Dynamic, Dynamic>, PermutationMatrix<Dynamic, Dynamic> >
-    permuteRowsAndColumns(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, std::mt19937& rng)
-{
-    /*
-     * Permute the rows and columns of a matrix, and return the result 
-     * and the permutation matrix. 
-     */
-    unsigned n = A.rows();
-    PermutationMatrix<Dynamic, Dynamic> perm(n);
-    perm.setIdentity();
-    std::shuffle(perm.indices().data(), perm.indices().data() + perm.indices().size(), rng);
-    return std::make_pair(perm * A * perm, perm); 
-}
-
-template <typename T>
-Matrix<T, Dynamic, Dynamic> signedStirlingNumbersOfFirstKindByFactorial(unsigned n)
-{
-    /*
-     * Return a lower-triangular matrix whose (i,j)-th entry is the
-     * signed Stirling number of the first kind divided by i!,
-     * s(i,j) / i!, for i >= j.
-     */
-    Matrix<T, Dynamic, Dynamic> S = Matrix<T, Dynamic, Dynamic>::Zero(n+1, n+1);
-
-    // Initialize by setting S(0,0) = 1, S(k,0) = S(0,k) = 0
-    S.row(0) = Matrix<T, 1, Dynamic>::Zero(1, n+1);
-    S.col(0) = Matrix<T, Dynamic, 1>::Zero(n+1, 1);
-    S(0,0) = 1.0;
-
-    // Apply recurrence relation:
-    // S(i,j) = s(i,j) / i! = -(i-1) * s(i-1,j) / i! + s(i-1,j-1) / i!
-    //        = -((i-1) / i) * s(i-1,j) / (i-1)! + (1 / i) * s(i-1,j-1) / i!
-    //        = -((i-1) / i) * S(i-1,j) + (1 / i) * S(i-1,j-1)
-    for (unsigned i = 1; i < n+1; i++)
-    {
-        for (unsigned j = 1; j < i+1; j++)
-            S(i,j) = -((i - 1.0) / i) * S(i-1,j) + (1.0 / i) * S(i-1,j-1);
-    }
-
-    // Return with row 0 and column 0 excised
-    return S.block(1, 1, n, n);
-}
-
 namespace linalg_internal {
 
 template <typename StdType, typename BoostMPFRType>
@@ -263,7 +219,6 @@ std::pair<DualMatrixMP<N, ET>, number<mpfr_float_backend<N>, ET> > spanningTreeW
     }
     return std::make_pair(weights.row(min_i).transpose(), norm(min_i));
 }
-
 
 }   // namespace linalg_internal
 
