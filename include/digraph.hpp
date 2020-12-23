@@ -9,9 +9,9 @@
 #include <unordered_set>
 #include <utility>
 #include <algorithm>
-#include <boost/random.hpp>
 #include <Eigen/Dense>
 #include <boost/container_hash/hash.hpp>
+#include <boost/random.hpp>
 #include "linalg.hpp"
 
 /*
@@ -21,13 +21,12 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     2/1/2020
+ *     12/23/2020
  */
 
 // ----------------------------------------------------- //
 //                    NODES AND EDGES                    //
 // ----------------------------------------------------- //
-template <typename T>
 struct Node
 {
     /*
@@ -61,10 +60,10 @@ struct Node
 
 namespace std {
 
-template <typename T>
-struct hash<Node<T> >
+template <>
+struct hash<Node>
 {
-    std::size_t operator()(const Node<T>& node) const noexcept
+    std::size_t operator()(const Node& node) const noexcept
     {
         return std::hash<std::string>{}(node.id);
     }
@@ -73,35 +72,30 @@ struct hash<Node<T> >
 }   // namespace std
 
 // An Edge is simply a pair of Node pointers
-template <typename T>
-using Edge = std::pair<Node<T>*, Node<T>*>;
-
-// Pairs of strings are used for outputting edges
-typedef std::pair<std::string, std::string> StrPair;
+using Edge = std::pair<Node*, Node*>;
 
 // ------------------------------------------------------- //
 //                     HELPER FUNCTIONS                    //
 // ------------------------------------------------------- //
-template <typename T>
-bool isBackEdge(const std::vector<Edge<T> >& tree, const Edge<T>& edge)
+bool isBackEdge(const std::vector<Edge>& tree, const Edge& edge)
 {
     /*
      * Determines whether the given edge is a "back edge" with respect to a
      * given tree (i.e., if its target vertex has a path to its source vertex
      * in the tree).
      */
-    Node<T>* source = edge.first;
-    Node<T>* target = edge.second;
+    Node* source = edge.first;
+    Node* target = edge.second;
 
     // Try to draw a path of edges in the tree from target to source
-    Node<T>* curr = target;
+    Node* curr = target;
     bool at_root = false;
     while (!at_root)
     {
         // Get the unique edge in the tree leaving curr 
         auto found = std::find_if(
             tree.begin(), tree.end(),
-            [curr](const Edge<T>& e){ return (curr == e.first); }
+            [curr](const Edge& e){ return (curr == e.first); }
         );
         if (found == tree.end()) at_root = true;
         else
@@ -167,34 +161,33 @@ std::vector<std::vector<T> > powerset(std::vector<T> data)
     return powerset;
 }
 
-template <typename T>
-void enumSpanningTreesIter(const std::vector<Edge<T> >& parent_tree,
-                           const std::vector<Edge<T> >& tree0,
-                           const std::vector<Edge<T> >& edges,
-                           const std::vector<Edge<T> >& back_edges,
-                           const std::vector<Edge<T> >& nonback_edges,
-                           const std::vector<Node<T>*>& order, 
-                           std::vector<std::vector<StrPair> >& trees)
+void enumSpanningTreesIter(const std::vector<Edge>& parent_tree,
+                           const std::vector<Edge>& tree0,
+                           const std::vector<Edge>& edges,
+                           const std::vector<Edge>& back_edges,
+                           const std::vector<Edge>& nonback_edges,
+                           const std::vector<Node*>& order, 
+                           std::vector<std::vector<std::pair<std::string, std::string> > >& trees)
 {
     /*
      * Recursive function to be called as part of Uno's algorithm. 
      */
     // Define function for obtaining the edge in a given tree with source
     // given by the input vertex
-    std::function<Edge<T>(const std::vector<Edge<T> >&, const Node<T>*)> edge_with_source
-        = [](const std::vector<Edge<T> >& tree, const Node<T>* node)
+    std::function<Edge(const std::vector<Edge>&, const Node*)> edge_with_source
+        = [](const std::vector<Edge>& tree, const Node* node)
     {
         return *std::find_if(
             tree.begin(), tree.end(),
-            [node](const Edge<T>& e){ return (node == e.first); }
+            [node](const Edge& e){ return (node == e.first); }
         );
     };
 
     // Find the least edge (with respect to source index) that is in 
     // tree0 and not in the parent tree
-    Edge<T> min_edge_not_in_parent_tree;
+    Edge min_edge_not_in_parent_tree;
     auto ite = std::find_if(
-        edges.begin(), edges.end(), [tree0, parent_tree](const Edge<T>& e)
+        edges.begin(), edges.end(), [tree0, parent_tree](const Edge& e)
         {
             return (
                 std::find(tree0.begin(), tree0.end(), e) != tree0.end() &&
@@ -215,29 +208,29 @@ void enumSpanningTreesIter(const std::vector<Edge<T> >& parent_tree,
         {
             // Add the nonback edge and find the edge with the source vertex 
             // of the nonback edge
-            Edge<T> to_be_removed = edge_with_source(parent_tree, e.first);
+            Edge to_be_removed = edge_with_source(parent_tree, e.first);
             auto it = std::find(parent_tree.begin(), parent_tree.end(), to_be_removed);
             unsigned i = it - parent_tree.begin();
-            std::vector<Edge<T> > child_tree(parent_tree);
+            std::vector<Edge> child_tree(parent_tree);
             child_tree[i] = e;
 
             // Classify all edges *not* in the new child tree as either back
             // or non-back edges with respect to the child tree
-            std::vector<Edge<T> > new_back_edges;
-            std::vector<Edge<T> > new_nonback_edges;
+            std::vector<Edge> new_back_edges;
+            std::vector<Edge> new_nonback_edges;
             for (auto&& e : edges)
             {
                 if (std::find(child_tree.begin(), child_tree.end(), e) == child_tree.end())
                 {
-                    if (isBackEdge<T>(child_tree, e)) new_back_edges.push_back(e);
-                    else                              new_nonback_edges.push_back(e);
+                    if (isBackEdge(child_tree, e)) new_back_edges.push_back(e);
+                    else                           new_nonback_edges.push_back(e);
                 }
                 // Note that these edge sets should already be sorted with 
                 // respect to source index 
             }
 
             // Add the child tree and call the function recursively on the child tree
-            std::vector<StrPair> child_tree_out;
+            std::vector<std::pair<std::string, std::string> > child_tree_out;
             for (auto&& e : child_tree) 
             {
                 std::string v(e.first->id);
@@ -265,13 +258,13 @@ class MarkovDigraph
         //                       ATTRIBUTES                      //
         // ----------------------------------------------------- //
         // All nodes in the graph, stored as an ordered vector
-        std::vector<Node<T>*> nodes;
+        std::vector<Node*> nodes;
 
         // All edges in the graph, stored as "adjacency sets"
-        std::unordered_map<Node<T>*, std::unordered_set<Node<T>*> > edges;
+        std::unordered_map<Node*, std::unordered_set<Node*> > edges;
 
         // All edge labels in the graph, stored as a hash table    
-        std::unordered_map<Edge<T>, T, boost::hash<Edge<T> > > labels;
+        std::unordered_map<Edge, T, boost::hash<Edge> > labels;
 
     public:
         MarkovDigraph()
@@ -284,7 +277,7 @@ class MarkovDigraph
         ~MarkovDigraph()
         {
             /*
-             * Destructor; de-allocates each microstate from heap memory.
+             * Destructor; de-allocates each Node from heap memory.
              */
             for (auto&& node : this->nodes) delete node;
         }
@@ -292,25 +285,26 @@ class MarkovDigraph
         // ----------------------------------------------------- //
         //              NODE-ADDING/GETTING METHODS              //
         // ----------------------------------------------------- //
-        Node<T>* addNode(std::string id)
+        Node* addNode(std::string id)
         {
             /*
              * Add a node to the graph with the given ID, and return pointer
-             * to the new node. Throw std::runtime_error if node with given ID
-             * already exists.
+             * to the new node.
+             *
+             * Throw std::runtime_error if node with given ID already exists.
              */
             for (auto&& node : this->nodes)
             {
                 if (!id.compare(node->id))
                     throw std::runtime_error("Node exists with specified ID");
             }
-            Node<T>* node = new Node<T>(id);
+            Node* node = new Node(id);
             this->nodes.push_back(node);
-            this->edges.emplace(node, std::unordered_set<Node<T>*>());
+            this->edges.emplace(node, std::unordered_set<Node*>());
             return node;
         }
 
-        Node<T>* getNode(std::string id) const
+        Node* getNode(std::string id) const
         {
             /*
              * Return pointer to node with given ID.
@@ -323,7 +317,7 @@ class MarkovDigraph
             return nullptr;    // Return nullptr if no matching node exists
         }
 
-        std::vector<Node<T>*> getNodes() const
+        std::vector<Node*> getNodes() const
         {
             /*
              * Return the vector of nodes. 
@@ -339,30 +333,33 @@ class MarkovDigraph
             /*
              * Add an edge between two nodes. If either ID does not 
              * correspond to a node in the graph, instantiate them.
-             * Return the instantiated edge. 
              */
-            Node<T>* source = this->getNode(source_id);
-            Node<T>* target = this->getNode(target_id);
+            Node* source = this->getNode(source_id);
+            Node* target = this->getNode(target_id);
             if (source == nullptr)
                 source = this->addNode(source_id);
             if (target == nullptr)
                 target = this->addNode(target_id);
-            Edge<T> edge = std::make_pair(source, target);
+            Edge edge = std::make_pair(source, target);
             this->edges[source].insert(target);
             this->labels[edge] = label;
         }
 
-        Edge<T> getEdge(std::string source_id, std::string target_id) const
+        Edge getEdge(std::string source_id, std::string target_id) const
         {
             /*
              * Return edge between the specified nodes.
              */
-            Node<T>* source = this->getNode(source_id);
-            Node<T>* target = this->getNode(target_id);
+            Node* source = this->getNode(source_id);
+            Node* target = this->getNode(target_id);
+
+            // Check that both nodes exist 
             if (source == nullptr)
                 throw std::runtime_error("Specified source node does not exist");
             if (target == nullptr)
                 throw std::runtime_error("Specified target node does not exist");
+
+            // Check that the edge exists 
             auto it = this->edges.find(source)->second.find(target);
             if (it != this->edges.find(source)->second.end())
                 return std::make_pair(source, *it);
@@ -370,17 +367,17 @@ class MarkovDigraph
                 return std::make_pair(nullptr, nullptr);
         }
 
-        std::vector<Edge<T> > getEdges() const
+        std::vector<Edge> getEdges() const
         {
             /*
              * Return a vector of all the edges in the graph.
              */
-            std::vector<Edge<T> > edges;
+            std::vector<Edge> edges;
             for (auto&& v : this->nodes)
             {
                 for (auto&& w : this->edges.find(v)->second)
                 {
-                    Edge<T> e = std::make_pair(v, w);
+                    Edge e = std::make_pair(v, w);
                     edges.push_back(e);
                 }
             }
@@ -393,28 +390,31 @@ class MarkovDigraph
              * Get the current numerical value of the given edge label.
              * Return zero if edge does not exist. 
              */
-            Node<T>* source = this->getNode(source_id);
-            Node<T>* target = this->getNode(target_id);
+            Node* source = this->getNode(source_id);
+            Node* target = this->getNode(target_id);
+
+            // Check that both nodes exist 
             if (source == nullptr)
                 throw std::runtime_error("Specified source node does not exist");
             if (target == nullptr)
                 throw std::runtime_error("Specified target node does not exist");
+
+            // Check that the edge exists 
             auto it = this->edges[source].find(target);
             if (it != this->edges[source].end())
             {
-                Edge<T> edge = std::make_pair(source, *it);
+                Edge edge = std::make_pair(source, *it);
                 return this->labels[edge];
             }
-            else return 0.0;
+            else return 0.0;    // Return zero if edge doesn't exist 
         }
 
-        std::unordered_map<Edge<T>, T, boost::hash<Edge<T> > > getEdgeLabels()
+        std::unordered_map<Edge, T, boost::hash<Edge> > getEdgeLabels()
         {
             /*
              * Return a copy of the edge label data. 
              */
-            std::unordered_map<Edge<T>, T, boost::hash<Edge<T> > > labels;
-            labels = this->labels;
+            std::unordered_map<Edge, T, boost::hash<Edge> > labels(this->labels);
             return labels;
         }
 
@@ -425,26 +425,29 @@ class MarkovDigraph
              * Throw std::runtime_error if either node or the edge 
              * does not exist.
              */
-            Node<T>* source = this->getNode(source_id);
-            Node<T>* target = this->getNode(target_id);
+            Node* source = this->getNode(source_id);
+            Node* target = this->getNode(target_id);
+
+            // Check that both nodes exist 
             if (source == nullptr)
                 throw std::runtime_error("Specified source node does not exist");
             if (target == nullptr)
                 throw std::runtime_error("Specified target node does not exist");
+
+            // Check that the edge exists 
             auto it = this->edges[source].find(target);
             if (it != this->edges[source].end())
             {
-                Edge<T> edge = std::make_pair(source, *it);
+                Edge edge = std::make_pair(source, *it);
                 this->labels[edge] = value;
             }
-            else
-                throw std::runtime_error("Specified edge does not exist");
+            else throw std::runtime_error("Specified edge does not exist");
         }
 
         // ----------------------------------------------------- //
         //                     OTHER METHODS                     //
         // ----------------------------------------------------- //
-        MarkovDigraph<T>* subgraph(std::vector<Node<T>*> nodes) const
+        MarkovDigraph<T>* subgraph(std::vector<Node*> nodes) const
         {
             /*
              * Return the subgraph induced by the given vector of nodes.
@@ -460,11 +463,13 @@ class MarkovDigraph
                     graph->addNode(v->id);
                 }
                 catch (const std::runtime_error& e) { }
+
+                // Find all edges between pairs of nodes in the given vector 
                 for (auto&& w : this->edges.find(v)->second)
                 {
                     if (std::find(nodes.begin(), nodes.end(), w) != nodes.end())
                     {
-                        Edge<T> edge = std::make_pair(v, w);
+                        Edge edge = std::make_pair(v, w);
                         graph->addEdge(v->id, w->id, this->labels.find(edge)->second);
                     }
                 }
@@ -478,7 +483,7 @@ class MarkovDigraph
             /* 
              * Clear the graph's contents.
              */
-            // De-allocate all Node instances from heap memory
+            // De-allocate all Nodes from heap memory
             for (auto&& node : this->nodes) delete node;
 
             // Clear all attributes
@@ -504,7 +509,7 @@ class MarkovDigraph
             // Copy over edges and edge label values
             for (auto&& edge_label : this->labels)
             {
-                Edge<T> edge = edge_label.first;
+                Edge edge = edge_label.first;
                 U label(edge_label.second);
                 graph->addEdge(edge.first->id, edge.second->id, label);
             }
@@ -529,7 +534,7 @@ class MarkovDigraph
             // Copy over edges and edge label values
             for (auto&& edge_label : this->labels)
             {
-                Edge<T> edge = edge_label.first;
+                Edge edge = edge_label.first;
                 U label(edge_label.second);
                 graph->addEdge(edge.first->id, edge.second->id, label);
             }
@@ -553,8 +558,8 @@ class MarkovDigraph
                 {
                     if (i != j)
                     {
-                        Node<T>* source = this->nodes[j];
-                        Node<T>* target = this->nodes[i];
+                        Node* source = this->nodes[j];
+                        Node* target = this->nodes[i];
 
                         // Look for value specified for edge j -> i
                         auto it = this->labels.find(std::make_pair(source, target));
@@ -592,7 +597,7 @@ class MarkovDigraph
             }
         }
 
-        std::vector<Edge<T> > getSpanningTreeFromDFS(std::string id)
+        std::vector<Edge> getSpanningTreeFromDFS(std::string id)
         {
             /*
              * Obtain a vector of edges in a single spanning in-tree, with  
@@ -600,12 +605,12 @@ class MarkovDigraph
              * index (i.e., for any two edges (i, j) and (k, l) in the
              * vector such that (j, l) is an edge, (i, j) precedes (k, l)).
              */
-            std::vector<Edge<T> > tree;
-            std::stack<Node<T>*> stack;
-            std::unordered_set<Node<T>*> visited;
+            std::vector<Edge> tree;
+            std::stack<Node*> stack;
+            std::unordered_set<Node*> visited;
 
             // Initiate depth-first search from the root
-            Node<T>* root = this->getNode(id);
+            Node* root = this->getNode(id);
             visited.insert(root);
             stack.push(root);
 
@@ -613,11 +618,11 @@ class MarkovDigraph
             while (!stack.empty())
             {
                 // Pop topmost vertex from the stack ...
-                Node<T>* curr = stack.top();
+                Node* curr = stack.top();
                 stack.pop();
 
                 // ... and push its unvisited neighbors onto the stack
-                std::vector<Node<T>*> neighbors;
+                std::vector<Node*> neighbors;
                 for (auto&& v : this->edges)
                 {
                     if (std::find(v.second.begin(), v.second.end(), curr) != v.second.end())
@@ -637,7 +642,7 @@ class MarkovDigraph
             return tree;
         }
 
-        std::vector<Edge<T> > getOutwardTreeFromDFS(Node<T>* root)
+        std::vector<Edge> getSpanningOutTreeFromDFS(Node* root)
         {
             /*
              * Obtain a vector of edges in a single spanning out-tree, with  
@@ -645,9 +650,9 @@ class MarkovDigraph
              * index (i.e., for any two edges (i, j) and (k, l) in the
              * vector such that (j, l) is an edge, (i, j) precedes (k, l)).
              */
-            std::vector<Edge<T> > tree;
-            std::stack<Node<T>*> stack;
-            std::unordered_set<Node<T>*> visited;
+            std::vector<Edge> tree;
+            std::stack<Node*> stack;
+            std::unordered_set<Node*> visited;
 
             // Initiate depth-first search from the root
             visited.insert(root);
@@ -657,7 +662,7 @@ class MarkovDigraph
             while (!stack.empty())
             {
                 // Pop topmost vertex from the stack ...
-                Node<T>* curr = stack.top();
+                Node* curr = stack.top();
                 stack.pop();
 
                 // ... and push its unvisited neighbors onto the stack
@@ -675,19 +680,19 @@ class MarkovDigraph
             return tree;
         }
 
-        std::vector<std::vector<StrPair> > enumSpanningTrees(std::string id)
+        std::vector<std::vector<std::pair<std::string, std::string> > > enumSpanningTrees(std::string id)
         {
             /*
              * Perform Uno's algorithm for enumerating the spanning trees 
              * rooted at the given node. 
              */
             // Initialize a vector of spanning trees
-            std::vector<std::vector<StrPair> > trees; 
+            std::vector<std::vector<std::pair<std::string, std::string> > > trees; 
 
             // Get a DFS spanning tree at the root vertex
-            Node<T>* root = this->getNode(id);
-            std::vector<Edge<T> > tree0 = this->getSpanningTreeFromDFS(id);
-            std::vector<StrPair> tree0_out;
+            Node* root = this->getNode(id);
+            std::vector<Edge> tree0 = this->getSpanningTreeFromDFS(id);
+            std::vector<std::pair<std::string, std::string> > tree0_out;
             for (auto&& e : tree0)
             {
                 std::string v(e.first->id);
@@ -697,19 +702,19 @@ class MarkovDigraph
             trees.push_back(tree0_out);
 
             // Order the nodes with respect to the DFS traversal 
-            std::vector<Node<T>*> order;
+            std::vector<Node*> order;
             order.push_back(root);
             for (auto&& e : tree0) order.push_back(e.second);
 
             // Get all the edges in the graph and sort them by w.r.t to 
             // DFS traversal 
-            std::vector<Edge<T> > edges = this->getEdges();
+            std::vector<Edge> edges = this->getEdges();
             if (order.size() == 1)    // If the graph has a single vertex, return the empty tree
             {
                 return trees;
             }
             std::sort(
-                edges.begin(), edges.end(), [order](const Edge<T>& left, const Edge<T>& right)
+                edges.begin(), edges.end(), [order](const Edge& left, const Edge& right)
                 {
                     return std::find(order.begin(), order.end(), left.first) < std::find(order.begin(), order.end(), right.first);
                 }
@@ -717,48 +722,46 @@ class MarkovDigraph
 
             // Classify all edges *not* in tree0 as either back or non-back 
             // edges with respect to tree0 
-            std::vector<Edge<T> > back_edges;
-            std::vector<Edge<T> > nonback_edges;
+            std::vector<Edge> back_edges;
+            std::vector<Edge> nonback_edges;
             for (auto&& e : edges)
             {
                 if (std::find(tree0.begin(), tree0.end(), e) == tree0.end())
                 {
-                    if (isBackEdge<T>(tree0, e)) back_edges.push_back(e);
-                    else                         nonback_edges.push_back(e);
+                    if (isBackEdge(tree0, e)) back_edges.push_back(e);
+                    else                      nonback_edges.push_back(e);
                 }
                 // Note that these edge sets should already be sorted with 
                 // respect to source index 
             }
 
             // Call recursive function
-            enumSpanningTreesIter(
-                tree0, tree0, edges, back_edges, nonback_edges, order, trees
-            );
+            enumSpanningTreesIter(tree0, tree0, edges, back_edges, nonback_edges, order, trees);
 
             return trees;
         }
 
-        std::vector<std::vector<StrPair> > enumAllSpanningTrees()
+        std::vector<std::vector<std::pair<std::string, std::string> > > enumAllSpanningTrees()
         {
             /*
              * Perform Uno's algorithm to enumerate all the spanning trees on 
              * the given graph. 
              */
             // Initialize a vector of spanning trees
-            std::vector<std::vector<StrPair> > trees; 
+            std::vector<std::vector<std::pair<std::string, std::string> > > trees; 
 
             // Run Uno's algorithm for each node in the tree 
-            std::vector<Node<T>*> nodes = this->getNodes();
+            std::vector<Node*> nodes = this->getNodes();
             for (auto&& node : nodes)
             {
-                std::vector<std::vector<StrPair> > trees_rooted_at_node = this->enumSpanningTrees(node->id);
+                std::vector<std::vector<std::pair<std::string, std::string> > > trees_rooted_at_node = this->enumSpanningTrees(node->id);
                 for (auto&& tree : trees_rooted_at_node) trees.push_back(tree);
             }
 
             return trees;
         }
 
-        std::vector<std::vector<StrPair> > enumDoubleSpanningForests(std::string id1, std::string id2)
+        std::vector<std::vector<std::pair<std::string, std::string> > > enumTwoRootSpanningForests(std::string id1, std::string id2)
         {
             /*
              * Enumerate the two-component spanning forests of the given graph at 
@@ -767,24 +770,24 @@ class MarkovDigraph
              * subgraph. 
              */
             // Initialize a vector of spanning forests
-            std::vector<std::vector<StrPair> > forests;
-            Node<T>* root1 = this->getNode(id1);
-            Node<T>* root2 = this->getNode(id2);
+            std::vector<std::vector<std::pair<std::string, std::string> > > forests;
+            Node* root1 = this->getNode(id1);
+            Node* root2 = this->getNode(id2);
 
             // Get the nodes in the graph
-            std::vector<Node<T>*> nodes = this->getNodes();
-            std::vector<Node<T>*> nonroot;
+            std::vector<Node*> nodes = this->getNodes();
+            std::vector<Node*> nonroot;
             for (auto&& v : nodes)
             {
                 if (v != root1 && v != root2) nonroot.push_back(v);
             }
 
             // Get all subsets of nodes containing root1 and not root2
-            std::vector<std::vector<Node<T>*> > subsets = powerset<Node<T>*>(nonroot);
-            std::vector<std::vector<Node<T>*> > subsets1;
+            std::vector<std::vector<Node*> > subsets = powerset<Node*>(nonroot);
+            std::vector<std::vector<Node*> > subsets1;
             for (auto&& subset : subsets)
             {
-                std::vector<Node<T>*> subset1(subset);
+                std::vector<Node*> subset1(subset);
                 subset1.push_back(root1);
                 subsets1.push_back(subset1);
             }
@@ -792,7 +795,7 @@ class MarkovDigraph
             // Run Uno's algorithm on each pair of induced subgraphs
             for (auto&& subset1 : subsets1)
             {
-                std::vector<Node<T>*> subset2;
+                std::vector<Node*> subset2;
                 for (auto&& v : nonroot)
                 {
                     if (std::find(subset1.begin(), subset1.end(), v) == subset1.end())
@@ -804,19 +807,19 @@ class MarkovDigraph
                 
                 // Compute a spanning tree of the two subgraphs and ensure 
                 // that they are connected
-                std::vector<Edge<T> > tree1 = subgraph1->getSpanningTreeFromDFS(id1);
-                std::vector<Edge<T> > tree2 = subgraph2->getSpanningTreeFromDFS(id2);
+                std::vector<Edge> tree1 = subgraph1->getSpanningTreeFromDFS(id1);
+                std::vector<Edge> tree2 = subgraph2->getSpanningTreeFromDFS(id2);
                 if (tree1.size() == subset1.size() - 1 && tree2.size() == subset2.size() - 1)
                 {
-                    std::vector<std::vector<StrPair> > trees1 = subgraph1->enumSpanningTrees(id1);
-                    std::vector<std::vector<StrPair> > trees2 = subgraph2->enumSpanningTrees(id2);
+                    std::vector<std::vector<std::pair<std::string, std::string> > > trees1 = subgraph1->enumSpanningTrees(id1);
+                    std::vector<std::vector<std::pair<std::string, std::string> > > trees2 = subgraph2->enumSpanningTrees(id2);
 
                     // Concatenate each pair of trees to get the desired forests 
                     for (auto&& t1 : trees1)
                     {
                         for (auto&& t2 : trees2)
                         {
-                            std::vector<StrPair> forest;
+                            std::vector<std::pair<std::string, std::string> > forest;
                             for (auto&& e : t1) forest.push_back(e);
                             for (auto&& e : t2) forest.push_back(e);
                             if (forest.size() == nodes.size() - 2)
@@ -909,8 +912,6 @@ class MarkovDigraph
              * satisfy detailed balance. This method does not check 
              * whether detailed balance is satisfied.
              */
-            using std::log;
-
             unsigned dim = this->nodes.size();
             Array<T, Dynamic, 1> steady_state(dim);
 
@@ -927,14 +928,14 @@ class MarkovDigraph
                 // in log-scale) to the first unvisited node and mark it
                 // as visited
                 unsigned curr_idx = curr_unvisited - visited.begin();
-                Node<T>* curr_node = this->nodes[curr_idx];
+                Node* curr_node = this->nodes[curr_idx];
                 steady_state(curr_idx) = 0.0;
                 visited[curr_idx] = true;
 
                 // Obtain a spanning tree of all accessible nodes from
                 // the first unvisited node (note that all such nodes 
                 // should also be unvisited)
-                std::vector<Edge<T> > tree = this->getOutwardTreeFromDFS(curr_node);
+                std::vector<Edge> tree = this->getSpanningOutTreeFromDFS(curr_node);
 
                 // Propagate ratios of forward/reverse edge label values
                 // down the tree in log-scale
@@ -942,8 +943,8 @@ class MarkovDigraph
                 T forward, reverse, log_ratio;
                 for (auto&& edge : tree)
                 {
-                    Node<T>* source = edge.first;
-                    Node<T>* target = edge.second;
+                    Node* source = edge.first;
+                    Node* target = edge.second;
                     source_idx = std::find(this->nodes.begin(), this->nodes.end(), source) - this->nodes.begin();
                     target_idx = std::find(this->nodes.begin(), this->nodes.end(), target) - this->nodes.begin();
                     
@@ -953,8 +954,8 @@ class MarkovDigraph
 
                     // Compute the log-ratio of forward/reverse edge label values
                     // (given that they were both specified)
-                    forward = log(this->labels[edge]);
-                    reverse = log(this->labels[std::make_pair(target, source)]);
+                    forward = std::log(this->labels[edge]);
+                    reverse = std::log(this->labels[std::make_pair(target, source)]);
                     log_ratio = forward - reverse;
 
                     // Assign the steady-state value for the target node
@@ -970,7 +971,7 @@ class MarkovDigraph
 
             if (normalize)    // Normalize by log-sum-exp if desired
             {
-                T logsumexp = log((steady_state - steady_state.maxCoeff()).exp().sum());
+                T logsumexp = std::log((steady_state - steady_state.maxCoeff()).exp().sum());
                 return (steady_state - logsumexp).exp();
             }
             else              // Otherwise, simply exponentiate and return
@@ -985,8 +986,6 @@ class MarkovDigraph
              * between 10 ^ param_lower and 10 ^ param_upper for the model
              * parameters without any constraints.
              */
-            using std::pow;
-
             // Iterate over all edges ...
             T rand, value;
             for (auto&& node : this->nodes)
@@ -996,8 +995,8 @@ class MarkovDigraph
                     // ... and update their edge label values, up to the 
                     // precision of the scalar type
                     rand = dist(rng);
-                    value = pow(10.0, param_lower + (param_upper - param_lower) * rand);
-                    Edge<T> edge = std::make_pair(node, dest);
+                    value = std::pow(10.0, param_lower + (param_upper - param_lower) * rand);
+                    Edge edge = std::make_pair(node, dest);
                     this->labels[edge] = value;
                 }
             }
