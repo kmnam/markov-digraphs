@@ -21,7 +21,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     12/23/2020
+ *     12/24/2020
  */
 
 // ----------------------------------------------------- //
@@ -597,7 +597,7 @@ class MarkovDigraph
             }
         }
 
-        std::vector<Edge> getSpanningTreeFromDFS(std::string id)
+        std::vector<Edge> getSpanningInTreeFromDFS(Node* root)
         {
             /*
              * Obtain a vector of edges in a single spanning in-tree, with  
@@ -610,24 +610,27 @@ class MarkovDigraph
             std::unordered_set<Node*> visited;
 
             // Initiate depth-first search from the root
-            Node* root = this->getNode(id);
             visited.insert(root);
             stack.push(root);
 
             // Run until stack is empty
             while (!stack.empty())
             {
-                // Pop topmost vertex from the stack ...
+                // Pop topmost vertex from the stack
                 Node* curr = stack.top();
                 stack.pop();
 
-                // ... and push its unvisited neighbors onto the stack
+                // Find all vertices that have an edge *leading to* curr
                 std::vector<Node*> neighbors;
-                for (auto&& v : this->edges)
+                for (auto&& edge : this->edges)
                 {
-                    if (std::find(v.second.begin(), v.second.end(), curr) != v.second.end())
-                        neighbors.push_back(v.first);
+                    if (std::find(edge.second.begin(), edge.second.end(), curr) != edge.second.end())
+                        neighbors.push_back(edge.first);
                 }
+
+                // For each such source vertex, if not visited already, 
+                // mark as visited, add onto stack, and add the edge to curr 
+                // onto the tree 
                 for (auto&& neighbor : neighbors)
                 {
                     if (visited.find(neighbor) == visited.end())
@@ -661,11 +664,16 @@ class MarkovDigraph
             // Run until stack is empty
             while (!stack.empty())
             {
-                // Pop topmost vertex from the stack ...
+                // Pop topmost vertex from the stack
                 Node* curr = stack.top();
                 stack.pop();
 
-                // ... and push its unvisited neighbors onto the stack
+                // Simply run through the unvisited neighbors of curr,
+                // marking each as visited, pushing onto stack, and adding
+                // the edge from curr to the tree
+                //
+                // (Note that this tree is an *out-tree*, and so each vertex 
+                // has one edge coming into it)
                 for (auto&& neighbor : this->edges[curr])
                 {
                     if (visited.find(neighbor) == visited.end())
@@ -691,7 +699,7 @@ class MarkovDigraph
 
             // Get a DFS spanning tree at the root vertex
             Node* root = this->getNode(id);
-            std::vector<Edge> tree0 = this->getSpanningTreeFromDFS(id);
+            std::vector<Edge> tree0 = this->getSpanningInTreeFromDFS(root);
             std::vector<std::pair<std::string, std::string> > tree0_out;
             for (auto&& e : tree0)
             {
@@ -807,8 +815,8 @@ class MarkovDigraph
                 
                 // Compute a spanning tree of the two subgraphs and ensure 
                 // that they are connected
-                std::vector<Edge> tree1 = subgraph1->getSpanningTreeFromDFS(id1);
-                std::vector<Edge> tree2 = subgraph2->getSpanningTreeFromDFS(id2);
+                std::vector<Edge> tree1 = subgraph1->getSpanningInTreeFromDFS(root1);
+                std::vector<Edge> tree2 = subgraph2->getSpanningInTreeFromDFS(root2);
                 if (tree1.size() == subset1.size() - 1 && tree2.size() == subset2.size() - 1)
                 {
                     std::vector<std::vector<std::pair<std::string, std::string> > > trees1 = subgraph1->enumSpanningTrees(id1);
