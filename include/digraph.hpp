@@ -10,8 +10,6 @@
 #include <utility>
 #include <algorithm>
 #include <Eigen/Dense>
-#include <boost/random.hpp>
-#include "linalg.hpp"
 
 /*
  * An implementation of a labeled directed graph.  
@@ -19,8 +17,90 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     12/27/2020
+ *     12/29/2020
  */
+using namespace Eigen;
+
+// ----------------------------------------------------- //
+//                    LINEAR ALGEBRA                     //
+// ----------------------------------------------------- //
+template <typename T>
+bool isclose(T a, T b, T tol)
+{
+    /*
+     * Return true if abs(a - b) < tol.
+     */
+    T c = a - b;
+    return ((c >= 0 && c < tol) || (c < 0 && -c < tol));
+}
+
+template <typename T>
+Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, const T sv_tol)
+{
+    /*
+     * Compute the nullspace of A by performing a singular value decomposition.
+     *
+     * This function does not check that the given matrix is indeed a
+     * valid row Laplacian matrix (zero row sums, positive diagonal,
+     * negative off-diagonal). 
+     */
+    // Perform a singular value decomposition of A, only computing V in full
+    Eigen::BDCSVD<Matrix<T, Dynamic, Dynamic> > svd(A, Eigen::ComputeFullV);
+
+    // Initialize nullspace basis matrix
+    Matrix<T, Dynamic, Dynamic> nullmat;
+    unsigned ncols = 0;
+    unsigned nrows = A.cols();
+
+    // Run through the singular values of A (in ascending, i.e., reverse order) ...
+    Matrix<T, Dynamic, 1> S = svd.singularValues();
+    Matrix<T, Dynamic, Dynamic> V = svd.matrixV();
+    unsigned nsingvals = S.rows();
+    unsigned j = nsingvals - 1;
+    while (isclose<T>(S(j), 0.0, sv_tol) && j >= 0)
+    {
+        // ... and grab the columns of V that correspond to the zero
+        // singular values
+        ncols++;
+        nullmat.resize(nrows, ncols);
+        nullmat.col(ncols - 1) = V.col(j);
+        j--;
+    }
+
+    return nullmat;
+}
+
+template <typename T>
+Matrix<T, Dynamic, 1> spanningTreeWeights(const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian)
+{
+    /*
+     * Use the recurrence of Chebotarev & Agaev (Lin Alg Appl, 2002, Eqs. 17-18)
+     * for the spanning tree weight vector of the given Laplacian matrix.
+     *
+     * This function does not check that the given matrix is indeed a
+     * valid row Laplacian matrix (zero row sums, positive diagonal,
+     * negative off-diagonal). 
+     */
+    unsigned dim = laplacian.rows();
+    Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(dim, dim);
+    Matrix<T, Dynamic, Dynamic> weights = Matrix<T, Dynamic, Dynamic>::Identity(dim, dim);
+    for (unsigned k = 1; k < dim; ++k)
+    {
+        T K(k);   // Need to cast as type T (to accommodate boost::multiprecision types)
+        T sigma = (laplacian * weights).trace() / K;
+        weights = -laplacian * weights + sigma * identity;
+    }
+
+    // Return the row of the weight matrix whose product with the (negative
+    // transpose of) the Laplacian matrix has the smallest norm
+    Matrix<T, Dynamic, 1> norm = (weights * (-laplacian)).rowwise().norm();
+    unsigned min_i = 0;
+    for (unsigned i = 1; i < norm.size(); ++i)
+    {
+        if (norm(i) < norm(min_i)) min_i = i;
+    }
+    return weights.row(min_i);
+}
 
 // ----------------------------------------------------- //
 //                    NODES AND EDGES                    //
@@ -107,7 +187,7 @@ bool isBackEdge(const std::vector<Edge>& tree, const Edge& edge)
 void enumSpanningInTreesIter(const std::vector<Edge>& parent_tree,
                              const std::vector<Edge>& tree0,
                              const std::vector<Edge>& edges,
-                             std::vector<std::vector<std::pair<std::string, std::string> > >& trees)
+                             std::vector<std::vector<Edge> >& trees)
 {
     /*
      * Recursive function to be called as part of Uno's algorithm.
@@ -148,7 +228,7 @@ void enumSpanningInTreesIter(const std::vector<Edge>& parent_tree,
         // Is this valid edge (1) not in the parent tree, and (2) a non-back-edge
         // with respect to the parent tree?
         if (std::find(parent_tree.begin(), parent_tree.end(), curr_valid_edge) == parent_tree.end()
-            && !isBackEdge(curr_valid_edge, parent_tree))
+            && !isBackEdge(parent_tree, curr_valid_edge))
         {
             // Add the non-back-edge to the parent tree and remove the edge
             // with the same source vertex as the non-back-edge, to obtain
@@ -161,9 +241,7 @@ void enumSpanningInTreesIter(const std::vector<Edge>& parent_tree,
 
             // Add the child tree and call the function recursively on
             // the child tree
-            std::vector<std::pair<std::string, std::string> > tc;
-            for (auto&& e : child_tree) tc.push_back(std::make_pair(e.first->id, e.second->id));
-            trees.push_back(tc);
+            trees.push_back(child_tree);
             enumSpanningInTreesIter(child_tree, tree0, edges, trees);
         }
     }
@@ -182,7 +260,7 @@ class LabeledDigraph
         //                       ATTRIBUTES                      //
         // ----------------------------------------------------- //
         // Dictionary mapping string (ids) to Node pointers 
-        std::unordered_map<std::string, Node*>
+        std::unordered_map<std::string, Node*> nodes;
 
         // Maintain edges in a nested dictionary of adjacency "dictionaries"  
         std::unordered_map<Node*, std::unordered_map<Node*, T> > edges;
@@ -190,7 +268,8 @@ class LabeledDigraph
         // ----------------------------------------------------- //
         //                     PRIVATE METHODS                   //
         // ----------------------------------------------------- //
-        Matrix<T, Dynamic, Dynamic> getLaplacian(std::vector<Node*> nodes) const
+        template <typename U = T>
+        Matrix<U, Dynamic, Dynamic> getLaplacian(std::vector<Node*> nodes)
         {
             /*
              * Return a numerical Laplacian matrix with the given scalar type,
@@ -200,21 +279,23 @@ class LabeledDigraph
              */
             // Initialize a zero matrix with #rows = #cols = #nodes
             unsigned dim = nodes.size();
-            Matrix<T, Dynamic, Dynamic> laplacian = Matrix<T, Dynamic, Dynamic>::Zero(dim, dim);
+            Matrix<U, Dynamic, Dynamic> laplacian = Matrix<U, Dynamic, Dynamic>::Zero(dim, dim);
 
             // Populate the off-diagonal entries of the matrix first: 
             // (i,j)-th entry is the label of the edge j -> i
-            unsigned i = 0, j = 0;
+            unsigned i = 0;
             for (auto&& v : nodes)
             {
+                unsigned j = 0;
                 for (auto&& w : nodes)
                 {
                     if (i != j)
                     {
                         // Get the edge label for j -> i
-                        if (this->edges[w].find(v) != this->edges.end());
+                        if (this->edges[w].find(v) != this->edges[w].end())
                         {
-                            laplacian(i,j) = this->edges[w][v];
+                            U label(this->edges[w][v]);
+                            laplacian(i,j) = label;
                             if (laplacian(i,j) < 0)
                                 throw std::runtime_error("Negative edge label found");
                         }
@@ -232,7 +313,7 @@ class LabeledDigraph
             return laplacian;
         }
 
-        std::vector<Node*> DFS(const Node* init)
+        std::vector<Node*> DFS(Node* init)
         {
             /*
              * Perform a DFS starting from the given node.
@@ -242,7 +323,7 @@ class LabeledDigraph
             std::unordered_map<Node*, bool> visited;
 
             // Initialize every node as having been unvisited
-            for (auto&& edge_set : this->edge)
+            for (auto&& edge_set : this->edges)
                 visited[edge_set.first] = false;
 
             // Starting from init, run until the current node has no 
@@ -271,7 +352,7 @@ class LabeledDigraph
             return order; 
         }
 
-        void tarjanIter(const Node* node, int curr, std::unordered_map<Node*, int>& index,
+        void tarjanIter(Node* node, int curr, std::unordered_map<Node*, int>& index,
                         std::unordered_map<Node*, int>& lowlink, std::stack<Node*>& stack,
                         std::unordered_map<Node*, bool>& onstack,
                         std::vector<std::unordered_set<Node*> >& components)
@@ -307,26 +388,21 @@ class LabeledDigraph
             {
                 std::unordered_set<Node*> component; 
                 Node* next;
-                while (next != node)
+                while (next != node && !stack.empty())
                 {
                     next = stack.top();
-                    stack.pop();
                     onstack[next] = false;
                     component.insert(next);
+                    stack.pop();
                 }
-                // Make sure to pop the node itself as well! 
-                next = stack.top();
-                stack.pop();
-                onstack[next] = false;
-                component.insert(next);
-
+                
                 // Append new component onto vector of components
                 components.push_back(component);
             }
         }
 
-        bool isTerminal(const Node* node, const std::vector<std::unordered_set<Node*> >& components,
-                        const unsigned component_index)
+        bool isTerminal(Node* node, std::vector<std::unordered_set<Node*> >& components,
+                        unsigned component_index)
         {
             /*
              * Return true if the node lies in a terminal strongly connected
@@ -347,7 +423,7 @@ class LabeledDigraph
             return true;
         }
 
-        std::vector<Edge> getSpanningInTreeFromDFS(Node* root)
+        std::pair<std::vector<Edge>, std::vector<Node*> > getSpanningInTreeFromDFS(Node* root)
         {
             /*
              * Obtain a vector of edges in a single spanning in-tree, with  
@@ -358,10 +434,12 @@ class LabeledDigraph
             std::vector<Edge> tree;
             std::stack<Node*> stack;
             std::unordered_set<Node*> visited;
+            std::vector<Node*> traversal;
 
             // Initiate depth-first search from the root
             visited.insert(root);
             stack.push(root);
+            traversal.push_back(root);
 
             // Run until stack is empty
             while (!stack.empty())
@@ -388,14 +466,15 @@ class LabeledDigraph
                         tree.push_back(std::make_pair(neighbor, curr));
                         stack.push(neighbor);
                         visited.insert(neighbor);
+                        traversal.push_back(neighbor);
                     }
                 }
             }
 
-            return tree;
+            return std::make_pair(tree, traversal);
         }
 
-        std::vector<Edge> getSpanningOutTreeFromDFS(Node* root)
+        std::pair<std::vector<Edge>, std::vector<Node*> > getSpanningOutTreeFromDFS(Node* root)
         {
             /*
              * Obtain a vector of edges in a single spanning out-tree, with  
@@ -406,10 +485,12 @@ class LabeledDigraph
             std::vector<Edge> tree;
             std::stack<Node*> stack;
             std::unordered_set<Node*> visited;
+            std::vector<Node*> traversal;
 
             // Initiate depth-first search from the root
             visited.insert(root);
             stack.push(root);
+            traversal.push_back(root);
 
             // Run until stack is empty
             while (!stack.empty())
@@ -432,11 +513,12 @@ class LabeledDigraph
                         tree.push_back(std::make_pair(curr, neighbor));
                         stack.push(neighbor);
                         visited.insert(neighbor);
+                        traversal.push_back(neighbor);
                     }
                 }
             }
 
-            return tree;
+            return std::make_pair(tree, traversal);
         }
 
         std::vector<std::vector<Edge> > enumSpanningInTrees(Node* root)
@@ -449,31 +531,29 @@ class LabeledDigraph
             std::vector<std::vector<Edge> > trees; 
 
             // Get a DFS spanning tree starting at the root vertex
-            std::vector<Edge> tree0 = this->getSpanningInTreeFromDFS(root);
-            trees.push_back(tree0);
-
-            // Sort the nodes with respect to the DFS traversal 
-            std::vector<Node*> order;
-            order.push_back(root);
-            for (auto&& e : tree0) order.push_back(e.second);
+            std::pair<std::vector<Edge>, std::vector<Node*> > tree_dfs = this->getSpanningInTreeFromDFS(root);
+            trees.push_back(tree_dfs.first);
 
             // Get all the edges in the graph and sort them lexicographically
             // with respect to the new (DFS) node order 
             std::vector<std::pair<Edge, T> > edges = this->getEdges();
-            if (order.size() == 1)    // If the graph has a single vertex, return the empty tree
+            if (tree_dfs.second.size() == 1)    // If the graph has a single vertex, return the empty tree
             {
                 return trees;
             }
             std::sort(
                 edges.begin(), edges.end(),
-                [order](const std::pair<Edge, T>& left, const std::pair<Edge, T>& right)
+                [tree_dfs](const std::pair<Edge, T>& left, const std::pair<Edge, T>& right)
                 {
                     Node* lv = left.first.first;
                     Node* rv = right.first.first;
 
                     // Is the source vertex in left less than the source vertex
                     // in right, according to the DFS order?
-                    bool lt = (std::find(order.begin(), order.end(), lv) < std::find(order.begin(), order.end(), rv));
+                    bool lt = (
+                        std::find(tree_dfs.second.begin(), tree_dfs.second.end(), lv)
+                        < std::find(tree_dfs.second.begin(), tree_dfs.second.end(), rv)
+                    );
                     if (lt) return true;
                     // Otherwise, if the source vertices are the same, what about
                     // the target vertices?
@@ -481,15 +561,21 @@ class LabeledDigraph
                     {
                         Node* lw = left.first.second;
                         Node* rw = left.first.second;
-                        lt = (std::find(order.begin(), order.end(), lw) < std::find(order.begin(), order.end(), rw));
+                        lt = (
+                            std::find(tree_dfs.second.begin(), tree_dfs.second.end(), lw)
+                            < std::find(tree_dfs.second.begin(), tree_dfs.second.end(), rw)
+                        );
                         return lt;
                     }
                     return false;   // Otherwise, return false
                 }
             );
+            std::vector<Edge> edges_without_labels;
+            for (auto&& edge : edges)
+                edges_without_labels.push_back(edge.first);
 
             // Call recursive function
-            enumSpanningInTreesIter(tree0, tree0, edges, trees);
+            enumSpanningInTreesIter(tree_dfs.first, tree_dfs.first, edges_without_labels, trees);
 
             return trees;
         }
@@ -529,7 +615,7 @@ class LabeledDigraph
         }
 
         std::pair<std::vector<std::unordered_set<Node*> >,
-                  std::unordered_map<unsigned, std::unordered_map<Node*, std::vector<std::vector<Edge> > > > >
+                  std::vector<std::unordered_map<Node*, std::vector<std::vector<Edge> > > > >
             enumTerminalSpanningInTrees()
         {
             /*
@@ -539,38 +625,51 @@ class LabeledDigraph
             // Run Tarjan's algorithm to get the SCCs of the graph
             std::vector<std::unordered_set<Node*> > components = this->enumStronglyConnectedComponents();
 
-            // Find the terminal SCCs
-            std::function<bool(std::unordered_set<Node*>, unsigned)> isTerminalComponent =
-                [](std::unordered_set<Node*> component, unsigned index)
-                {
-                    return isTerminal(*component.begin(), component, index);
-                };
-
-            // Maintain a dictionary of dictionaries of vectors of spanning trees:
+            // Maintain a vector of dictionaries of vectors of spanning trees:
             // - all_trees[i] is a dictionary containing all spanning trees 
-            //   of the SCC given by components[i]
+            //   of the terminal SCC given by components[i]
+            // - all_trees[i] is empty if components[i] is not terminal
             // - all_trees[i][node] is a vector of spanning trees of the 
             //   spanning trees of components[i] rooted at node
-            std::unordered_map<unsigned, std::unordered_map<Node*, std::vector<std::vector<Edge> > > > all_trees;
+            std::vector<std::unordered_map<Node*, std::vector<std::vector<Edge> > > > all_trees;
 
             // Run Uno's algorithm on each node in each terminal SCC
             for (unsigned i = 0; i < components.size(); ++i)
             {
                 std::unordered_set<Node*> component = components[i];
-                LabeledDigraph<T>* subgraph = this->subgraph(component);
+                all_trees.emplace_back(std::unordered_map<Node*, std::vector<std::vector<Edge> > >());
 
                 // Is the current SCC terminal?
-                if (isTerminalComponent(component, i))
+                if (this->isTerminal(*component.begin(), components, i))
                 {
-                    all_trees.emplace(i, std::unordered_map<Node*, std::vector<std::vector<Edge> > >());
-
                     // If so, run through the nodes in the SCC and get spanning
                     // trees rooted at each node
+                    LabeledDigraph<T>* subgraph = this->subgraph(component);
+                    std::vector<Node*> subnodes = subgraph->getNodes();
+                    std::vector<std::pair<Edge, T> > subedges = subgraph->getEdges();
                     for (auto&& root : component)
                     {
-                        std::vector<std::vector<Edge> > trees = subgraph->enumSpanningInTrees(root);
-                        all_trees[i][root] = trees;
+                        // IMPORTANT: Find the pointer to the root node in
+                        // the *induced subgraph*
+                        Node* subroot = subgraph->getNode(root->id);
+                        std::vector<std::vector<Edge> > subtrees = subgraph->enumSpanningInTrees(subroot);
+                        
+                        // IMPORTANT: Then find the pointer to each node in 
+                        // each tree in the *original graph*
+                        std::vector<std::vector<Edge> > trees;
+                        for (auto&& subtree : subtrees)
+                        {
+                            std::vector<Edge> tree;
+                            for (auto&& subedge : subtree)
+                            {
+                                Edge edge = std::make_pair(this->getNode((subedge.first)->id), this->getNode((subedge.second)->id)); 
+                                tree.push_back(edge);
+                            }
+                            trees.push_back(tree);
+                        }
                     }
+                    
+                    delete subgraph;
                 }
             } 
 
@@ -621,13 +720,13 @@ class LabeledDigraph
              */
             auto it = this->nodes.find(id);
             if (it == this->nodes.end()) return nullptr;
-            else return *it; 
+            else return it->second; 
         }
 
         std::vector<Node*> getNodes() const
         {
             /*
-             * Return a vector of the node pointers. 
+             * Return a vector of the node pointers in arbitrary order.  
              */
             std::vector<Node*> nodes;
             for (auto&& edge_set : this->edges) nodes.push_back(edge_set.first);
@@ -657,7 +756,7 @@ class LabeledDigraph
             this->edges[source][target] = label;
         }
         
-        std::pair<Edge, T> getEdge(std::string source_id, std::string target_id) const
+        std::pair<Edge, T> getEdge(std::string source_id, std::string target_id)
         {
             /*
              * Return the edge between the specified nodes, along with the
@@ -691,8 +790,8 @@ class LabeledDigraph
             {
                 for (auto&& dest : edge_set.second)
                 {
-                    Edge e = std::make_pair(std::make_pair(edge_set.first, dest.first), dest.second);
-                    edges.push_back(e);
+                    Edge edge = std::make_pair(edge_set.first, dest.first);
+                    edges.push_back(std::make_pair(edge, dest.second));
                 }
             }
             return edges;
@@ -726,7 +825,7 @@ class LabeledDigraph
         // ----------------------------------------------------- //
         //                     OTHER METHODS                     //
         // ----------------------------------------------------- //
-        LabeledDigraph<T>* subgraph(std::unordered_set<Node*> nodes) const
+        LabeledDigraph<T>* subgraph(std::unordered_set<Node*> nodes)
         {
             /*
              * Return the subgraph induced by the given subset of nodes.
@@ -814,7 +913,7 @@ class LabeledDigraph
 
             // Copy over nodes with the same IDs
             for (auto&& node : this->nodes)
-                graph->addNode(node->id);
+                graph->addNode(node.first);
 
             // Copy over edges and edge labels
             for (auto&& edge_set : this->edges)
@@ -827,71 +926,112 @@ class LabeledDigraph
             }
         }
 
-        Array<T, Dynamic, 1> getSteadyStateFromSVD(T svtol, bool normalize = true)
+        template <typename U = T>
+        Matrix<U, Dynamic, 1> getSteadyStateFromSVD(std::vector<Node*> nodes, U sv_tol)
         {
             /*
-             * Return a vector of steady-state probabilities for the 
-             * nodes, in the order given by this->nodes, by solving
-             * for the nullspace of the Laplacian matrix.
+             * Return a vector of steady-state probabilities for the nodes,
+             * according to the given ordering of nodes, by solving for the
+             * nullspace of the Laplacian matrix.
              */
-            Matrix<T, Dynamic, Dynamic> laplacian = this->getLaplacian();
+            Matrix<U, Dynamic, Dynamic> laplacian = this->getLaplacian<U>(nodes);
             
             // Obtain the nullspace matrix of the Laplacian matrix
-            Matrix<T, Dynamic, Dynamic> nullspace;
+            Matrix<U, Dynamic, Dynamic> nullmat;
             try
             {
-                nullspace = nullspaceSVD<T>(laplacian, svtol);
+                nullmat = nullspaceSVD<U>(laplacian, sv_tol);
             }
             catch (const std::runtime_error& e)
             {
                 throw;
             }
 
-            // Each column of the nullspace matrix corresponds to a basis
-            // vector of the nullspace; each row corresponds to a single 
-            // microstate in the graph; since each microstate lies in a
-            // single terminal SCC of the graph, each microstate has only
-            // one nullspace basis vector contributing to (defining) its 
-            // steady-state probability
-            Array<T, Dynamic, 1> steady_state = nullspace.array().rowwise().sum();
-            if (normalize)
-                return (steady_state / steady_state.sum());
-            else
-                return steady_state;
+            // Each column is a nullspace basis vector (for each SCC) and
+            // each row corresponds to a node in the graph
+            Matrix<U, Dynamic, 1> steady_state = nullmat.array().rowwise().sum().matrix();
+            
+            return steady_state;
         }
 
-        Array<T, Dynamic, 1> getSteadyStateFromRecurrence(bool normalize, T ztol)
+        template <typename U = T>
+        Matrix<U, Dynamic, 1> getSteadyStateFromRecurrence(std::vector<Node*> nodes)
         {
             /*
-             * Return a vector of steady-state probabilities for the
-             * nodes, in the order given by this->nodes, by the recurrence
+             * Return a vector of steady-state probabilities for the nodes,
+             * according to the given ordering of nodes, by the recurrence
              * relation of Chebotarev & Agaev for the k-th forest matrix
              * (Chebotarev & Agaev, Lin Alg Appl, 2002, Eqs. 17-18).
              */
             // Get the row Laplacian matrix
-            Matrix<T, Dynamic, Dynamic> laplacian = (-this->getLaplacian()).transpose();
+            Matrix<U, Dynamic, Dynamic> laplacian = (-this->getLaplacian<U>(nodes)).transpose();
 
             // Obtain the spanning tree weight vector from the row Laplacian matrix
-            Matrix<T, Dynamic, 1> steady_state;
+            Matrix<U, Dynamic, 1> steady_state;
             try
             {
-                steady_state = spanningTreeWeightVector<T>(laplacian, ztol);
+                steady_state = spanningTreeWeights<U>(laplacian);
             }
             catch (const std::runtime_error& e)
             {
                 throw;
             }
-            if (normalize)
-            {
-                T norm = steady_state.sum();
-                return (steady_state / norm).array();
-            }
-            return steady_state.array(); 
+            
+            return steady_state; 
         }
 
-        Array<T, Dynamic, 1> getSteadyStateFromPaths(bool normalize = true)
+        template <typename U = T>
+        Matrix<U, Dynamic, 1> getSteadyStateFromTrees(std::vector<Node*> nodes)
         {
             /*
+             * Return a vector of steady-state probabilities for the nodes, 
+             * according to the given ordering of nodes, by enumerating the 
+             * spanning trees of the terminal strongly connected components
+             * of the graph. 
+             */
+            // Enumerate the spanning trees of the terminal SCCs of the graph
+            auto data = this->enumTerminalSpanningInTrees();
+            std::vector<std::unordered_set<Node*> > components = data.first;
+            std::vector<std::unordered_map<Node*, std::vector<std::vector<Edge> > > > trees = data.second;
+            
+            // For each node in the ordering, find the SCC it lies within, and 
+            // get the sum of the weights of the spanning trees given by 
+            // the corresponding dictionary
+            Matrix<U, Dynamic, 1> steady_state = Matrix<U, Dynamic, 1>::Zero(nodes.size());
+            for (unsigned i = 0; i < nodes.size(); ++i)
+            {
+                // What SCC does the node lie in?
+                auto it = std::find_if(
+                    components.begin(), components.end(), [nodes, i](const std::unordered_set<Node*> component)
+                    {
+                        return (component.find(nodes[i]) != component.end());
+                    }
+                );
+
+                // If the SCC is terminal, find all the spanning trees of the
+                // SCC rooted at the node
+                unsigned component_index = it - components.begin();
+                if (trees[component_index].size() > 0)
+                {
+                    U total_weight = 0;
+                    for (auto&& tree : trees[component_index][nodes[i]])
+                    {
+                        U tree_weight = 1;
+                        for (auto&& edge : tree)
+                            tree_weight *= this->edges[edge.first][edge.second];
+                        total_weight += tree_weight;
+                    }
+                    steady_state[i] = total_weight;
+                }
+            }
+
+            return steady_state;
+        }
+
+        /*
+        Array<T, Dynamic, 1> getSteadyStateFromPaths(bool normalize = true)
+        {
+            //
              * Return a vector of steady-state probabilities for the
              * nodes, in the order given by this->nodes, by following
              * paths from arbitrarily chosen nodes in each terminal SCC.
@@ -900,7 +1040,7 @@ class LabeledDigraph
              * if, and only if, the given values for the edge labels 
              * satisfy detailed balance. This method does not check 
              * whether detailed balance is satisfied.
-             */
+             //
             unsigned dim = this->nodes.size();
             Array<T, Dynamic, 1> steady_state(dim);
 
@@ -934,8 +1074,8 @@ class LabeledDigraph
                 {
                     Node* source = edge.first;
                     Node* target = edge.second;
-                    source_idx = std::find(this->nodes.begin(), this->nodes.end(), source) - this->nodes.begin();
-                    target_idx = std::find(this->nodes.begin(), this->nodes.end(), target) - this->nodes.begin();
+                    //source_idx = std::find(this->nodes.begin(), this->nodes.end(), source) - this->nodes.begin();
+                    //target_idx = std::find(this->nodes.begin(), this->nodes.end(), target) - this->nodes.begin();
                     
                     // Check that the reverse edge exists in the graph
                     if (this->edges[target].find(source) == this->edges[target].end())
@@ -966,6 +1106,7 @@ class LabeledDigraph
             else              // Otherwise, simply exponentiate and return
                 return steady_state.exp();
         }
+        */
 };
 
 #endif
