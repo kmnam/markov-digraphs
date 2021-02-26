@@ -17,7 +17,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     12/29/2020
+ *     2/25/2021
  */
 using namespace Eigen;
 
@@ -667,11 +667,13 @@ class LabeledDigraph
                             }
                             trees.push_back(tree);
                         }
+
+                        all_trees[i][root] = trees;
                     }
                     
                     delete subgraph;
                 }
-            } 
+            }
 
             return std::make_pair(components, all_trees);
         }
@@ -1021,7 +1023,7 @@ class LabeledDigraph
                             tree_weight *= this->edges[edge.first][edge.second];
                         total_weight += tree_weight;
                     }
-                    steady_state[i] = total_weight;
+                    steady_state(i) = total_weight;
                 }
             }
 
