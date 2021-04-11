@@ -17,7 +17,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     2/25/2021
+ *     4/11/2021
  */
 using namespace Eigen;
 
@@ -71,35 +71,18 @@ Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dyna
 }
 
 template <typename T>
-Matrix<T, Dynamic, 1> spanningTreeWeights(const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian)
+Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian,
+                                                      const Ref<const Matrix<T, Dynamic, Dynamic> >& curr,
+                                                      unsigned k)
 {
     /*
-     * Use the recurrence of Chebotarev & Agaev (Lin Alg Appl, 2002, Eqs. 17-18)
-     * for the spanning tree weight vector of the given Laplacian matrix.
-     *
-     * This function does not check that the given matrix is indeed a
-     * valid row Laplacian matrix (zero row sums, positive diagonal,
-     * negative off-diagonal). 
+     * Apply one iteration of the recurrence of Chebotarev & Agaev (Lin Alg
+     * Appl, 2002, Eqs. 17-18) for the in-forest matrices of the graph. 
      */
-    unsigned dim = laplacian.rows();
-    Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(dim, dim);
-    Matrix<T, Dynamic, Dynamic> weights = Matrix<T, Dynamic, Dynamic>::Identity(dim, dim);
-    for (unsigned k = 1; k < dim; ++k)
-    {
-        T K(k);   // Need to cast as type T (to accommodate boost::multiprecision types)
-        T sigma = (laplacian * weights).trace() / K;
-        weights = -laplacian * weights + sigma * identity;
-    }
-
-    // Return the row of the weight matrix whose product with the (negative
-    // transpose of) the Laplacian matrix has the smallest norm
-    Matrix<T, Dynamic, 1> norm = (weights * (-laplacian)).rowwise().norm();
-    unsigned min_i = 0;
-    for (unsigned i = 1; i < norm.size(); ++i)
-    {
-        if (norm(i) < norm(min_i)) min_i = i;
-    }
-    return weights.row(min_i);
+    T K(k + 1);
+    T sigma = (laplacian * curr).trace() / K;
+    Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(laplacian.rows(), laplacian.cols());
+    return (-laplacian) * curr + sigma * identity; 
 }
 
 // ----------------------------------------------------- //
@@ -147,108 +130,6 @@ struct Node
 // An Edge is simply a pair of Node pointers
 using Edge = std::pair<Node*, Node*>;
 
-// ------------------------------------------------------- //
-//                     HELPER FUNCTIONS                    //
-// ------------------------------------------------------- //
-bool isBackEdge(const std::vector<Edge>& tree, const Edge& edge)
-{
-    /*
-     * Determines whether the given edge is a "back-edge" with respect to a
-     * given tree (i.e., if its target vertex has a path to its source vertex
-     * in the tree).
-     */
-    Node* source = edge.first;
-    Node* target = edge.second;
-
-    // Try to draw a path of edges in the tree from target to source
-    Node* curr = target;
-    bool at_root = false;
-    while (!at_root)
-    {
-        // Find the unique edge in the tree leaving curr 
-        auto found = std::find_if(
-            tree.begin(), tree.end(),
-            [curr](const Edge& e){ return (curr == e.first); }
-        );
-
-        // If this edge doesn't exist, then we have reached the root
-        if (found == tree.end()) at_root = true;
-        else
-        {
-            // If this edge does exist, check that its destination is 
-            // the desired source vertex 
-            curr = found->second;
-            if (curr == source) return true;
-        }
-    }
-    return false;
-}
-
-void enumSpanningInTreesIter(const std::vector<Edge>& parent_tree,
-                             const std::vector<Edge>& tree0,
-                             const std::vector<Edge>& edges,
-                             std::vector<std::vector<Edge> >& trees)
-{
-    /*
-     * Recursive function to be called as part of Uno's algorithm.
-     */
-    // Define function that returns, given a (in-)tree and a vertex, the edge 
-    // with that vertex as its source
-    std::function<Edge(const std::vector<Edge>&, const Node*)> get_leaving_edge
-        = [](const std::vector<Edge>& tree, const Node* node)
-    {
-        return *std::find_if(
-            tree.begin(), tree.end(),
-            [node](const Edge& e){ return (node == e.first); }
-        );
-    };
-
-    // Find the minimal edge that is in tree0 and not in the parent tree
-    // (An edge in the graph is *valid* if less than this minimal edge)
-    Edge min_edge_not_in_parent_tree;
-    auto ite = std::find_if(
-        edges.begin(), edges.end(), [tree0, parent_tree](const Edge& e)
-        {
-            return (
-                std::find(tree0.begin(), tree0.end(), e) != tree0.end() &&
-                std::find(parent_tree.begin(), parent_tree.end(), e) == parent_tree.end()
-            );
-        }
-    );
-    if (ite == edges.end())
-        min_edge_not_in_parent_tree = std::make_pair(nullptr, nullptr);
-    else
-        min_edge_not_in_parent_tree = *ite;
-    
-    // Find each valid non-back-edge with respect to the parent tree
-    for (auto it = edges.begin(); it != ite; ++it)    // Iterate over only valid edges 
-    {
-        Edge curr_valid_edge = *it;
-
-        // Is this valid edge (1) not in the parent tree, and (2) a non-back-edge
-        // with respect to the parent tree?
-        if (std::find(parent_tree.begin(), parent_tree.end(), curr_valid_edge) == parent_tree.end()
-            && !isBackEdge(parent_tree, curr_valid_edge))
-        {
-            // Add the non-back-edge to the parent tree and remove the edge
-            // with the same source vertex as the non-back-edge, to obtain
-            // the *child tree*
-            Edge to_be_removed = get_leaving_edge(parent_tree, curr_valid_edge.first);
-            auto it = std::find(parent_tree.begin(), parent_tree.end(), to_be_removed);
-            unsigned i = it - parent_tree.begin();
-            std::vector<Edge> child_tree(parent_tree);
-            child_tree[i] = curr_valid_edge;
-
-            // Add the child tree and call the function recursively on
-            // the child tree
-            trees.push_back(child_tree);
-            enumSpanningInTreesIter(child_tree, tree0, edges, trees);
-        }
-    }
-}
-
-using namespace Eigen;
-
 template <typename T>
 class LabeledDigraph
 {
@@ -259,6 +140,12 @@ class LabeledDigraph
         // ----------------------------------------------------- //
         //                       ATTRIBUTES                      //
         // ----------------------------------------------------- //
+        // Number of nodes 
+        unsigned N = 0;
+
+        // Store a canonical ordering of nodes 
+        std::vector<Node*> order; 
+
         // Dictionary mapping string (ids) to Node pointers 
         std::unordered_map<std::string, Node*> nodes;
 
@@ -268,51 +155,6 @@ class LabeledDigraph
         // ----------------------------------------------------- //
         //                     PRIVATE METHODS                   //
         // ----------------------------------------------------- //
-        template <typename U = T>
-        Matrix<U, Dynamic, Dynamic> getLaplacian(std::vector<Node*> nodes)
-        {
-            /*
-             * Return a numerical Laplacian matrix with the given scalar type,
-             * according to the given node ordering.
-             *
-             * The ordering is assumed to include every node in the graph once.
-             */
-            // Initialize a zero matrix with #rows = #cols = #nodes
-            unsigned dim = nodes.size();
-            Matrix<U, Dynamic, Dynamic> laplacian = Matrix<U, Dynamic, Dynamic>::Zero(dim, dim);
-
-            // Populate the off-diagonal entries of the matrix first: 
-            // (i,j)-th entry is the label of the edge j -> i
-            unsigned i = 0;
-            for (auto&& v : nodes)
-            {
-                unsigned j = 0;
-                for (auto&& w : nodes)
-                {
-                    if (i != j)
-                    {
-                        // Get the edge label for j -> i
-                        if (this->edges[w].find(v) != this->edges[w].end())
-                        {
-                            U label(this->edges[w][v]);
-                            laplacian(i,j) = label;
-                            if (laplacian(i,j) < 0)
-                                throw std::runtime_error("Negative edge label found");
-                        }
-                    }
-                    j++;
-                }
-                i++;
-            }
-
-            // Populate diagonal entries as negative sums of the off-diagonal
-            // entries in each column
-            for (unsigned i = 0; i < dim; ++i)
-                laplacian(i,i) = -(laplacian.col(i).sum());
-
-            return laplacian;
-        }
-
         std::vector<Node*> DFS(Node* init)
         {
             /*
@@ -423,163 +265,6 @@ class LabeledDigraph
             return true;
         }
 
-        std::pair<std::vector<Edge>, std::vector<Node*> > getSpanningInTreeFromDFS(Node* root)
-        {
-            /*
-             * Obtain a vector of edges in a single spanning in-tree, with  
-             * the edges ordered via a topological sort on the second
-             * index (i.e., for any two edges (i, j) and (k, l) in the
-             * vector such that (j, l) is an edge, (i, j) precedes (k, l)).
-             */
-            std::vector<Edge> tree;
-            std::stack<Node*> stack;
-            std::unordered_set<Node*> visited;
-            std::vector<Node*> traversal;
-
-            // Initiate depth-first search from the root
-            visited.insert(root);
-            stack.push(root);
-            traversal.push_back(root);
-
-            // Run until stack is empty
-            while (!stack.empty())
-            {
-                // Pop topmost node from the stack
-                Node* curr = stack.top();
-                stack.pop();
-
-                // Find all nodes that have an edge *leading to* curr
-                std::vector<Node*> neighbors;
-                for (auto&& edge_set : this->edges)
-                {
-                    if (edge_set.second.find(curr) != edge_set.second.end())
-                        neighbors.push_back(edge_set.first);
-                }
-
-                // For each such source node, if not visited already: 
-                // mark as visited, add onto stack, and add the edge to curr 
-                // onto the tree 
-                for (auto&& neighbor : neighbors)
-                {
-                    if (visited.find(neighbor) == visited.end())
-                    {
-                        tree.push_back(std::make_pair(neighbor, curr));
-                        stack.push(neighbor);
-                        visited.insert(neighbor);
-                        traversal.push_back(neighbor);
-                    }
-                }
-            }
-
-            return std::make_pair(tree, traversal);
-        }
-
-        std::pair<std::vector<Edge>, std::vector<Node*> > getSpanningOutTreeFromDFS(Node* root)
-        {
-            /*
-             * Obtain a vector of edges in a single spanning out-tree, with  
-             * the edges ordered via a topological sort on the second
-             * index (i.e., for any two edges (i, j) and (k, l) in the
-             * vector such that (j, l) is an edge, (i, j) precedes (k, l)).
-             */
-            std::vector<Edge> tree;
-            std::stack<Node*> stack;
-            std::unordered_set<Node*> visited;
-            std::vector<Node*> traversal;
-
-            // Initiate depth-first search from the root
-            visited.insert(root);
-            stack.push(root);
-            traversal.push_back(root);
-
-            // Run until stack is empty
-            while (!stack.empty())
-            {
-                // Pop topmost vertex from the stack
-                Node* curr = stack.top();
-                stack.pop();
-
-                // Simply run through the unvisited neighbors of curr,
-                // marking each as visited, pushing onto stack, and adding
-                // the edge from curr to the tree
-                //
-                // (Note that this tree is an *out-tree*, and so each vertex 
-                // has one edge coming into it, not one edge leaving it)
-                for (auto&& dest : this->edges[curr])
-                {
-                    Node* neighbor = dest.first;
-                    if (visited.find(neighbor) == visited.end())
-                    {
-                        tree.push_back(std::make_pair(curr, neighbor));
-                        stack.push(neighbor);
-                        visited.insert(neighbor);
-                        traversal.push_back(neighbor);
-                    }
-                }
-            }
-
-            return std::make_pair(tree, traversal);
-        }
-
-        std::vector<std::vector<Edge> > enumSpanningInTrees(Node* root)
-        {
-            /*
-             * Perform Uno's algorithm for enumerating the spanning trees 
-             * rooted at the given node. 
-             */
-            // Initialize a vector of spanning trees
-            std::vector<std::vector<Edge> > trees; 
-
-            // Get a DFS spanning tree starting at the root vertex
-            std::pair<std::vector<Edge>, std::vector<Node*> > tree_dfs = this->getSpanningInTreeFromDFS(root);
-            trees.push_back(tree_dfs.first);
-
-            // Get all the edges in the graph and sort them lexicographically
-            // with respect to the new (DFS) node order 
-            std::vector<std::pair<Edge, T> > edges = this->getEdges();
-            if (tree_dfs.second.size() == 1)    // If the graph has a single vertex, return the empty tree
-            {
-                return trees;
-            }
-            std::sort(
-                edges.begin(), edges.end(),
-                [tree_dfs](const std::pair<Edge, T>& left, const std::pair<Edge, T>& right)
-                {
-                    Node* lv = left.first.first;
-                    Node* rv = right.first.first;
-
-                    // Is the source vertex in left less than the source vertex
-                    // in right, according to the DFS order?
-                    bool lt = (
-                        std::find(tree_dfs.second.begin(), tree_dfs.second.end(), lv)
-                        < std::find(tree_dfs.second.begin(), tree_dfs.second.end(), rv)
-                    );
-                    if (lt) return true;
-                    // Otherwise, if the source vertices are the same, what about
-                    // the target vertices?
-                    else if (lv == rv)
-                    {
-                        Node* lw = left.first.second;
-                        Node* rw = left.first.second;
-                        lt = (
-                            std::find(tree_dfs.second.begin(), tree_dfs.second.end(), lw)
-                            < std::find(tree_dfs.second.begin(), tree_dfs.second.end(), rw)
-                        );
-                        return lt;
-                    }
-                    return false;   // Otherwise, return false
-                }
-            );
-            std::vector<Edge> edges_without_labels;
-            for (auto&& edge : edges)
-                edges_without_labels.push_back(edge.first);
-
-            // Call recursive function
-            enumSpanningInTreesIter(tree_dfs.first, tree_dfs.first, edges_without_labels, trees);
-
-            return trees;
-        }
-
         std::vector<std::unordered_set<Node*> > enumStronglyConnectedComponents()
         {
             /*
@@ -614,70 +299,6 @@ class LabeledDigraph
             return components;
         }
 
-        std::pair<std::vector<std::unordered_set<Node*> >,
-                  std::vector<std::unordered_map<Node*, std::vector<std::vector<Edge> > > > >
-            enumTerminalSpanningInTrees()
-        {
-            /*
-             * Perform Uno's algorithm to enumerate all the spanning (in-)trees
-             * of each terminal strongly connected component in the graph. 
-             */
-            // Run Tarjan's algorithm to get the SCCs of the graph
-            std::vector<std::unordered_set<Node*> > components = this->enumStronglyConnectedComponents();
-
-            // Maintain a vector of dictionaries of vectors of spanning trees:
-            // - all_trees[i] is a dictionary containing all spanning trees 
-            //   of the terminal SCC given by components[i]
-            // - all_trees[i] is empty if components[i] is not terminal
-            // - all_trees[i][node] is a vector of spanning trees of the 
-            //   spanning trees of components[i] rooted at node
-            std::vector<std::unordered_map<Node*, std::vector<std::vector<Edge> > > > all_trees;
-
-            // Run Uno's algorithm on each node in each terminal SCC
-            for (unsigned i = 0; i < components.size(); ++i)
-            {
-                std::unordered_set<Node*> component = components[i];
-                all_trees.emplace_back(std::unordered_map<Node*, std::vector<std::vector<Edge> > >());
-
-                // Is the current SCC terminal?
-                if (this->isTerminal(*component.begin(), components, i))
-                {
-                    // If so, run through the nodes in the SCC and get spanning
-                    // trees rooted at each node
-                    LabeledDigraph<T>* subgraph = this->subgraph(component);
-                    std::vector<Node*> subnodes = subgraph->getNodes();
-                    std::vector<std::pair<Edge, T> > subedges = subgraph->getEdges();
-                    for (auto&& root : component)
-                    {
-                        // IMPORTANT: Find the pointer to the root node in
-                        // the *induced subgraph*
-                        Node* subroot = subgraph->getNode(root->id);
-                        std::vector<std::vector<Edge> > subtrees = subgraph->enumSpanningInTrees(subroot);
-                        
-                        // IMPORTANT: Then find the pointer to each node in 
-                        // each tree in the *original graph*
-                        std::vector<std::vector<Edge> > trees;
-                        for (auto&& subtree : subtrees)
-                        {
-                            std::vector<Edge> tree;
-                            for (auto&& subedge : subtree)
-                            {
-                                Edge edge = std::make_pair(this->getNode((subedge.first)->id), this->getNode((subedge.second)->id)); 
-                                tree.push_back(edge);
-                            }
-                            trees.push_back(tree);
-                        }
-
-                        all_trees[i][root] = trees;
-                    }
-                    
-                    delete subgraph;
-                }
-            }
-
-            return std::make_pair(components, all_trees);
-        }
-
     public:
         LabeledDigraph()
         {
@@ -710,8 +331,10 @@ class LabeledDigraph
                 throw std::runtime_error("Node exists with specified id");
 
             Node* node = new Node(id);
+            this->order.push_back(node); 
             this->nodes[id] = node;
             this->edges.emplace(node, std::unordered_map<Node*, T>());
+            this->N++;
             return node;
         }
 
@@ -725,14 +348,12 @@ class LabeledDigraph
             else return it->second; 
         }
 
-        std::vector<Node*> getNodes() const
+        bool hasNode(std::string id) const 
         {
             /*
-             * Return a vector of the node pointers in arbitrary order.  
+             * Return true if node with given id exists in the graph. 
              */
-            std::vector<Node*> nodes;
-            for (auto&& edge_set : this->edges) nodes.push_back(edge_set.first);
-            return nodes; 
+            return this->nodes.count(id);
         }
 
         // ----------------------------------------------------- //
@@ -781,22 +402,20 @@ class LabeledDigraph
                 return std::make_pair(std::make_pair(nullptr, nullptr), 0);
         }
 
-        std::vector<std::pair<Edge, T> > getEdges() const
+        bool hasEdge(std::string source_id, std::string target_id) const
         {
             /*
-             * Return a vector of all the edges in the graph, along with the 
-             * edge labels. 
+             * Return true if the given edge exists in the graph. 
              */
-            std::vector<std::pair<Edge, T> > edges;
-            for (auto&& edge_set : this->edges)
+            // Check that the two nodes exist 
+            if (this->nodes.count(source_id) && this->nodes.count(target_id))
             {
-                for (auto&& dest : edge_set.second)
-                {
-                    Edge edge = std::make_pair(edge_set.first, dest.first);
-                    edges.push_back(std::make_pair(edge, dest.second));
-                }
+                // Look up the edge to see if it exists 
+                Node* source = this->nodes.find(source_id)->second;
+                Node* target = this->nodes.find(target_id)->second;
+                return (this->edges.count(source) && (this->edges.find(source))->second.count(target));
             }
-            return edges;
+            return false;
         }
 
         void setEdgeLabel(std::string source_id, std::string target_id, T value)
@@ -928,21 +547,82 @@ class LabeledDigraph
             }
         }
 
-        template <typename U = T>
-        Matrix<U, Dynamic, 1> getSteadyStateFromSVD(std::vector<Node*> nodes, U sv_tol)
+        Matrix<T, Dynamic, Dynamic> getLaplacian()
+        {
+            /*
+             * Return a numerical Laplacian matrix with the given scalar type,
+             * according to the given node ordering.
+             *
+             * The ordering is assumed to include every node in the graph once.
+             */
+            // Initialize a zero matrix with #rows = #cols = #nodes
+            Matrix<T, Dynamic, Dynamic> laplacian = Matrix<T, Dynamic, Dynamic>::Zero(this->N, this->N);
+
+            // Populate the off-diagonal entries of the matrix first: 
+            // (i,j)-th entry is the label of the edge j -> i
+            unsigned i = 0;
+            for (auto&& v : this->order)
+            {
+                unsigned j = 0;
+                for (auto&& w : this->order)
+                {
+                    if (i != j)
+                    {
+                        // Get the edge label for j -> i
+                        if (this->edges[w].find(v) != this->edges[w].end())
+                        {
+                            T label(this->edges[w][v]);
+                            laplacian(i,j) = label;
+                            if (laplacian(i,j) < 0)
+                                throw std::runtime_error("Negative edge label found");
+                        }
+                    }
+                    j++;
+                }
+                i++;
+            }
+
+            // Populate diagonal entries as negative sums of the off-diagonal
+            // entries in each column
+            for (unsigned i = 0; i < this->N; ++i)
+                laplacian(i,i) = -(laplacian.col(i).sum());
+
+            return laplacian;
+        }
+
+        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrix(unsigned k)
+        {
+            /*
+             * Compute the k-th spanning forest matrix, using the recurrence
+             * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs. 17-18). 
+             */
+            // Begin with the identity matrix 
+            Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->N, this->N);
+
+            // Apply the recurrence ...
+            // NOTE: The row Laplacian is required here!
+            //       Not the column Laplacian, as per usual!
+            Matrix<T, Dynamic, Dynamic> laplacian = -this->getLaplacian().transpose();
+            for (unsigned i = 0; i < k; ++i)
+                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i);
+
+            return curr; 
+        }
+
+        Matrix<T, Dynamic, 1> getSteadyStateFromSVD(T sv_tol)
         {
             /*
              * Return a vector of steady-state probabilities for the nodes,
-             * according to the given ordering of nodes, by solving for the
-             * nullspace of the Laplacian matrix.
+             * according to the canonical ordering of nodes, by solving for
+             * the nullspace of the Laplacian matrix.
              */
-            Matrix<U, Dynamic, Dynamic> laplacian = this->getLaplacian<U>(nodes);
+            Matrix<T, Dynamic, Dynamic> laplacian = this->getLaplacian();
             
             // Obtain the nullspace matrix of the Laplacian matrix
-            Matrix<U, Dynamic, Dynamic> nullmat;
+            Matrix<T, Dynamic, Dynamic> nullmat;
             try
             {
-                nullmat = nullspaceSVD<U>(laplacian, sv_tol);
+                nullmat = nullspaceSVD<T>(laplacian, sv_tol);
             }
             catch (const std::runtime_error& e)
             {
@@ -951,13 +631,12 @@ class LabeledDigraph
 
             // Each column is a nullspace basis vector (for each SCC) and
             // each row corresponds to a node in the graph
-            Matrix<U, Dynamic, 1> steady_state = nullmat.array().rowwise().sum().matrix();
+            Matrix<T, Dynamic, 1> steady_state = nullmat.array().rowwise().sum().matrix();
             
             return steady_state;
         }
 
-        template <typename U = T>
-        Matrix<U, Dynamic, 1> getSteadyStateFromRecurrence(std::vector<Node*> nodes)
+        Matrix<T, Dynamic, 1> getSteadyStateFromRecurrence()
         {
             /*
              * Return a vector of steady-state probabilities for the nodes,
@@ -965,69 +644,11 @@ class LabeledDigraph
              * relation of Chebotarev & Agaev for the k-th forest matrix
              * (Chebotarev & Agaev, Lin Alg Appl, 2002, Eqs. 17-18).
              */
-            // Get the row Laplacian matrix
-            Matrix<U, Dynamic, Dynamic> laplacian = (-this->getLaplacian<U>(nodes)).transpose();
+            // Obtain the spanning tree weight matrix from the row Laplacian matrix
+            Matrix<T, Dynamic, Dynamic> forest_matrix = this->getSpanningForestMatrix(this->N - 1);
 
-            // Obtain the spanning tree weight vector from the row Laplacian matrix
-            Matrix<U, Dynamic, 1> steady_state;
-            try
-            {
-                steady_state = spanningTreeWeights<U>(laplacian);
-            }
-            catch (const std::runtime_error& e)
-            {
-                throw;
-            }
-            
-            return steady_state; 
-        }
-
-        template <typename U = T>
-        Matrix<U, Dynamic, 1> getSteadyStateFromTrees(std::vector<Node*> nodes)
-        {
-            /*
-             * Return a vector of steady-state probabilities for the nodes, 
-             * according to the given ordering of nodes, by enumerating the 
-             * spanning trees of the terminal strongly connected components
-             * of the graph. 
-             */
-            // Enumerate the spanning trees of the terminal SCCs of the graph
-            auto data = this->enumTerminalSpanningInTrees();
-            std::vector<std::unordered_set<Node*> > components = data.first;
-            std::vector<std::unordered_map<Node*, std::vector<std::vector<Edge> > > > trees = data.second;
-            
-            // For each node in the ordering, find the SCC it lies within, and 
-            // get the sum of the weights of the spanning trees given by 
-            // the corresponding dictionary
-            Matrix<U, Dynamic, 1> steady_state = Matrix<U, Dynamic, 1>::Zero(nodes.size());
-            for (unsigned i = 0; i < nodes.size(); ++i)
-            {
-                // What SCC does the node lie in?
-                auto it = std::find_if(
-                    components.begin(), components.end(), [nodes, i](const std::unordered_set<Node*> component)
-                    {
-                        return (component.find(nodes[i]) != component.end());
-                    }
-                );
-
-                // If the SCC is terminal, find all the spanning trees of the
-                // SCC rooted at the node
-                unsigned component_index = it - components.begin();
-                if (trees[component_index].size() > 0)
-                {
-                    U total_weight = 0;
-                    for (auto&& tree : trees[component_index][nodes[i]])
-                    {
-                        U tree_weight = 1;
-                        for (auto&& edge : tree)
-                            tree_weight *= this->edges[edge.first][edge.second];
-                        total_weight += tree_weight;
-                    }
-                    steady_state(i) = total_weight;
-                }
-            }
-
-            return steady_state;
+            // Return any row of the matrix 
+            return forest_matrix.row(0); 
         }
 };
 
