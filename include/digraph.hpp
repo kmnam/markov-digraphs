@@ -141,7 +141,7 @@ class LabeledDigraph
         //                       ATTRIBUTES                      //
         // ----------------------------------------------------- //
         // Number of nodes 
-        unsigned N = 0;
+        unsigned numnodes = 0;
 
         // Store a canonical ordering of nodes 
         std::vector<Node*> order; 
@@ -334,7 +334,7 @@ class LabeledDigraph
             this->order.push_back(node); 
             this->nodes[id] = node;
             this->edges.emplace(node, std::unordered_map<Node*, T>());
-            this->N++;
+            this->numnodes++;
             return node;
         }
 
@@ -556,7 +556,7 @@ class LabeledDigraph
              * The ordering is assumed to include every node in the graph once.
              */
             // Initialize a zero matrix with #rows = #cols = #nodes
-            Matrix<T, Dynamic, Dynamic> laplacian = Matrix<T, Dynamic, Dynamic>::Zero(this->N, this->N);
+            Matrix<T, Dynamic, Dynamic> laplacian = Matrix<T, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
 
             // Populate the off-diagonal entries of the matrix first: 
             // (i,j)-th entry is the label of the edge j -> i
@@ -584,7 +584,7 @@ class LabeledDigraph
 
             // Populate diagonal entries as negative sums of the off-diagonal
             // entries in each column
-            for (unsigned i = 0; i < this->N; ++i)
+            for (unsigned i = 0; i < this->numnodes; ++i)
                 laplacian(i,i) = -(laplacian.col(i).sum());
 
             return laplacian;
@@ -597,7 +597,7 @@ class LabeledDigraph
              * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs. 17-18). 
              */
             // Begin with the identity matrix 
-            Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->N, this->N);
+            Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes);
 
             // Apply the recurrence ...
             // NOTE: The row Laplacian is required here!
@@ -645,7 +645,7 @@ class LabeledDigraph
              * (Chebotarev & Agaev, Lin Alg Appl, 2002, Eqs. 17-18).
              */
             // Obtain the spanning tree weight matrix from the row Laplacian matrix
-            Matrix<T, Dynamic, Dynamic> forest_matrix = this->getSpanningForestMatrix(this->N - 1);
+            Matrix<T, Dynamic, Dynamic> forest_matrix = this->getSpanningForestMatrix(this->numnodes - 1);
 
             // Return any row of the matrix 
             return forest_matrix.row(0); 
