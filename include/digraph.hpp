@@ -338,6 +338,45 @@ class LabeledDigraph
             return node;
         }
 
+        Node* removeNode(std::string id)
+        {
+            /*
+             * Remove a node from the graph with the given id.
+             *
+             * Throw std::runtime_error if node with given id does not exist. 
+             */
+            // Check that a node with the given id exists
+            if (this->nodes.find(id) == this->nodes.end())
+                throw std::runtime_error("Node does not exist with specified id");
+
+            // Run through and delete all edges with given node as source
+            Node* node = this->nodes[id];
+            for (auto&& v : this->edges[node]) this->edges[node].erase(v.first);
+            this->edges.erase(node);  
+
+            // Run through and delete all edges with given node as target 
+            for (auto&& v : this->edges)
+            {
+                for (auto&& w : this->edges[v.first])
+                {
+                    if (w.first == node) this->edges[v.first].erase(w.first);
+                } 
+            }
+           
+            // Find and delete node
+            for (auto it = this->order.begin(); it != this->order.end(); ++it)
+            {
+                if (*it == node)
+                {
+                    this->order.erase(it);
+                    break;
+                }
+            }
+            this->nodes.erase(id); 
+            this->numnodes--;
+            delete node; 
+        }
+
         Node* getNode(std::string id) const
         {
             /*
@@ -495,7 +534,7 @@ class LabeledDigraph
             this->edges.clear();
         }
 
-        template <typename U>
+        template <typename U = T>
         LabeledDigraph<U>* copy() const
         {
             /*
@@ -522,7 +561,7 @@ class LabeledDigraph
             return graph;
         }
 
-        template <typename U>
+        template <typename U = T>
         void copy(LabeledDigraph<U>* graph) const
         {
             /*
