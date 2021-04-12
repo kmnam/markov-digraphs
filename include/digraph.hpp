@@ -349,22 +349,8 @@ class LabeledDigraph
             if (this->nodes.find(id) == this->nodes.end())
                 throw std::runtime_error("Node does not exist with specified id");
 
-            // Run through and delete all edges with given node as source
-            Node* node = this->nodes[id];
-            for (auto&& v : this->edges[node]) this->edges[node].erase(v.first);
-
-            // Run through and delete all edges with given node as target 
-            for (auto&& v : this->edges)
-            {
-                // v.first of type Node*, v.second of type std::unordered_map<Node*, T>
-                for (auto&& w : v.second)
-                {
-                    // w.first of type Node*, w.second of type T
-                    if (w.first == node) (v.second).erase(w.first);
-                } 
-            }
-           
-            // Find and delete node
+            // Find and delete node in this->order
+            Node* node = this->getNode(id);
             for (auto it = this->order.begin(); it != this->order.end(); ++it)
             {
                 if (*it == node)
@@ -373,10 +359,38 @@ class LabeledDigraph
                     break;
                 }
             }
+
+            // Run through and delete all edges with given node as source
+            this->edges[node].clear();
+
+            // Run through and delete all edges with given node as target 
+            for (auto&& v : this->edges)
+            {
+                // v.first of type Node*, v.second of type std::unordered_map<Node*, T>
+                for (auto it = v.second.begin(); it != v.second.end(); ++it)
+                {
+                    if (it->first == node)
+                    {
+                        (v.second).erase(it);
+                        break;
+                    }
+                } 
+            }
+
+            // Erase given node from this->edges 
+            for (auto it = this->edges.begin(); it != this->edges.end(); ++it)
+            {
+                if (it->first == node)
+                {
+                    this->edges.erase(it);
+                    break;
+                }
+            }
+           
+            // Delete the heap-allocated Node itself 
+            delete node;
             this->nodes.erase(id);
-            this->edges.erase(node);  
             this->numnodes--;
-            delete node; 
         }
 
         Node* getNode(std::string id) const
