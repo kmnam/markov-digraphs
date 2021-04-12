@@ -338,7 +338,7 @@ class LabeledDigraph
             return node;
         }
 
-        Node* removeNode(std::string id)
+        void removeNode(std::string id)
         {
             /*
              * Remove a node from the graph with the given id.
@@ -352,14 +352,15 @@ class LabeledDigraph
             // Run through and delete all edges with given node as source
             Node* node = this->nodes[id];
             for (auto&& v : this->edges[node]) this->edges[node].erase(v.first);
-            this->edges.erase(node);  
 
             // Run through and delete all edges with given node as target 
             for (auto&& v : this->edges)
             {
-                for (auto&& w : this->edges[v.first])
+                // v.first of type Node*, v.second of type std::unordered_map<Node*, T>
+                for (auto&& w : v.second)
                 {
-                    if (w.first == node) this->edges[v.first].erase(w.first);
+                    // w.first of type Node*, w.second of type T
+                    if (w.first == node) (v.second).erase(w.first);
                 } 
             }
            
@@ -372,7 +373,8 @@ class LabeledDigraph
                     break;
                 }
             }
-            this->nodes.erase(id); 
+            this->nodes.erase(id);
+            this->edges.erase(node);  
             this->numnodes--;
             delete node; 
         }
