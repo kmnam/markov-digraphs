@@ -545,8 +545,8 @@ class LabeledDigraph
             LabeledDigraph<U>* graph = new LabeledDigraph<U>();
 
             // Copy over nodes with the same ids
-            for (auto&& node : this->nodes)
-                graph->addNode(node.first);
+            for (auto&& node : this->order)
+                graph->addNode(node->id);
             
             // Copy over edges and edge labels
             for (auto&& edge_set : this->edges)
@@ -572,8 +572,8 @@ class LabeledDigraph
             graph->clear();
 
             // Copy over nodes with the same IDs
-            for (auto&& node : this->nodes)
-                graph->addNode(node.first);
+            for (auto&& node : this->order)
+                graph->addNode(node->id);
 
             // Copy over edges and edge labels
             for (auto&& edge_set : this->edges)
