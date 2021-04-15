@@ -2,6 +2,7 @@
 #define LOG_SEMIRING_HPP 
 
 #include <iostream>
+#include <sstream>
 #include <Eigen/Core>
 
 /*
@@ -25,14 +26,26 @@ T logsumexp(T loga, T logb, T base = 10.0)
 }
 
 template <typename T>
-class LogType<T>
+T logdiffexp(T loga, T logb, T base = 10.0)
+{
+    /*
+     * Given log(a) and log(b) with log(a) > log(b), return log(a - b).
+     *
+     * The given log-values are assumed to be of the specified base.
+     */
+    if (loga <= logb) throw std::invalid_argument("log(a - b) undefined with log(a) <= log(b)");
+    else              return loga - (std::log1p(-std::pow(base, logb - loga)) / std::log(base));
+}
+
+template <typename T>
+class LogType
 {
     /*
      * Implement log semiring arithmetic for the given scalar type. 
      */
     private:
-        T value; 
-        T base; 
+        T value_; 
+        T base_; 
 
     public:
         LogType()
@@ -40,8 +53,8 @@ class LogType<T>
             /*
              * Empty constructor; set to zero. 
              */
-            this->value = 0.0;
-            this->base = 0.0;
+            this->value_ = 0.0;
+            this->base_ = 0.0;
         }
 
         LogType(T value)
@@ -49,8 +62,8 @@ class LogType<T>
             /*
              * Constructor with specified value; assume base = 10. 
              */
-            this->value = value; 
-            this->base = 10.0;
+            this->value_ = value; 
+            this->base_ = 10.0;
         }
 
         LogType(T value, T base)
@@ -58,8 +71,8 @@ class LogType<T>
             /*
              * Constructor with given value and base. 
              */
-            this->value = value; 
-            this->base = base; 
+            this->value_ = value; 
+            this->base_ = base; 
         }
 
         ~LogType()
@@ -74,7 +87,7 @@ class LogType<T>
             /*
              * Return the (log) value. 
              */
-            return this->value; 
+            return this->value_; 
         }
 
         T base() const 
@@ -82,7 +95,7 @@ class LogType<T>
             /*
              * Return the base. 
              */
-            return this->base; 
+            return this->base_; 
         }
 
         T expValue() const 
@@ -90,25 +103,27 @@ class LogType<T>
             /*
              * Return the value in linear (exponentiated) space. 
              */
-            return std::pow(this->base, this->value);
+            return std::pow(this->base_, this->value_);
         }
 
-        LogType& operator=(const LogType<T>& other)
+        LogType& operator=(const LogType<T>& logx)
         {
             /*
              * Assignment operator: assigns both value and base.
              */
-            this->value = other.value();
-            this->base = other.base();
+            this->value_ = logx.value();
+            this->base_ = logx.base();
             return *this;
         }
 
-        LogType& operator=(const T other)
+        LogType& operator=(const T logx)
         {
             /*
-             * Assignment operator with only value specified (base unchanged). 
+             * Assignment operator with only value specified (base unchanged).
+             *
+             * Note that the given scalar value is assumed to lie in log-space. 
              */
-            this->value = other;
+            this->value_ = logx;
             return *this; 
         }
 
@@ -117,7 +132,7 @@ class LogType<T>
             /*
              * Equality operator.
              */
-            return (this->value == other.value() && this->base == other.base());
+            return (this->value_ == other.value() && this->base_ == other.base());
         }
 
         bool operator!=(const LogType<T>& other) const
@@ -125,7 +140,7 @@ class LogType<T>
             /*
              * Inequality operator.
              */
-            return (this->value != other.value() || this->base != other.base());
+            return (this->value_ != other.value() || this->base_ != other.base());
         }
 
         bool operator<(const LogType<T>& other) const
@@ -135,10 +150,13 @@ class LogType<T>
              *
              * Raise std::invalid_argument if bases do not match. 
              */
-            if (this->base != other.base())
-                throw std::invalid_argument("Bases do not match");
-
-            return (this->value < other.value());
+            if (this->base_ != other.base())
+            {
+                std::stringstream ss; 
+                ss << "Bases do not match: " << this->base_ << " != " << other.base();
+                throw std::invalid_argument(ss.str());
+            }
+            return (this->value_ < other.value());
         }
 
         bool operator>(const LogType<T>& other) const 
@@ -148,10 +166,13 @@ class LogType<T>
              *
              * Raise std::invalid_argument if bases do not match.
              */
-            if (this->base != other.base())
-                throw std::invalid_argument("Bases do not match");
-
-            return (this->value > other.value());
+            if (this->base_ != other.base())
+            {
+                std::stringstream ss; 
+                ss << "Bases do not match: " << this->base_ << " != " << other.base();
+                throw std::invalid_argument(ss.str());
+            }
+            return (this->value_ > other.value());
         }
 
         bool operator<=(const LogType<T>& other) const
@@ -161,10 +182,13 @@ class LogType<T>
              *
              * Raise std::invalid_argument if bases do not match.
              */
-            if (this->base != other.base())
-                throw std::invalid_argument("Bases do not match");
-
-            return (this->value <= other.value());
+            if (this->base_ != other.base())
+            {
+                std::stringstream ss; 
+                ss << "Bases do not match: " << this->base_ << " != " << other.base();
+                throw std::invalid_argument(ss.str());
+            }
+            return (this->value_ <= other.value());
         }
 
         bool operator>=(const LogType<T>& other) const
@@ -174,10 +198,13 @@ class LogType<T>
              *
              * Raise std::invalid_argument if bases do not match.
              */
-            if (this->base != other.base())
-                throw std::invalid_argument("Bases do not match");
-
-            return (this->value >= other.value());
+            if (this->base_ != other.base())
+            {
+                std::stringstream ss; 
+                ss << "Bases do not match: " << this->base_ << " != " << other.base();
+                throw std::invalid_argument(ss.str());
+            }
+            return (this->value_ >= other.value());
         }
 
         LogType operator+(const LogType<T>& logb) const
@@ -187,10 +214,34 @@ class LogType<T>
              *
              * Raise std::invalid_argument if bases do not match. 
              */
-            if (this->base != logb.base())
-                throw std::invalid_argument("Bases do not match");
+            if (this->base_ != logb.base())
+            {
+                std::stringstream ss; 
+                ss << "Bases do not match: " << this->base_ << " != " << logb.base();
+                throw std::invalid_argument(ss.str());
+            }
+            return LogType<T>(logsumexp<T>(this->value_, logb.value(), this->base_), this->base_);
+        }
 
-            return LogType<T>(logsumexp<T>(this->value, logb.value(), this->base), this->base);
+        LogType operator-(const LogType<T>& logb) const 
+        {
+            /*
+             * Return the result of subtracting log(b) via logdiffexp. 
+             *
+             * Raise std::invalid_argument if bases do not match or this->value_
+             * is less than log(b). 
+             */
+            if (this->base_ != logb.base())
+            {
+                std::stringstream ss; 
+                ss << "Bases do not match: " << this->base_ << " != " << logb.base();
+                throw std::invalid_argument(ss.str());
+            }
+            else if (this->value_ <= logb.value())
+            {
+                throw std::invalid_argument("log(a - b) undefined with log(a) <= log(b)");
+            }
+            return LogType<T>(logdiffexp<T>(this->value_, logb.value(), this->base_), this->base_);
         }
 
         LogType operator*(const LogType<T>& logb) const
@@ -200,10 +251,13 @@ class LogType<T>
              *
              * Raise std::invalid_argument if bases do not match.
              */
-            if (this->base != logb.base())
-                throw std::invalid_argument("Bases do not match");
-
-            return LogType<T>(this->value + logb.value(), this->base); 
+            if (this->base_ != logb.base())
+            {
+                std::stringstream ss; 
+                ss << "Bases do not match: " << this->base_ << " != " << logb.base();
+                throw std::invalid_argument(ss.str());
+            }
+            return LogType<T>(this->value_ + logb.value(), this->base_); 
         }
 
         LogType operator/(const LogType<T>& logb) const
@@ -213,10 +267,13 @@ class LogType<T>
              *
              * Raise std::invalid_argument if bases do not match.
              */
-            if (this->base != logb.base())
-                throw std::invalid_argument("Bases do not match");
-
-            return LogType<T>(this->value - logb.value(), this->base);
+            if (this->base_ != logb.base())
+            {
+                std::stringstream ss; 
+                ss << "Bases do not match: " << this->base_ << " != " << logb.base();
+                throw std::invalid_argument(ss.str());
+            }
+            return LogType<T>(this->value_ - logb.value(), this->base_);
         }
 
         LogType& operator+=(const LogType<T>& logb)
@@ -226,11 +283,36 @@ class LogType<T>
              *
              * Raise std::invalid_argument if bases do not match.
              */
-            if (this->base != logb.base())
-                throw std::invalid_argument("Bases do not match");
-
-            this->value = logsumexp<T>(this->value, logb.value(), this->base);
+            if (this->base_ != logb.base())
+            {
+                std::stringstream ss; 
+                ss << "Bases do not match: " << this->base_ << " != " << logb.base();
+                throw std::invalid_argument(ss.str());
+            }
+            this->value_ = logsumexp<T>(this->value_, logb.value(), this->base_);
             return *this;
+        }
+
+        LogType& operator-=(const LogType<T>& logb)
+        {
+            /*
+             * In-place subtraction by log(b) via logdiffexp. 
+             *
+             * Raise std::invalid_argument if bases do not match or this->value_
+             * is less than log(b).
+             */
+            if (this->base_ != logb.base())
+            {
+                std::stringstream ss; 
+                ss << "Bases do not match: " << this->base_ << " != " << logb.base();
+                throw std::invalid_argument(ss.str());
+            }
+            else if (this->value_ <= logb.value())
+            {
+                throw std::invalid_argument("log(a - b) undefined with log(a) <= log(b)");
+            }
+            this->value_ = logdiffexp<T>(this->value_, logb.value(), this->base_);
+            return *this; 
         }
 
         LogType& operator*=(const LogType<T>& logb)
@@ -240,10 +322,13 @@ class LogType<T>
              *
              * Raise std::invalid_argument if bases do not match.
              */
-            if (this->base != logb.base())
-                throw std::invalid_argument("Bases do not match");
-
-            this->value = this->value + logb.value();
+            if (this->base_ != logb.base())
+            {
+                std::stringstream ss; 
+                ss << "Bases do not match: " << this->base_ << " != " << logb.base();
+                throw std::invalid_argument(ss.str());
+            }
+            this->value_ = this->value_ + logb.value();
             return *this;
         }
 
@@ -254,19 +339,15 @@ class LogType<T>
              *
              * Raise std::invalid_argument if bases do not match.
              */
-            if (this->base != logb.base())
-                throw std::invalid_argument("Bases do not match");
-
-            this->value = this->value - logb.value();
+            if (this->base_ != logb.base())
+            {
+                std::stringstream ss; 
+                ss << "Bases do not match: " << this->base_ << " != " << logb.base();
+                throw std::invalid_argument(ss.str());
+            }
+            this->value_ = this->value_ - logb.value();
             return *this; 
         }
-
-        /*
-         * Friend function declarations for further operator overloads. 
-         */
-        friend LogType operator+(LogType<T> loga, const LogType<T>& logb);
-        friend LogType operator*(LogType<T> loga, const LogType<T>& logb);
-        friend LogType operator/(LogType<T> loga, const LogType<T>& logb);
 };
 
 /*
