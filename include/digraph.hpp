@@ -17,7 +17,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     4/11/2021
+ *     4/24/2021
  */
 using namespace Eigen;
 
@@ -73,7 +73,7 @@ Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dyna
 template <typename T>
 Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian,
                                                       const Ref<const Matrix<T, Dynamic, Dynamic> >& curr,
-                                                      unsigned k)
+                                                      int k)
 {
     /*
      * Apply one iteration of the recurrence of Chebotarev & Agaev (Lin Alg
@@ -82,7 +82,9 @@ Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const Ref<const Matrix<T, 
     T K(k + 1);
     T sigma = (laplacian * curr).trace() / K;
     Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(laplacian.rows(), laplacian.cols());
-    return (-laplacian) * curr + sigma * identity; 
+    curr.noalias() = (-laplacian) * curr;
+    curr.noalias() += sigma * identity;
+    return curr; 
 }
 
 // ----------------------------------------------------- //
@@ -645,7 +647,7 @@ class LabeledDigraph
             return laplacian;
         }
 
-        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrix(unsigned k)
+        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrix(int k)
         {
             /*
              * Compute the k-th spanning forest matrix, using the recurrence
@@ -659,7 +661,7 @@ class LabeledDigraph
             //       Not the column Laplacian, as per usual!
             Matrix<T, Dynamic, Dynamic> laplacian = -this->getLaplacian().transpose();
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i);
+                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i).eval();
 
             return curr; 
         }
