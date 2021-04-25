@@ -82,9 +82,9 @@ Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const Ref<const Matrix<T, 
     T K(k + 1);
     T sigma = (laplacian * curr).trace() / K;
     Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(laplacian.rows(), laplacian.cols());
-    curr.noalias() = (-laplacian) * curr;
-    curr.noalias() += sigma * identity;
-    return curr; 
+    Matrix<T, Dynamic, Dynamic> m = (-laplacian) * curr;
+    m.noalias() += sigma * identity;
+    return m; 
 }
 
 // ----------------------------------------------------- //
