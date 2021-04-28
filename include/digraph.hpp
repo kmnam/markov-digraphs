@@ -434,6 +434,31 @@ class LabeledDigraph
             // Then define the edge
             this->edges[source][target] = label;
         }
+
+        void removeEdge(std::string source_id, std::string target_id)
+        {
+            /*
+             * Remove the edge between the two given nodes.
+             *
+             * Throw std::runtime_error if node with either given id does
+             * not exist. 
+             */
+            // Check that nodes with the given ids exist
+            if (this->nodes.find(source_id) == this->nodes.end())
+                throw std::runtime_error("Node does not exist with specified id");
+            if (this->nodes.find(target_id) == this->nodes.end())
+                throw std::runtime_error("Node does not exist with specified id");
+
+            // Does the given edge exist? 
+            Node* source = this->getNode(source_id);
+            Node* target = this->getNode(target_id);
+            if (this->edges[source].find(target) != this->edges[source].end())
+            {
+                // If so, then get rid of it 
+                this->edges[source].erase(this->edges[source].find(target));
+            }
+            // If not, then do nothing!
+        }
         
         std::pair<Edge, T> getEdge(std::string source_id, std::string target_id)
         {
