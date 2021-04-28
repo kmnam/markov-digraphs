@@ -17,7 +17,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     4/24/2021
+ *     4/28/2021
  */
 using namespace Eigen;
 
@@ -80,11 +80,10 @@ Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const Ref<const Matrix<T, 
      * Appl, 2002, Eqs. 17-18) for the in-forest matrices of the graph. 
      */
     T K(k + 1);
-    T sigma = (laplacian * curr).trace() / K;
+    Matrix<T, Dynamic, Dynamic> product = (-laplacian) * curr;
+    T sigma = -product.trace() / K;
     Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(laplacian.rows(), laplacian.cols());
-    Matrix<T, Dynamic, Dynamic> m = (-laplacian) * curr;
-    m.noalias() += sigma * identity;
-    return m; 
+    return product + (sigma * identity);
 }
 
 // ----------------------------------------------------- //
@@ -656,12 +655,41 @@ class LabeledDigraph
             // Begin with the identity matrix 
             Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes);
 
+            // Initialize a zero matrix with #rows = #cols = #nodes
+            Matrix<T, Dynamic, Dynamic> laplacian = Matrix<T, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
+
+            // Populate the off-diagonal entries of the matrix first: 
+            // (i,j)-th entry is the *negative* of the label of the edge i -> j
+            unsigned i = 0;
+            for (auto&& v : this->order)
+            {
+                unsigned j = 0;
+                for (auto&& w : this->order)
+                {
+                    if (i != j)
+                    {
+                        // Get the edge label for i -> j
+                        if (this->edges[v].find(w) != this->edges[v].end())
+                        {
+                            T label(this->edges[v][w]);
+                            laplacian(i,j) = -label;
+                            if (laplacian(i,j) > 0)
+                                throw std::runtime_error("Negative edge label found");
+                        }
+                    }
+                    j++;
+                }
+                i++;
+            }
+
+            // Populate diagonal entries as negative sums of the off-diagonal
+            // entries in each row
+            for (unsigned i = 0; i < this->numnodes; ++i)
+                laplacian(i,i) = -(laplacian.row(i).sum());
+
             // Apply the recurrence ...
-            // NOTE: The row Laplacian is required here!
-            //       Not the column Laplacian, as per usual!
-            Matrix<T, Dynamic, Dynamic> laplacian = -this->getLaplacian().transpose();
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i).eval();
+                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i);
 
             return curr; 
         }
