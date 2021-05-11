@@ -17,7 +17,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     4/28/2021
+ *     5/10/2021
  */
 using namespace Eigen;
 
@@ -412,6 +412,14 @@ class LabeledDigraph
             return this->nodes.count(id);
         }
 
+        std::vector<Node*> getAllNodes() const 
+        {
+            /*
+             * Return this->order. 
+             */
+            return this->order; 
+        }
+
         // ----------------------------------------------------- //
         //              EDGE-ADDING/GETTING METHODS              //
         // ----------------------------------------------------- //
@@ -481,6 +489,61 @@ class LabeledDigraph
                 return std::make_pair(std::make_pair(source, it->first), it->second);
             else    // Return pair of nullptrs and zero label if no edge exists
                 return std::make_pair(std::make_pair(nullptr, nullptr), 0);
+        }
+
+        std::vector<std::pair<Edge, T> > getAllEdgesFromNode(std::string source_id) 
+        {
+            /*
+             * Return the std::vector of edges leaving the given node. 
+             */
+            std::vector<std::pair<Edge, T> > edges_from_node;
+            Node* source = this->getNode(source_id);
+
+            // Check that the given node exists
+            if (source == nullptr)
+                throw std::runtime_error("Specified source node does not exist");
+
+            // Run through all nodes in this->order ...
+            for (auto&& node : this->order)
+            {
+                // Is there an edge to this node?
+                if (this->edges[source].find(node) != this->edges[source].end())
+                {
+                    // If so, instantiate the edge and get the label 
+                    Edge edge = std::make_pair(source, node);
+                    T label = this->edges[source][node];
+                    edges_from_node.push_back(std::make_pair(edge, label)); 
+                }
+            }
+
+            return edges_from_node; 
+        }
+
+        std::vector<std::pair<Edge, T> > getAllEdgesFromNode(Node* source) 
+        {
+            /*
+             * Return the std::vector of edges leaving the given node. 
+             */
+            std::vector<std::pair<Edge, T> > edges_from_node;
+
+            // Check that the given node exists
+            if (source == nullptr)
+                throw std::runtime_error("Specified source node does not exist");
+
+            // Run through all nodes in this->order ...
+            for (auto&& node : this->order)
+            {
+                // Is there an edge to this node?
+                if (this->edges[source].find(node) != this->edges[source].end())
+                {
+                    // If so, instantiate the edge and get the label 
+                    Edge edge = std::make_pair(source, node);
+                    T label = this->edges[source][node];
+                    edges_from_node.push_back(std::make_pair(edge, label)); 
+                }
+            }
+
+            return edges_from_node; 
         }
 
         bool hasEdge(std::string source_id, std::string target_id) const
