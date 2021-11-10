@@ -10,6 +10,7 @@
 #include <utility>
 #include <algorithm>
 #include <Eigen/Dense>
+#include <Eigen/Sparse>
 
 /*
  * An implementation of a labeled directed graph.  
@@ -17,12 +18,12 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     5/10/2021
+ *     11/10/2021
  */
 using namespace Eigen;
 
 // ----------------------------------------------------- //
-//                    LINEAR ALGEBRA                     //
+//       LINEAR ALGEBRA AND OTHER HELPER FUNCTIONS       //
 // ----------------------------------------------------- //
 template <typename T>
 bool isclose(T a, T b, T tol)
@@ -35,14 +36,182 @@ bool isclose(T a, T b, T tol)
 }
 
 template <typename T>
-Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, const T sv_tol)
+T logsumexp(T loga, T logb)
+{
+    /*
+     * Given log(a) and log(b), return log(a + b).
+     *
+     * If log(a) > log(b), then this computation is performed as follows: 
+     *  
+     * log(a + b) = log(exp(log(a)) + exp(log(b)))
+     *            = log(exp(log(a)) * (exp(log(a) - log(a)) + exp(log(b) - log(a))))
+     *            = log(a * (exp(0) + exp(log(b) - log(a))))
+     *            = log(a) + log(1 + exp(log(b) - log(a)))
+     *            = log(a) + log1p(exp(log(b) - log(a)))
+     *
+     * Here, log() is assumed to be of base e.
+     *
+     * Cases where log(a) or log(b) are negative infinity are handled explicitly
+     * (see below). 
+     */
+    using std::log1p; 
+    using std::exp; 
+    using boost::multiprecision::log1p; 
+    using boost::multiprecision::exp; 
+
+    if (loga == -std::numeric_limits<T>::infinity() && logb == -std::numeric_limits<T>::infinity())
+        return -std::numeric_limits<T>::infinity(); 
+    else if (loga == -std::numeric_limits<T>::infinity())
+        return logb; 
+    else if (logb == -std::numeric_limits<T>::infinity())
+        return loga;  
+    else if (loga <= logb)
+        return logb + log1p(exp(loga - logb)); 
+    else
+        return loga + log1p(exp(logb - loga)); 
+}
+
+template <typename T>
+T logsumexp(std::vector<T> logx) 
+{
+    /*
+     * Given a vector of log-scale values, [log(x1), ..., log(xN)], return
+     * the log-sum-exp, log(x1 + ... + xN).
+     *
+     * Here, log() is assumed to be of base e. 
+     */
+    using std::log1p; 
+    using std::exp; 
+    using boost::multiprecision::log1p; 
+    using boost::multiprecision::exp; 
+
+    auto maxit = std::max_element(logx.begin(), logx.end());
+    T maxval = *maxit;
+
+    // If the maximum value itself is negative infinity, just return it
+    if (maxval == -std::numeric_limits<T>::infinity())
+        return maxval; 
+
+    // Otherwise, run through the remaining values, skipping over all 
+    // negative infinities  
+    T result = 0;
+    for (auto it = logx.begin(); it != logx.end(); ++it)
+    {
+        if (it != maxit && *it != -std::numeric_limits<T>::infinity())
+            result += exp(*it - maxval); 
+    } 
+
+    return maxval + log1p(result); 
+}
+
+template <typename T>
+T logsumexp(Matrix<T, Dynamic, 1> logx) 
+{
+    /*
+     * Given a vector of log-scale values, [log(x1), ..., log(xN)], as a  
+     * 1-D Eigen::Matrix type, return the log-sum-exp, log(x1 + ... + xN).
+     *
+     * Here, log() is assumed to be of base e.
+     *
+     * NOTE: Eigen v3.4 is essential here, as it requires the use of STL 
+     * iterators and algorithms on the input vector.  
+     */
+    using std::log1p; 
+    using std::exp; 
+    using boost::multiprecision::log1p; 
+    using boost::multiprecision::exp; 
+
+    auto maxit = std::max_element(logx.begin(), logx.end());
+    T maxval = *maxit;
+
+    // If the maximum value itself is negative infinity, just return it
+    if (maxval == -std::numeric_limits<T>::infinity())
+        return maxval; 
+
+    // Otherwise, run through the remaining values, skipping over all 
+    // negative infinities  
+    T result = 0;
+    for (auto it = logx.begin(); it != logx.end(); ++it)
+    {
+        if (it != maxit && *it != -std::numeric_limits<T>::infinity())
+            result += exp(*it - maxval); 
+    } 
+
+    return maxval + log1p(result); 
+}
+
+template <typename T>
+T logdiffexp(T loga, T logb)
+{
+    /*
+     * Given log(a) and log(b) with log(a) >= log(b), return log(a - b).
+     *
+     * Here, log() is assumed to be of base e.
+     *
+     * If log(a) < log(b), then a std::invalid_argument() exception is raised.
+     *
+     * If log(a) == log(b), then negative infinity is returned.
+     * 
+     * Cases where log(a) or log(b) are negative infinity are handled explicitly
+     * (see below). 
+     */
+    using std::log1p; 
+    using std::exp; 
+    using boost::multiprecision::log1p; 
+    using boost::multiprecision::exp; 
+
+    if (loga < logb)
+        throw std::invalid_argument("log(a - b) is undefined whenever log(a) < log(b)");
+    // If log(a) == log(b), then return negative infinity 
+    else if (loga == logb)
+        return -std::numeric_limits<T>::infinity();
+    // If log(a) is negative infinity, then return negative infinity 
+    else if (loga == -std::numeric_limits<T>::infinity())
+        return -std::numeric_limits<T>::infinity();
+    // If log(a) is finite and log(b) is negative infinity, then return log(a) by itself 
+    else if (logb == -std::numeric_limits<T>::infinity())
+        return loga; 
+    else
+        return loga + log1p(-exp(logb - loga));
+}
+
+template <typename T>
+Matrix<T, Dynamic, 1> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A)
 {
     /*
      * Compute the nullspace of A by performing a singular value decomposition.
      *
+     * This function returns the column of V in the SVD of A = USV corresponding
+     * to the least singular value (recall that singular values are always
+     * non-negative). It therefore effectively assumes that the A has a 
+     * nullspace of dimension one.  
+     *
      * This function does not check that the given matrix is indeed a
      * valid row Laplacian matrix (zero row sums, positive diagonal,
-     * negative off-diagonal). 
+     * negative off-diagonal).  
+     */
+    // Perform a singular value decomposition of A, only computing V in full
+    Eigen::BDCSVD<Matrix<T, Dynamic, Dynamic> > svd(A, Eigen::ComputeFullV);
+
+    // Return the column of V corresponding to the least singular value of A
+    // (always given last in the decomposition) 
+    Matrix<T, Dynamic, 1> singular = svd.singularValues(); 
+    Matrix<T, Dynamic, Dynamic> V = svd.matrixV();
+    return V.col(singular.rows() - 1); 
+}
+
+template <typename T>
+Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, const T tol)
+{
+    /*
+     * Compute the nullspace of A by performing a singular value decomposition.
+     *
+     * This function returns the column(s) of V in the SVD of A = USV
+     * corresponding to singular values with absolute value < tol.  
+     *
+     * This function does not check that the given matrix is indeed a
+     * valid row Laplacian matrix (zero row sums, positive diagonal,
+     * negative off-diagonal).  
      */
     // Perform a singular value decomposition of A, only computing V in full
     Eigen::BDCSVD<Matrix<T, Dynamic, Dynamic> > svd(A, Eigen::ComputeFullV);
@@ -53,11 +222,11 @@ Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dyna
     unsigned nrows = A.cols();
 
     // Run through the singular values of A (in ascending, i.e., reverse order) ...
-    Matrix<T, Dynamic, 1> S = svd.singularValues();
+    Matrix<T, Dynamic, 1> singular = svd.singularValues();
     Matrix<T, Dynamic, Dynamic> V = svd.matrixV();
-    unsigned nsingvals = S.rows();
-    unsigned j = nsingvals - 1;
-    while (isclose<T>(S(j), 0.0, sv_tol) && j >= 0)
+    unsigned ns = singular.rows();
+    unsigned j = ns - 1;
+    while (isclose<T>(singular(j), 0.0, tol) && j >= 0)
     {
         // ... and grab the columns of V that correspond to the zero
         // singular values
@@ -77,13 +246,36 @@ Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const Ref<const Matrix<T, 
 {
     /*
      * Apply one iteration of the recurrence of Chebotarev & Agaev (Lin Alg
-     * Appl, 2002, Eqs. 17-18) for the in-forest matrices of the graph. 
+     * Appl, 2002, Eqs. 17-18) for the in-forest matrices of the graph.
+     *
+     * This function takes and outputs *dense* matrices.  
      */
     T K(k + 1);
-    Matrix<T, Dynamic, Dynamic> product = (-laplacian) * curr;
-    T sigma = -product.trace() / K;
+    Matrix<T, Dynamic, Dynamic> product = laplacian * curr;
+    T sigma = product.trace() / K;
     Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(laplacian.rows(), laplacian.cols());
-    return product + (sigma * identity);
+
+    return (sigma * identity) - product;
+}
+
+template <typename T>
+Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const Ref<const SparseMatrix<T> >& laplacian, 
+                                                      const Ref<const Matrix<T, Dynamic, Dynamic> >& curr,
+                                                      int k)
+{
+    /*
+     * Apply one iteration of the recurrence of Chebotarev & Agaev (Lin Alg
+     * Appl, 2002, Eqs. 17-18) for the in-forest matrices of the graph.
+     *
+     * This function takes a *sparse* Laplacian matrix as input, but takes 
+     * and computes *dense* forest matrices. 
+     */
+    T K(k + 1);
+    Matrix<T, Dynamic, Dynamic> product = laplacian * curr;
+    T sigma = product.trace() / K;
+    Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(laplacian.rows(), laplacian.cols());
+
+    return (sigma * identity) - product;
 }
 
 // ----------------------------------------------------- //
@@ -316,6 +508,14 @@ class LabeledDigraph
             for (auto&& edge_set : this->edges) delete edge_set.first;
         }
 
+        unsigned getNumNodes() const 
+        {
+            /*
+             * Return the number of nodes in the graph. 
+             */
+            return this->numnodes; 
+        }
+
         // ----------------------------------------------------- //
         //              NODE-ADDING/GETTING METHODS              //
         // ----------------------------------------------------- //
@@ -494,7 +694,8 @@ class LabeledDigraph
         std::vector<std::pair<Edge, T> > getAllEdgesFromNode(std::string source_id) 
         {
             /*
-             * Return the std::vector of edges leaving the given node. 
+             * Return the std::vector of edges leaving the given node, given 
+             * the *id* of the source node.  
              */
             std::vector<std::pair<Edge, T> > edges_from_node;
             Node* source = this->getNode(source_id);
@@ -522,7 +723,8 @@ class LabeledDigraph
         std::vector<std::pair<Edge, T> > getAllEdgesFromNode(Node* source) 
         {
             /*
-             * Return the std::vector of edges leaving the given node. 
+             * Return the std::vector of edges leaving the given node, 
+             * given the *pointer* to the source Node object itself.  
              */
             std::vector<std::pair<Edge, T> > edges_from_node;
 
@@ -540,6 +742,38 @@ class LabeledDigraph
                     Edge edge = std::make_pair(source, node);
                     T label = this->edges[source][node];
                     edges_from_node.push_back(std::make_pair(edge, label)); 
+                }
+            }
+
+            return edges_from_node; 
+        }
+
+        std::vector<std::pair<int, T> > getAllEdgesFromNode(int source_idx) 
+        {
+            /*
+             * Return the std::vector of edges leaving the given node. 
+             *
+             * This method takes the *index* of the source node in this->order 
+             * and returns the *indices* of the target nodes with an edge from
+             * the source node in this->order.  
+             */
+            std::vector<std::pair<int, T> > edges_from_node;
+            Node* source = this->order[source_idx];
+
+            // Check that the given node exists
+            if (source == nullptr)
+                throw std::runtime_error("Specified source node does not exist");
+
+            // Run through all nodes in this->order ...
+            for (int i = 0; i < this->numnodes; ++i)
+            {
+                // Is there an edge to this node?
+                Node* target = this->order[i]; 
+                if (this->edges[source].find(target) != this->edges[source].end())
+                {
+                    // If so, instantiate the edge and get the label 
+                    T label = this->edges[source][target];
+                    edges_from_node.push_back(std::make_pair(i, label)); 
                 }
             }
 
@@ -761,8 +995,6 @@ class LabeledDigraph
                         {
                             T label(this->edges[v][w]);
                             laplacian(i,j) = -label;
-                            if (laplacian(i,j) > 0)
-                                throw std::runtime_error("Negative edge label found");
                         }
                     }
                     j++;
@@ -782,12 +1014,68 @@ class LabeledDigraph
             return curr; 
         }
 
-        Matrix<T, Dynamic, 1> getSteadyStateFromSVD(T sv_tol)
+        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrixSparse(int k)
         {
             /*
-             * Return a vector of steady-state probabilities for the nodes,
-             * according to the canonical ordering of nodes, by solving for
-             * the nullspace of the Laplacian matrix.
+             * Compute the k-th spanning forest matrix, using the recurrence
+             * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs. 17-18).
+             *
+             * This method uses a sparse Laplacian matrix.  
+             */
+            // Begin with the identity matrix
+            Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes); 
+
+            // Initialize a zero matrix with #rows = #cols = #nodes
+            SparseMatrix<T> laplacian(this->numnodes, this->numnodes); 
+
+            // Populate the entries of the matrix: the off-diagonal (i,j)-th  
+            // entry is the *negative* of the label of the edge i -> j, and 
+            // the diagonal entries are set so that each *row* sum is zero 
+            std::vector<Triplet<T> > laplacian_triplets; 
+            unsigned i = 0;
+            for (auto&& v : this->order)
+            {
+                T row_sum = 0;    // Sum of all off-diagonal entries in i-th row
+                unsigned j = 0;
+                for (auto&& w : this->order)
+                {
+                    if (i != j)
+                    {
+                        // Get the edge label for i -> j
+                        if (this->edges[v].find(w) != this->edges[v].end())
+                        {
+                            T label(this->edges[v][w]);
+                            laplacian_triplets.push_back(Triplet<T>(i, j, -label));
+                            row_sum += label;   // Add to the (negative of the) i-th row sum  
+                        }
+                    }
+                    j++;
+                }
+                laplacian_triplets.push_back(Triplet<T>(i, i, row_sum)); 
+                i++;
+            }
+            laplacian.setFromTriplets(laplacian_triplets.begin(), laplacian_triplets.end());
+
+            // Apply the recurrence ...
+            for (unsigned i = 0; i < k; ++i)
+                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i);
+
+            return curr; 
+        }
+
+        Matrix<T, Dynamic, 1> getSteadyStateFromSVD()
+        {
+            /*
+             * Return a *normalized* steady-state vector for the Laplacian 
+             * dynamics on the graph, with the nodes ordered according to the
+             * canonical ordering, by solving for the nullspace of the Laplacian
+             * matrix.
+             *
+             * This method assumes that the graph is strongly connected, in
+             * which case there is a unique (up to normalization) steady-state
+             * vector. If the graph is not strongly connected, then this 
+             * method returns only one basis vector for the nullspace of 
+             * the Laplacian matrix.   
              */
             Matrix<T, Dynamic, Dynamic> laplacian = this->getLaplacian();
             
@@ -795,7 +1083,7 @@ class LabeledDigraph
             Matrix<T, Dynamic, Dynamic> nullmat;
             try
             {
-                nullmat = nullspaceSVD<T>(laplacian, sv_tol);
+                nullmat = nullspaceSVD<T>(laplacian);
             }
             catch (const std::runtime_error& e)
             {
@@ -805,24 +1093,169 @@ class LabeledDigraph
             // Each column is a nullspace basis vector (for each SCC) and
             // each row corresponds to a node in the graph
             Matrix<T, Dynamic, 1> steady_state = nullmat.array().rowwise().sum().matrix();
-            
-            return steady_state;
+           
+            // Normalize by the sum of its entries and return 
+            T norm = steady_state.sum();
+            return steady_state / norm;
         }
 
-        Matrix<T, Dynamic, 1> getSteadyStateFromRecurrence()
+        Matrix<T, Dynamic, 1> getSteadyStateFromRecurrence(bool sparse = true)
         {
             /*
-             * Return a vector of steady-state probabilities for the nodes,
-             * according to the given ordering of nodes, by the recurrence
-             * relation of Chebotarev & Agaev for the k-th forest matrix
-             * (Chebotarev & Agaev, Lin Alg Appl, 2002, Eqs. 17-18).
+             * Return a *normalized* steady-state vector for the Laplacian 
+             * dynamics on the graph, with the nodes ordered according to the
+             * canonical ordering, by solving the recurrence relation of 
+             * Chebotarev & Agaev for the k-th forest matrix (Chebotarev & Agaev,
+             * Lin Alg Appl, 2002, Eqs. 17-18).
+             *
+             * Setting sparse = true enforces the use of a sparse Laplacian
+             * matrix in the calculations. 
              */
             // Obtain the spanning tree weight matrix from the row Laplacian matrix
-            Matrix<T, Dynamic, Dynamic> forest_matrix = this->getSpanningForestMatrix(this->numnodes - 1);
+            Matrix<T, Dynamic, Dynamic> forest_matrix; 
+            if (sparse)
+                forest_matrix = this->getSpanningForestMatrixSparse(this->numnodes - 1);
+            else 
+                forest_matrix = this->getSpanningForestMatrix(this->numnodes - 1);
 
-            // Return any row of the matrix 
-            return forest_matrix.row(0); 
+            // Return any row of the matrix (after normalizing by the sum of 
+            // its entries)
+            T norm = forest_matrix.row(0).sum(); 
+            return forest_matrix.row(0) / norm; 
         }
+
+        T getMeanFirstPassageTime(Node* source, Node* target, bool sparse = true)
+        {
+            /*
+             * Return the mean first-passage time from the source node to the 
+             * target node, assuming that the target node will always eventually
+             * be reached.
+             *
+             * This quantity is only well-defined if there are no alternative 
+             * terminal SCCs to which a path from the source node can travel.
+             * In other words, for any node in the graph with a path from the
+             * source node, there must also exist a path from that node to the
+             * target node.  
+             */
+            // Check that the two nodes are distinct
+            if (source == target) return 0; 
+
+            // Collect all outgoing edges from the target node and store them 
+            // separately, removing them from the graph
+            std::unordered_map<Node*, T> edges_from_target(this->edges[target]);
+            this->edges[target].clear();
+
+            // Compute the required spanning forest matrices ...
+            Matrix<T, Dynamic, Dynamic> forest_one_root, forest_two_roots;
+            if (sparse)
+            {
+                // Instantiate a *sparse* Laplacian matrix ...
+                //
+                // Initialize a zero matrix with #rows = #cols = #nodes
+                SparseMatrix<T> laplacian(this->numnodes, this->numnodes); 
+
+                // Populate the entries of the matrix: the off-diagonal (i,j)-th  
+                // entry is the *negative* of the label of the edge i -> j, and 
+                // the diagonal entries are set so that each *row* sum is zero 
+                std::vector<Triplet<T> > laplacian_triplets; 
+                unsigned i = 0;
+                for (auto&& v : this->order)
+                {
+                    T row_sum = 0;    // Sum of all off-diagonal entries in i-th row
+                    unsigned j = 0;
+                    for (auto&& w : this->order)
+                    {
+                        if (i != j)
+                        {
+                            // Get the edge label for i -> j
+                            if (this->edges[v].find(w) != this->edges[v].end())
+                            {
+                                T label(this->edges[v][w]);
+                                laplacian_triplets.push_back(Triplet<T>(i, j, -label));
+                                row_sum += label;   // Add to the (negative of the) i-th row sum  
+                            }
+                        }
+                        j++;
+                    }
+                    laplacian_triplets.push_back(Triplet<T>(i, i, row_sum)); 
+                    i++;
+                }
+                laplacian.setFromTriplets(laplacian_triplets.begin(), laplacian_triplets.end());
+
+                // Then run the Chebotarev-Agaev recurrence to get the two-root
+                // forest matrix 
+                forest_two_roots = this->getSpanningForestMatrixSparse(this->numnodes - 2);
+
+                // Then run the Chebotarev-Agaev recurrence one more time to get 
+                // the one-root forest (tree) matrix  
+                forest_one_root = chebotarevAgaevRecurrence<T>(laplacian, forest_two_roots, this->numnodes - 2);
+            }
+            else 
+            {
+                // Instantiate a *dense* Laplacian matrix ...
+                //
+                // Initialize a zero matrix with #rows = #cols = #nodes
+                Matrix<T, Dynamic, Dynamic> laplacian = Matrix<T, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
+
+                // Populate the off-diagonal entries of the matrix first: 
+                // (i,j)-th entry is the *negative* of the label of the edge i -> j
+                unsigned i = 0;
+                for (auto&& v : this->order)
+                {
+                    unsigned j = 0;
+                    for (auto&& w : this->order)
+                    {
+                        if (i != j)
+                        {
+                            // Get the edge label for i -> j
+                            if (this->edges[v].find(w) != this->edges[v].end())
+                            {
+                                T label(this->edges[v][w]);
+                                laplacian(i,j) = -label;
+                            }
+                        }
+                        j++;
+                    }
+                    i++;
+                }
+
+                // Populate diagonal entries as negative sums of the off-diagonal
+                // entries in each row
+                for (unsigned i = 0; i < this->numnodes; ++i)
+                    laplacian(i,i) = -(laplacian.row(i).sum());
+
+                // Then run the Chebotarev-Agaev recurrence to get the two-root
+                // forest matrix 
+                forest_two_roots = this->getSpanningForestMatrix(this->numnodes - 2);
+
+                // Then run the Chebotarev-Agaev recurrence one more time to get 
+                // the one-root forest (tree) matrix  
+                forest_one_root = chebotarevAgaevRecurrence<T>(laplacian, forest_two_roots, this->numnodes - 2);
+            }
+
+            // Now compute the desired mean first-passage time ...
+            T mean_time = 0;
+            unsigned source_idx = 0;
+            unsigned target_idx = 0;  
+            for (unsigned i = 0; i < this->numnodes; ++i)
+            {
+                if (this->order[i] == source)
+                    source_idx = i;
+                if (this->order[i] == target)
+                    target_idx = i;  
+            }
+            for (unsigned i = 0; i < target_idx; ++i)
+                mean_time += forest_two_roots(source_idx, i);
+            for (unsigned i = target_idx + 1; i < this->numnodes; ++i)
+                mean_time += forest_two_roots(source_idx, i);
+            mean_time /= forest_one_root(target_idx, target_idx);
+
+            // ... and add the outgoing edges from the target node back into the 
+            // graph 
+            this->edges[target] = edges_from_target; 
+
+            return mean_time;  
+        } 
 };
 
 #endif
