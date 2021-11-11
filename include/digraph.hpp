@@ -18,7 +18,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     11/10/2021
+ *     11/11/2021
  */
 using namespace Eigen;
 
@@ -184,11 +184,7 @@ Matrix<T, Dynamic, 1> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >
      * This function returns the column of V in the SVD of A = USV corresponding
      * to the least singular value (recall that singular values are always
      * non-negative). It therefore effectively assumes that the A has a 
-     * nullspace of dimension one.  
-     *
-     * This function does not check that the given matrix is indeed a
-     * valid row Laplacian matrix (zero row sums, positive diagonal,
-     * negative off-diagonal).  
+     * nullspace of dimension one.
      */
     // Perform a singular value decomposition of A, only computing V in full
     Eigen::BDCSVD<Matrix<T, Dynamic, Dynamic> > svd(A, Eigen::ComputeFullV);
@@ -207,11 +203,7 @@ Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dyna
      * Compute the nullspace of A by performing a singular value decomposition.
      *
      * This function returns the column(s) of V in the SVD of A = USV
-     * corresponding to singular values with absolute value < tol.  
-     *
-     * This function does not check that the given matrix is indeed a
-     * valid row Laplacian matrix (zero row sums, positive diagonal,
-     * negative off-diagonal).  
+     * corresponding to singular values with absolute value < tol.
      */
     // Perform a singular value decomposition of A, only computing V in full
     Eigen::BDCSVD<Matrix<T, Dynamic, Dynamic> > svd(A, Eigen::ComputeFullV);
@@ -238,6 +230,23 @@ Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dyna
 
     return nullmat;
 }
+
+template <typename T>
+Matrix<T, Dynamic, 1> solveByQRD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, 
+                                 const Ref<const Matrix<T, Dynamic, 1> >& b)
+{
+    /*
+     * Solve the non-homogeneous linear system Ax = b by obtaining a QR 
+     * decomposition of A. 
+     *
+     * A is assumed to be square.  
+     */
+    // Obtain a QR decomposition of A 
+    Eigen::ColPivHouseholderQR<Matrix<T, Dynamic, Dynamic> > qrd(A);
+
+    // Get and return the solution to Ax = b
+    return qrd.solve(b); 
+} 
 
 template <typename T>
 Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian,
@@ -783,7 +792,8 @@ class LabeledDigraph
         bool hasEdge(std::string source_id, std::string target_id) const
         {
             /*
-             * Return true if the given edge exists in the graph. 
+             * Given the *ids* of two nodes, return true if the given edge
+             * exists in the graph.  
              */
             // Check that the two nodes exist 
             if (this->nodes.count(source_id) && this->nodes.count(target_id))
@@ -795,6 +805,16 @@ class LabeledDigraph
             }
             return false;
         }
+
+        bool hasEdge(Node* source, Node* target) const 
+        {
+            /*
+             * Given the *pointers* to two nodes, return true if the given
+             * edge exists in the graph. 
+             */
+            return (this->edges.count(source) && (this->edges.find(source))->second.count(target)); 
+        }
+
 
         void setEdgeLabel(std::string source_id, std::string target_id, T value)
         {
@@ -1124,12 +1144,79 @@ class LabeledDigraph
             return forest_matrix.row(0) / norm; 
         }
 
-        T getMeanFirstPassageTime(Node* source, Node* target, bool sparse = true)
+        Matrix<T, Dynamic, 1> getMeanFirstPassageTimesFromQRD(Node* target)
         {
             /*
-             * Return the mean first-passage time from the source node to the 
-             * target node, assuming that the target node will always eventually
-             * be reached.
+             * Return the mean first-passage time to the given target node from 
+             * *every node* (including itself), assuming that the target node
+             * will always eventually be reached, no matter which starting node
+             * is chosen.  
+             *
+             * This quantity is only well-defined if there are no alternative 
+             * terminal SCCs to which a path from the source node can travel.
+             * In other words, for any node in the graph with a path from the
+             * source node, there must also exist a path from that node to the
+             * target node.
+             */
+            // Get the index of the target node 
+            int t; 
+            for (auto it = this->order.begin(); it != this->order.end(); ++it)
+            {
+                if (*it == target)
+                {
+                    t = std::distance(this->order.begin(), it);
+                    break;
+                }
+            } 
+
+            // Get the Laplacian matrix of the graph and drop the row and column
+            // corresponding to the target node 
+            Matrix<T, Dynamic, Dynamic> laplacian = this->getLaplacian();
+            Matrix<T, Dynamic, Dynamic> sublaplacian(this->numnodes - 1, this->numnodes - 1);
+            sublaplacian.block(0, 0, t, t) = laplacian.block(0, 0, t, t); 
+            sublaplacian.block(0, t, t, this->numnodes - 1 - t) = laplacian.block(0, t + 1, t, this->numnodes - 1 - t); 
+            sublaplacian.block(t, 0, t, this->numnodes - 1 - t) = laplacian.block(t + 1, 0, t, this->numnodes - 1 - t); 
+            sublaplacian.block(t, t, this->numnodes - 1 - t, this->numnodes - 1 - t)
+                = laplacian.block(t + 1, t + 1 , this->numnodes - 1 - t, this->numnodes - 1 - t); 
+
+            // Get the left-hand matrix in the first-passage time linear system
+            Matrix<T, Dynamic, Dynamic> A = sublaplacian.transpose() * sublaplacian.transpose();
+
+            // Get the right-hand vector in the first-passage time linear system 
+            Matrix<T, Dynamic, 1> b = Matrix<T, Dynamic, 1>::Zero(this->numnodes - 1); 
+            for (unsigned i = 0; i < t; ++i)
+            {
+                if (this->hasEdge(this->order[i], target))
+                    b(i) = this->edges[this->order[i]][target];
+            }
+            for (unsigned i = t + 1; i < this->numnodes; ++i)
+            {
+                if (this->hasEdge(this->order[i], target))
+                    b(i - 1) = this->edges[this->order[i]][target]; 
+            }
+
+            // Solve the linear system and return the coordinate corresponding 
+            // to the given source node 
+            Matrix<T, Dynamic, 1> solution = solveByQRD<T>(A, b);
+
+            // Return an augmented vector with the zero mean FPT from the 
+            // target node to itself
+            Matrix<T, Dynamic, 1> fpt_vec = Matrix<T, Dynamic, 1>::Zero(this->numnodes);
+            for (unsigned i = 0; i < t; ++i)
+                fpt_vec(i) = solution(i); 
+            for (unsigned i = t + 1; i < this->numnodes; ++i)
+                fpt_vec(i) = solution(i - 1);
+
+            return fpt_vec;  
+        }
+
+        Matrix<T, Dynamic, 1> getMeanFirstPassageTimesFromRecurrence(Node* target, bool sparse = true)
+        {
+            /*
+             * Return the mean first-passage time to the given target node from 
+             * *every node* (including itself), assuming that the target node
+             * will always eventually be reached, no matter which starting node
+             * is chosen.  
              *
              * This quantity is only well-defined if there are no alternative 
              * terminal SCCs to which a path from the source node can travel.
@@ -1137,9 +1224,6 @@ class LabeledDigraph
              * source node, there must also exist a path from that node to the
              * target node.  
              */
-            // Check that the two nodes are distinct
-            if (source == target) return 0; 
-
             // Collect all outgoing edges from the target node and store them 
             // separately, removing them from the graph
             std::unordered_map<Node*, T> edges_from_target(this->edges[target]);
@@ -1233,28 +1317,34 @@ class LabeledDigraph
                 forest_one_root = chebotarevAgaevRecurrence<T>(laplacian, forest_two_roots, this->numnodes - 2);
             }
 
-            // Now compute the desired mean first-passage time ...
-            T mean_time = 0;
-            unsigned source_idx = 0;
-            unsigned target_idx = 0;  
+            // Now compute the desired mean first-passage times ...
+            int t;
+            Matrix<T, Dynamic, 1> mean_times = Matrix<T, Dynamic, 1>::Zero(this->numnodes);  
+            for (auto it = this->order.begin(); it != this->order.end(); ++it)
+            {
+                if (*it == target)
+                {
+                    t = std::distance(this->order.begin(), it); 
+                    break;
+                }
+            }
             for (unsigned i = 0; i < this->numnodes; ++i)
             {
-                if (this->order[i] == source)
-                    source_idx = i;
-                if (this->order[i] == target)
-                    target_idx = i;  
+                if (i != t)
+                {
+                    for (unsigned j = 0; j < t; ++j)
+                        mean_times(i) += forest_two_roots(i, j); 
+                    for (unsigned j = t + 1; j < this->numnodes; ++j)
+                        mean_times(i) += forest_two_roots(i, j);
+                }
             }
-            for (unsigned i = 0; i < target_idx; ++i)
-                mean_time += forest_two_roots(source_idx, i);
-            for (unsigned i = target_idx + 1; i < this->numnodes; ++i)
-                mean_time += forest_two_roots(source_idx, i);
-            mean_time /= forest_one_root(target_idx, target_idx);
+            mean_times /= forest_one_root(t, t); 
 
             // ... and add the outgoing edges from the target node back into the 
             // graph 
             this->edges[target] = edges_from_target; 
 
-            return mean_time;  
+            return mean_times;  
         } 
 };
 
