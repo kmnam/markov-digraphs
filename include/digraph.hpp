@@ -1215,6 +1215,7 @@ class LabeledDigraph
             // corresponding to the target node 
             Matrix<T, Dynamic, Dynamic> laplacian = this->getLaplacian();
             Matrix<T, Dynamic, Dynamic> sublaplacian(this->numnodes - 1, this->numnodes - 1);
+            int z = this->numnodes - 1 - t; 
             sublaplacian.block(0, 0, t, t) = laplacian.block(0, 0, t, t); 
             sublaplacian.block(0, t, t, z) = laplacian.block(0, t + 1, t, z); 
             sublaplacian.block(t, 0, z, t) = laplacian.block(t + 1, 0, z, t); 
