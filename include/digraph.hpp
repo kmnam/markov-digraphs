@@ -18,7 +18,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     11/11/2021
+ *     11/18/2021
  */
 using namespace Eigen;
 
@@ -357,6 +357,48 @@ class LabeledDigraph
         // ----------------------------------------------------- //
         //                     PRIVATE METHODS                   //
         // ----------------------------------------------------- //
+        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrix(int k, const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian)
+        {
+            /*
+             * Compute the k-th spanning forest matrix, using the recurrence
+             * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs. 17-18).
+             *
+             * A private version of the corresponding public method, in which 
+             * a pre-computed Laplacian matrix is provided as an argument. 
+             *
+             * This method uses a dense Laplacian matrix.  
+             */
+            // Begin with the identity matrix 
+            Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes);
+
+            // Apply the recurrence ...
+            for (unsigned i = 0; i < k; ++i)
+                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i);
+
+            return curr; 
+        }
+
+        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrixSparse(int k, const Ref<const SparseMatrix<T> >& laplacian)
+        {
+            /*
+             * Compute the k-th spanning forest matrix, using the recurrence
+             * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs. 17-18).
+             *
+             * A private version of the corresponding public method, in which 
+             * a pre-computed Laplacian matrix is provided as an argument. 
+             *
+             * This method uses a sparse Laplacian matrix.  
+             */
+            // Begin with the identity matrix
+            Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes); 
+
+            // Apply the recurrence ...
+            for (unsigned i = 0; i < k; ++i)
+                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i);
+
+            return curr; 
+        }
+
         std::vector<Node*> DFS(Node* init)
         {
             /*
@@ -1174,10 +1216,9 @@ class LabeledDigraph
             Matrix<T, Dynamic, Dynamic> laplacian = this->getLaplacian();
             Matrix<T, Dynamic, Dynamic> sublaplacian(this->numnodes - 1, this->numnodes - 1);
             sublaplacian.block(0, 0, t, t) = laplacian.block(0, 0, t, t); 
-            sublaplacian.block(0, t, t, this->numnodes - 1 - t) = laplacian.block(0, t + 1, t, this->numnodes - 1 - t); 
-            sublaplacian.block(t, 0, t, this->numnodes - 1 - t) = laplacian.block(t + 1, 0, t, this->numnodes - 1 - t); 
-            sublaplacian.block(t, t, this->numnodes - 1 - t, this->numnodes - 1 - t)
-                = laplacian.block(t + 1, t + 1 , this->numnodes - 1 - t, this->numnodes - 1 - t); 
+            sublaplacian.block(0, t, t, z) = laplacian.block(0, t + 1, t, z); 
+            sublaplacian.block(t, 0, z, t) = laplacian.block(t + 1, 0, z, t); 
+            sublaplacian.block(t, t, z, z) = laplacian.block(t + 1, t + 1, z, z); 
 
             // Get the left-hand matrix in the first-passage time linear system
             Matrix<T, Dynamic, Dynamic> A = sublaplacian.transpose() * sublaplacian.transpose();
@@ -1224,11 +1265,6 @@ class LabeledDigraph
              * source node, there must also exist a path from that node to the
              * target node.  
              */
-            // Collect all outgoing edges from the target node and store them 
-            // separately, removing them from the graph
-            std::unordered_map<Node*, T> edges_from_target(this->edges[target]);
-            this->edges[target].clear();
-
             // Compute the required spanning forest matrices ...
             Matrix<T, Dynamic, Dynamic> forest_one_root, forest_two_roots;
             if (sparse)
@@ -1251,8 +1287,9 @@ class LabeledDigraph
                     {
                         if (i != j)
                         {
-                            // Get the edge label for i -> j
-                            if (this->edges[v].find(w) != this->edges[v].end())
+                            // Get the edge label for i -> j, omitting all edges 
+                            // for which i is the target node 
+                            if (v != target && this->edges[v].find(w) != this->edges[v].end())
                             {
                                 T label(this->edges[v][w]);
                                 laplacian_triplets.push_back(Triplet<T>(i, j, -label));
@@ -1268,7 +1305,7 @@ class LabeledDigraph
 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // forest matrix 
-                forest_two_roots = this->getSpanningForestMatrixSparse(this->numnodes - 2);
+                forest_two_roots = this->getSpanningForestMatrixSparse(this->numnodes - 2, laplacian);
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root forest (tree) matrix  
@@ -1291,8 +1328,9 @@ class LabeledDigraph
                     {
                         if (i != j)
                         {
-                            // Get the edge label for i -> j
-                            if (this->edges[v].find(w) != this->edges[v].end())
+                            // Get the edge label for i -> j, omitting all edges
+                            // for which i is the target node 
+                            if (v != target && this->edges[v].find(w) != this->edges[v].end())
                             {
                                 T label(this->edges[v][w]);
                                 laplacian(i,j) = -label;
@@ -1310,7 +1348,7 @@ class LabeledDigraph
 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // forest matrix 
-                forest_two_roots = this->getSpanningForestMatrix(this->numnodes - 2);
+                forest_two_roots = this->getSpanningForestMatrix(this->numnodes - 2, laplacian);
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root forest (tree) matrix  
@@ -1328,21 +1366,12 @@ class LabeledDigraph
                     break;
                 }
             }
-            for (unsigned i = 0; i < this->numnodes; ++i)
-            {
-                if (i != t)
-                {
-                    for (unsigned j = 0; j < t; ++j)
-                        mean_times(i) += forest_two_roots(i, j); 
-                    for (unsigned j = t + 1; j < this->numnodes; ++j)
-                        mean_times(i) += forest_two_roots(i, j);
-                }
-            }
+            int z = this->numnodes - 1 - t; 
+            mean_times.head(t) = forest_two_roots.block(0, 0, t, t).rowwise().sum();
+            mean_times.head(t) += forest_two_roots.block(0, t + 1, t, z).rowwise().sum(); 
+            mean_times.tail(z) = forest_two_roots.block(t + 1, 0, z, t).rowwise().sum(); 
+            mean_times.tail(z) += forest_two_roots.block(t + 1, t + 1, z, z).rowwise().sum(); 
             mean_times /= forest_one_root(t, t); 
-
-            // ... and add the outgoing edges from the target node back into the 
-            // graph 
-            this->edges[target] = edges_from_target; 
 
             return mean_times;  
         } 
