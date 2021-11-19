@@ -18,7 +18,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     11/18/2021
+ *     11/19/2021
  */
 using namespace Eigen;
 
@@ -176,6 +176,281 @@ T logdiffexp(T loga, T logb)
 }
 
 template <typename T>
+T kahanVectorSum(const std::vector<T>& v)
+{
+    /*
+     * Return the sum of the entries in the given vector, computed using 
+     * Kahan's compensated summation algorithm. 
+     *
+     * Note that this algorithm may not be effective at preserving floating-
+     * point accuracy if the compiler is overly aggressive at optimization. 
+     */
+    T sum, err, delta, newsum; 
+    sum = 0; 
+    err = 0; 
+    for (const T entry : v)
+    {
+        delta = entry - err; 
+        newsum = sum + delta; 
+        err = (newsum - sum) - delta; 
+        sum = newsum; 
+    }
+
+    return sum; 
+}
+
+template <typename Derived, typename T = typename Derived::Scalar>
+T kahanTrace(const MatrixBase<Derived>& A)
+{
+    /*
+     * Return the trace of A, computed using Kahan's compensated summation
+     * algorithm.
+     *
+     * Note that this algorithm may not be effective at preserving floating-
+     * point accuracy if the compiler is overly aggressive at optimization.  
+     */
+    T sum, err, delta, newsum; 
+    sum = 0; 
+    err = 0;
+    int dim = std::min(A.rows(), A.cols()); 
+    for (unsigned i = 0; i < dim; ++i)
+    {
+        delta = A(i, i) - err; 
+        newsum = sum + delta;  
+        err = (newsum - sum) - delta; 
+        sum = newsum; 
+    } 
+
+    return sum; 
+}
+
+template <typename Derived, typename T = typename Derived::Scalar>
+Matrix<T, Derived::RowsAtCompileTime, 1> kahanRowSum(const MatrixBase<Derived>& A)
+{
+    /*
+     * Return the column vector containing the row sums of A, computed using
+     * Kahan's compensated summation algorithm.
+     *
+     * This function takes *dense* matrices as input and returns *dense* vectors.  
+     *
+     * Note that this algorithm may not be effective at preserving floating-
+     * point accuracy if the compiler is overly aggressive at optimization. 
+     */
+    Matrix<T, Derived::RowsAtCompileTime, 1> row_sums(A.rows());
+    T sum, err, delta, newsum;  
+    for (unsigned i = 0; i < A.rows(); ++i)
+    {
+        sum = 0;
+        err = 0; 
+        for (unsigned j = 0; j < A.cols(); ++j)
+        {
+            delta = A(i, j) - err; 
+            newsum = sum + delta; 
+            err = (newsum - sum) - delta; 
+            sum = newsum; 
+        }
+        row_sums(i) = sum; 
+    }
+
+    return row_sums; 
+}
+
+template <typename Derived, typename T = typename Derived::Scalar>
+T kahanRowSum(const MatrixBase<Derived>& A, const int i)
+{
+    /*
+     * Return the i-th row sum of A, computed using Kahan's compensated
+     * summation algorithm. 
+     *
+     * Note that this algorithm may not be effective at preserving floating-
+     * point accuracy if the compiler is overly aggressive at optimization. 
+     */
+    T sum, err, delta, newsum; 
+    sum = 0;
+    err = 0; 
+    for (unsigned j = 0; j < A.cols(); ++j)
+    {
+        delta = A(i, j) - err; 
+        newsum = sum + delta; 
+        err = (newsum - sum) - delta; 
+        sum = newsum; 
+    }
+
+    return sum; 
+}
+
+template <typename Derived, typename T = typename Derived::Scalar>
+Matrix<T, 1, Derived::ColsAtCompileTime> kahanColSum(const MatrixBase<Derived>& A)
+{
+    /*
+     * Return the row vector containing the column sums of A, computed using
+     * Kahan's compensated summation algorithm.
+     *
+     * This function takes *dense* matrices as input and returns *dense* vectors.  
+     *
+     * Note that this algorithm may not be effective at preserving floating-
+     * point accuracy if the compiler is overly aggressive at optimization. 
+     */
+    Matrix<T, 1, Derived::ColsAtCompileTime> col_sums(A.cols());
+    T sum, err, delta, newsum;  
+    for (unsigned i = 0; i < A.cols(); ++i)
+    {
+        sum = 0;
+        err = 0; 
+        for (unsigned j = 0; j < A.rows(); ++j)
+        {
+            delta = A(j, i) - err; 
+            newsum = sum + delta; 
+            err = (newsum - sum) - delta; 
+            sum = newsum; 
+        }
+        col_sums(i) = sum; 
+    }
+
+    return col_sums; 
+}
+
+template <typename Derived, typename T = typename Derived::Scalar>
+T kahanColSum(const MatrixBase<Derived>& A, const int i)
+{
+    /*
+     * Return the i-th column sum of A, computed using Kahan's compensated
+     * summation algorithm. 
+     *
+     * Note that this algorithm may not be effective at preserving floating-
+     * point accuracy if the compiler is overly aggressive at optimization. 
+     */
+    T sum, err, delta, newsum; 
+    sum = 0;
+    err = 0; 
+    for (unsigned j = 0; j < A.rows(); ++j)
+    {
+        delta = A(j, i) - err; 
+        newsum = sum + delta; 
+        err = (newsum - sum) - delta; 
+        sum = newsum; 
+    }
+
+    return sum; 
+}
+
+template <typename Derived, typename T = typename Derived::Scalar>
+T kahanDotProduct(const MatrixBase<Derived>& A, const MatrixBase<Derived>& B,
+                  const int i, const int j)
+{
+    /*
+     * Return the dot product of the i-th row of A and the j-th column of B,
+     * computed using Kahan's compensated summation algorithm.
+     *
+     * The two matrices are assumed to have matching dimensions (i.e.,
+     * A.cols() == B.rows()).
+     *
+     * Note that this algorithm may not be effective at preserving floating-
+     * point accuracy if the compiler is overly aggressive at optimization.  
+     */
+    T sum, err, prod, delta, newsum; 
+    sum = 0;
+    err = 0; 
+    for (unsigned k = 0; k < A.cols(); ++k)
+    {
+        prod = A(i, k) * B(k, j);
+        delta = prod - err; 
+        newsum = sum + delta;  
+        err = (newsum - sum) - delta; 
+        sum = newsum; 
+    } 
+
+    return sum; 
+}
+
+template <typename Derived, typename T = typename Derived::Scalar>
+T kahanDotProduct(const SparseMatrix<T, RowMajor>& A, const MatrixBase<Derived>& B,
+                  const int i, const int j)
+{
+    /*
+     * Return the dot product of the i-th row of A and the j-th column of B,
+     * computed using Kahan's compensated summation algorithm, where A is 
+     * specified as a *compressed sparse row-major* matrix. 
+     *
+     * The two matrices are assumed to have matching dimensions (i.e.,
+     * A.cols() == B.rows()).
+     *
+     * Note that this algorithm may not be effective at preserving floating-
+     * point accuracy if the compiler is overly aggressive at optimization.  
+     */
+    T sum, err, prod, delta, newsum; 
+    sum = 0;
+    err = 0;
+
+    // Pick out only the nonzero entries in the i-th row of A
+    for (typename SparseMatrix<T, RowMajor>::InnerIterator it(A, i); it; ++it) 
+    {
+        prod = it.value() * B(it.col(), j);
+        delta = prod - err; 
+        newsum = sum + delta;  
+        err = (newsum - sum) - delta; 
+        sum = newsum; 
+    } 
+
+    return sum; 
+}
+
+template <typename T, int RowsAtCompileTimeA, int ColsAtCompileTimeA,
+          int RowsAtCompileTimeB, int ColsAtCompileTimeB>
+Matrix<T, RowsAtCompileTimeA, ColsAtCompileTimeB> kahanMultiply(
+    const Ref<const Matrix<T, RowsAtCompileTimeA, ColsAtCompileTimeA> >& A, 
+    const Ref<const Matrix<T, RowsAtCompileTimeB, ColsAtCompileTimeB> >& B)
+{
+    /*
+     * Return the matrix product A * B, computed using Kahan's compensated 
+     * summation algorithm.
+     *
+     * The two matrices are assumed to have matching dimensions (i.e.,
+     * A.cols() == B.rows()).
+     *
+     * Note that this algorithm may not be effective at preserving floating-
+     * point accuracy if the compiler is overly aggressive at optimization.  
+     */ 
+    Matrix<T, RowsAtCompileTimeA, ColsAtCompileTimeB> prod(A.rows(), B.cols());
+    for (unsigned i = 0; i < A.rows(); ++i)
+    {
+        for (unsigned j = 0; j < B.cols(); ++j)
+        {
+            prod(i, j) = kahanDotProduct(A, B, i, j); 
+        }
+    }
+    
+    return prod; 
+}
+
+template <typename T, int RowsAtCompileTimeB, int ColsAtCompileTimeB> 
+Matrix<T, Dynamic, ColsAtCompileTimeB> kahanMultiply(const SparseMatrix<T, RowMajor>& A,
+                                                     const Ref<const Matrix<T, RowsAtCompileTimeB, ColsAtCompileTimeB> >& B)
+{
+    /*
+     * Return the matrix product A * B, computed using Kahan's compensated 
+     * summation algorithm, where A is specified as a *compressed sparse 
+     * row-major* matrix
+     *
+     * The two matrices are assumed to have matching dimensions (i.e.,
+     * A.cols() == B.rows()).
+     *
+     * Note that this algorithm may not be effective at preserving floating-
+     * point accuracy if the compiler is overly aggressive at optimization.  
+     */
+    Matrix<T, Dynamic, ColsAtCompileTimeB> prod(A.rows(), B.cols());
+    for (unsigned i = 0; i < A.rows(); ++i)
+    {
+        for (unsigned j = 0; j < B.cols(); ++j)
+        {
+            prod(i, j) = kahanDotProduct(A, B, i, j); 
+        }
+    }
+    
+    return prod; 
+}
+
+template <typename T>
 Matrix<T, Dynamic, 1> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A)
 {
     /*
@@ -251,37 +526,65 @@ Matrix<T, Dynamic, 1> solveByQRD(const Ref<const Matrix<T, Dynamic, Dynamic> >& 
 template <typename T>
 Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian,
                                                       const Ref<const Matrix<T, Dynamic, Dynamic> >& curr,
-                                                      int k)
+                                                      int k, 
+                                                      bool use_kahan_sum)
 {
     /*
      * Apply one iteration of the recurrence of Chebotarev & Agaev (Lin Alg
      * Appl, 2002, Eqs. 17-18) for the in-forest matrices of the graph.
      *
-     * This function takes and outputs *dense* matrices.  
+     * This function takes and outputs *dense* matrices.
+     *
+     * This function also allows for usage of Kahan's compensated summation 
+     * algorithm for matrix multiplication and trace evaluation.  
      */
     T K(k + 1);
-    Matrix<T, Dynamic, Dynamic> product = laplacian * curr;
-    T sigma = product.trace() / K;
+    Matrix<T, Dynamic, Dynamic> product;
+    T sigma; 
+    if (use_kahan_sum)
+    {
+        product = kahanMultiply(laplacian, curr);
+        sigma = kahanTrace(product) / K;
+    } 
+    else
+    {
+        product = laplacian * curr;
+        sigma = product.trace() / K; 
+    }
     Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(laplacian.rows(), laplacian.cols());
 
     return (sigma * identity) - product;
 }
 
 template <typename T>
-Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const Ref<const SparseMatrix<T> >& laplacian, 
+Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const SparseMatrix<T, RowMajor>& laplacian, 
                                                       const Ref<const Matrix<T, Dynamic, Dynamic> >& curr,
-                                                      int k)
+                                                      int k,
+                                                      bool use_kahan_sum)
 {
     /*
      * Apply one iteration of the recurrence of Chebotarev & Agaev (Lin Alg
      * Appl, 2002, Eqs. 17-18) for the in-forest matrices of the graph.
      *
-     * This function takes a *sparse* Laplacian matrix as input, but takes 
-     * and computes *dense* forest matrices. 
+     * This function takes a *compressed sparse row-major* Laplacian matrix
+     * as input, but takes and computes *dense* forest matrices.
+     *
+     * This function also allows for usage of Kahan's compensated summation 
+     * algorithm for matrix multiplication and trace evaluation.  
      */
     T K(k + 1);
-    Matrix<T, Dynamic, Dynamic> product = laplacian * curr;
-    T sigma = product.trace() / K;
+    Matrix<T, Dynamic, Dynamic> product;
+    T sigma; 
+    if (use_kahan_sum)
+    {
+        product = kahanMultiply(laplacian, curr);
+        sigma = kahanTrace(product) / K;
+    } 
+    else
+    {
+        product = laplacian * curr;
+        sigma = product.trace() / K; 
+    }
     Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(laplacian.rows(), laplacian.cols());
 
     return (sigma * identity) - product;
@@ -357,7 +660,9 @@ class LabeledDigraph
         // ----------------------------------------------------- //
         //                     PRIVATE METHODS                   //
         // ----------------------------------------------------- //
-        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrix(int k, const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian)
+        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrix(int k,
+                                                            const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian,
+                                                            bool use_kahan_sum)
         {
             /*
              * Compute the k-th spanning forest matrix, using the recurrence
@@ -366,19 +671,21 @@ class LabeledDigraph
              * A private version of the corresponding public method, in which 
              * a pre-computed Laplacian matrix is provided as an argument. 
              *
-             * This method uses a dense Laplacian matrix.  
+             * This method uses a *dense* Laplacian matrix.
              */
             // Begin with the identity matrix 
             Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes);
 
             // Apply the recurrence ...
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i);
+                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i, use_kahan_sum);
 
             return curr; 
         }
 
-        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrixSparse(int k, const Ref<const SparseMatrix<T> >& laplacian)
+        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrixSparse(int k,
+                                                                  const SparseMatrix<T, RowMajor>& laplacian,
+                                                                  bool use_kahan_sum)
         {
             /*
              * Compute the k-th spanning forest matrix, using the recurrence
@@ -387,14 +694,14 @@ class LabeledDigraph
              * A private version of the corresponding public method, in which 
              * a pre-computed Laplacian matrix is provided as an argument. 
              *
-             * This method uses a sparse Laplacian matrix.  
+             * This method uses a *compressed sparse row-major* Laplacian matrix.  
              */
             // Begin with the identity matrix
             Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes); 
 
             // Apply the recurrence ...
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i);
+                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i, use_kahan_sum); 
 
             return curr; 
         }
@@ -1030,11 +1337,13 @@ class LabeledDigraph
             return laplacian;
         }
 
-        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrix(int k)
+        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrix(int k, bool use_kahan_sum)
         {
             /*
              * Compute the k-th spanning forest matrix, using the recurrence
-             * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs. 17-18). 
+             * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs. 17-18).
+             *
+             * This method uses a *dense* Laplacian matrix.  
              */
             // Begin with the identity matrix 
             Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes);
@@ -1056,7 +1365,7 @@ class LabeledDigraph
                         if (this->edges[v].find(w) != this->edges[v].end())
                         {
                             T label(this->edges[v][w]);
-                            laplacian(i,j) = -label;
+                            laplacian(i, j) = -label;
                         }
                     }
                     j++;
@@ -1066,29 +1375,37 @@ class LabeledDigraph
 
             // Populate diagonal entries as negative sums of the off-diagonal
             // entries in each row
-            for (unsigned i = 0; i < this->numnodes; ++i)
-                laplacian(i,i) = -(laplacian.row(i).sum());
+            if (use_kahan_sum)
+            {
+                for (unsigned i = 0; i < this->numnodes; ++i)
+                    laplacian(i, i) = -kahanRowSum(laplacian, i);
+            }
+            else
+            { 
+                for (unsigned i = 0; i < this->numnodes; ++i)
+                    laplacian(i, i) = -(laplacian.row(i).sum());
+            }
 
             // Apply the recurrence ...
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i);
+                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i, use_kahan_sum);
 
             return curr; 
         }
 
-        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrixSparse(int k)
+        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrixSparse(int k, bool use_kahan_sum)
         {
             /*
              * Compute the k-th spanning forest matrix, using the recurrence
              * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs. 17-18).
              *
-             * This method uses a sparse Laplacian matrix.  
+             * This method uses a *sparse* Laplacian matrix.  
              */
             // Begin with the identity matrix
             Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes); 
 
             // Initialize a zero matrix with #rows = #cols = #nodes
-            SparseMatrix<T> laplacian(this->numnodes, this->numnodes); 
+            SparseMatrix<T, RowMajor> laplacian(this->numnodes, this->numnodes); 
 
             // Populate the entries of the matrix: the off-diagonal (i,j)-th  
             // entry is the *negative* of the label of the edge i -> j, and 
@@ -1097,7 +1414,7 @@ class LabeledDigraph
             unsigned i = 0;
             for (auto&& v : this->order)
             {
-                T row_sum = 0;    // Sum of all off-diagonal entries in i-th row
+                std::vector<T> row_entries;    // All nonzero off-diagonal entries in i-th row
                 unsigned j = 0;
                 for (auto&& w : this->order)
                 {
@@ -1108,11 +1425,23 @@ class LabeledDigraph
                         {
                             T label(this->edges[v][w]);
                             laplacian_triplets.push_back(Triplet<T>(i, j, -label));
-                            row_sum += label;   // Add to the (negative of the) i-th row sum  
+                            row_entries.push_back(label);  
                         }
                     }
                     j++;
                 }
+
+                // Compute the negative of the i-th row sum
+                T row_sum = 0; 
+                if (use_kahan_sum)
+                {
+                    row_sum = kahanVectorSum(row_entries);
+                }
+                else 
+                {
+                    for (const T entry : row_entries)
+                        row_sum += entry; 
+                } 
                 laplacian_triplets.push_back(Triplet<T>(i, i, row_sum)); 
                 i++;
             }
@@ -1120,7 +1449,7 @@ class LabeledDigraph
 
             // Apply the recurrence ...
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i);
+                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i, use_kahan_sum); 
 
             return curr; 
         }
@@ -1161,7 +1490,7 @@ class LabeledDigraph
             return steady_state / norm;
         }
 
-        Matrix<T, Dynamic, 1> getSteadyStateFromRecurrence(bool sparse = true)
+        Matrix<T, Dynamic, 1> getSteadyStateFromRecurrence(bool sparse, bool use_kahan_sum)
         {
             /*
              * Return a *normalized* steady-state vector for the Laplacian 
@@ -1176,13 +1505,17 @@ class LabeledDigraph
             // Obtain the spanning tree weight matrix from the row Laplacian matrix
             Matrix<T, Dynamic, Dynamic> forest_matrix; 
             if (sparse)
-                forest_matrix = this->getSpanningForestMatrixSparse(this->numnodes - 1);
+                forest_matrix = this->getSpanningForestMatrixSparse(this->numnodes - 1, use_kahan_sum); 
             else 
-                forest_matrix = this->getSpanningForestMatrix(this->numnodes - 1);
+                forest_matrix = this->getSpanningForestMatrix(this->numnodes - 1, use_kahan_sum);
 
             // Return any row of the matrix (after normalizing by the sum of 
             // its entries)
-            T norm = forest_matrix.row(0).sum(); 
+            T norm;
+            if (use_kahan_sum)
+                norm = kahanRowSum(forest_matrix, 0); 
+            else 
+                norm = forest_matrix.row(0).sum(); 
             return forest_matrix.row(0) / norm; 
         }
 
@@ -1215,11 +1548,22 @@ class LabeledDigraph
             // corresponding to the target node 
             Matrix<T, Dynamic, Dynamic> laplacian = this->getLaplacian();
             Matrix<T, Dynamic, Dynamic> sublaplacian(this->numnodes - 1, this->numnodes - 1);
-            int z = this->numnodes - 1 - t; 
-            sublaplacian.block(0, 0, t, t) = laplacian.block(0, 0, t, t); 
-            sublaplacian.block(0, t, t, z) = laplacian.block(0, t + 1, t, z); 
-            sublaplacian.block(t, 0, z, t) = laplacian.block(t + 1, 0, z, t); 
-            sublaplacian.block(t, t, z, z) = laplacian.block(t + 1, t + 1, z, z); 
+            int z = this->numnodes - 1 - t;
+            if (t == 0)
+            {
+                sublaplacian = laplacian.block(1, 1, z, z);
+            }
+            else if (z == 0)
+            {
+                sublaplacian = laplacian.block(0, 0, t, t); 
+            }
+            else 
+            { 
+                sublaplacian.block(0, 0, t, t) = laplacian.block(0, 0, t, t);
+                sublaplacian.block(0, t, t, z) = laplacian.block(0, t + 1, t, z); 
+                sublaplacian.block(t, 0, z, t) = laplacian.block(t + 1, 0, z, t); 
+                sublaplacian.block(t, t, z, z) = laplacian.block(t + 1, t + 1, z, z);
+            } 
 
             // Get the left-hand matrix in the first-passage time linear system
             Matrix<T, Dynamic, Dynamic> A = sublaplacian.transpose() * sublaplacian.transpose();
@@ -1252,7 +1596,9 @@ class LabeledDigraph
             return fpt_vec;  
         }
 
-        Matrix<T, Dynamic, 1> getMeanFirstPassageTimesFromRecurrence(Node* target, bool sparse = true)
+        Matrix<T, Dynamic, 1> getMeanFirstPassageTimesFromRecurrence(Node* target,
+                                                                     bool sparse,
+                                                                     bool use_kahan_sum)
         {
             /*
              * Return the mean first-passage time to the given target node from 
@@ -1270,10 +1616,10 @@ class LabeledDigraph
             Matrix<T, Dynamic, Dynamic> forest_one_root, forest_two_roots;
             if (sparse)
             {
-                // Instantiate a *sparse* Laplacian matrix ...
+                // Instantiate a *sparse row-major* Laplacian matrix ...
                 //
                 // Initialize a zero matrix with #rows = #cols = #nodes
-                SparseMatrix<T> laplacian(this->numnodes, this->numnodes); 
+                SparseMatrix<T, RowMajor> laplacian(this->numnodes, this->numnodes); 
 
                 // Populate the entries of the matrix: the off-diagonal (i,j)-th  
                 // entry is the *negative* of the label of the edge i -> j, and 
@@ -1282,7 +1628,7 @@ class LabeledDigraph
                 unsigned i = 0;
                 for (auto&& v : this->order)
                 {
-                    T row_sum = 0;    // Sum of all off-diagonal entries in i-th row
+                    std::vector<T> row_entries;    // All nonzero off-diagonal entries in i-th row
                     unsigned j = 0;
                     for (auto&& w : this->order)
                     {
@@ -1294,11 +1640,22 @@ class LabeledDigraph
                             {
                                 T label(this->edges[v][w]);
                                 laplacian_triplets.push_back(Triplet<T>(i, j, -label));
-                                row_sum += label;   // Add to the (negative of the) i-th row sum  
+                                row_entries.push_back(label);  
                             }
                         }
                         j++;
                     }
+                    // Compute the negative of the i-th row sum
+                    T row_sum = 0; 
+                    if (use_kahan_sum)
+                    {
+                        row_sum = kahanVectorSum(row_entries);
+                    }
+                    else 
+                    {
+                        for (const T entry : row_entries)
+                            row_sum += entry; 
+                    } 
                     laplacian_triplets.push_back(Triplet<T>(i, i, row_sum)); 
                     i++;
                 }
@@ -1306,11 +1663,15 @@ class LabeledDigraph
 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // forest matrix 
-                forest_two_roots = this->getSpanningForestMatrixSparse(this->numnodes - 2, laplacian);
+                forest_two_roots = this->getSpanningForestMatrixSparse(
+                    this->numnodes - 2, laplacian, use_kahan_sum
+                );
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root forest (tree) matrix  
-                forest_one_root = chebotarevAgaevRecurrence<T>(laplacian, forest_two_roots, this->numnodes - 2);
+                forest_one_root = chebotarevAgaevRecurrence<T>(
+                    laplacian, forest_two_roots, this->numnodes - 2, use_kahan_sum
+                );
             }
             else 
             {
@@ -1334,7 +1695,7 @@ class LabeledDigraph
                             if (v != target && this->edges[v].find(w) != this->edges[v].end())
                             {
                                 T label(this->edges[v][w]);
-                                laplacian(i,j) = -label;
+                                laplacian(i, j) = -label;
                             }
                         }
                         j++;
@@ -1344,16 +1705,28 @@ class LabeledDigraph
 
                 // Populate diagonal entries as negative sums of the off-diagonal
                 // entries in each row
-                for (unsigned i = 0; i < this->numnodes; ++i)
-                    laplacian(i,i) = -(laplacian.row(i).sum());
+                if (use_kahan_sum)
+                {
+                    for (unsigned i = 0; i < this->numnodes; ++i)
+                        laplacian(i, i) = -kahanRowSum(laplacian, i);
+                }
+                else
+                { 
+                    for (unsigned i = 0; i < this->numnodes; ++i)
+                        laplacian(i, i) = -(laplacian.row(i).sum());
+                }
 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // forest matrix 
-                forest_two_roots = this->getSpanningForestMatrix(this->numnodes - 2, laplacian);
+                forest_two_roots = this->getSpanningForestMatrix(
+                    this->numnodes - 2, laplacian, use_kahan_sum
+                );
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root forest (tree) matrix  
-                forest_one_root = chebotarevAgaevRecurrence<T>(laplacian, forest_two_roots, this->numnodes - 2);
+                forest_one_root = chebotarevAgaevRecurrence<T>(
+                    laplacian, forest_two_roots, this->numnodes - 2, use_kahan_sum
+                );
             }
 
             // Now compute the desired mean first-passage times ...
@@ -1367,14 +1740,252 @@ class LabeledDigraph
                     break;
                 }
             }
-            int z = this->numnodes - 1 - t; 
-            mean_times.head(t) = forest_two_roots.block(0, 0, t, t).rowwise().sum();
-            mean_times.head(t) += forest_two_roots.block(0, t + 1, t, z).rowwise().sum(); 
-            mean_times.tail(z) = forest_two_roots.block(t + 1, 0, z, t).rowwise().sum(); 
-            mean_times.tail(z) += forest_two_roots.block(t + 1, t + 1, z, z).rowwise().sum(); 
+            int z = this->numnodes - 1 - t;
+            if (use_kahan_sum)
+            {
+                if (t == 0)
+                {
+                    mean_times.tail(z) = kahanRowSum(forest_two_roots.block(1, 1, z, z)); 
+                }
+                else if (z == 0)
+                {
+                    mean_times.head(t) = kahanRowSum(forest_two_roots.block(0, 0, t, t)); 
+                }
+                else
+                { 
+                    mean_times.head(t) = kahanRowSum(forest_two_roots.block(0, 0, t, t)); 
+                    mean_times.head(t) += kahanRowSum(forest_two_roots.block(0, t + 1, t, z)); 
+                    mean_times.tail(z) = kahanRowSum(forest_two_roots.block(t + 1, 0, z, t)); 
+                    mean_times.tail(z) += kahanRowSum(forest_two_roots.block(t + 1, t + 1, z, z));
+                }
+            }
+            else
+            {
+                if (t == 0)
+                {
+                    mean_times.tail(z) = forest_two_roots.block(1, 1, z, z).rowwise().sum(); 
+                }
+                else if (z == 0)
+                {
+                    mean_times.head(t) = forest_two_roots.block(0, 0, t, t).rowwise().sum();
+                }
+                else
+                {
+                    mean_times.head(t) = forest_two_roots.block(0, 0, t, t).rowwise().sum(); 
+                    mean_times.head(t) += forest_two_roots.block(0, t + 1, t, z).rowwise().sum(); 
+                    mean_times.tail(z) = forest_two_roots.block(t + 1, 0, z, t).rowwise().sum(); 
+                    mean_times.tail(z) += forest_two_roots.block(t + 1, t + 1, z, z).rowwise().sum();
+                } 
+            } 
             mean_times /= forest_one_root(t, t); 
 
             return mean_times;  
+        }
+
+        Matrix<T, Dynamic, 1> getVarianceOfFirstPassageTimesFromRecurrence(Node* target,
+                                                                           bool sparse,
+                                                                           bool use_kahan_sum) 
+        {
+            /*
+             * Return the mean first-passage time to the given target node from 
+             * *every node* (including itself), assuming that the target node
+             * will always eventually be reached, no matter which starting node
+             * is chosen.  
+             *
+             * This quantity is only well-defined if there are no alternative 
+             * terminal SCCs to which a path from the source node can travel.
+             * In other words, for any node in the graph with a path from the
+             * source node, there must also exist a path from that node to the
+             * target node.  
+             */
+            // Compute the required spanning forest matrices ...
+            Matrix<T, Dynamic, Dynamic> forest_one_root, forest_two_roots;
+            if (sparse)
+            {
+                // Instantiate a *sparse row-major* Laplacian matrix ...
+                //
+                // Initialize a zero matrix with #rows = #cols = #nodes
+                SparseMatrix<T, RowMajor> laplacian(this->numnodes, this->numnodes); 
+
+                // Populate the entries of the matrix: the off-diagonal (i,j)-th  
+                // entry is the *negative* of the label of the edge i -> j, and 
+                // the diagonal entries are set so that each *row* sum is zero 
+                std::vector<Triplet<T> > laplacian_triplets; 
+                unsigned i = 0;
+                for (auto&& v : this->order)
+                {
+                    std::vector<T> row_entries;    // All nonzero off-diagonal entries in i-th row
+                    unsigned j = 0;
+                    for (auto&& w : this->order)
+                    {
+                        if (i != j)
+                        {
+                            // Get the edge label for i -> j, omitting all edges 
+                            // for which i is the target node 
+                            if (v != target && this->edges[v].find(w) != this->edges[v].end())
+                            {
+                                T label(this->edges[v][w]);
+                                laplacian_triplets.push_back(Triplet<T>(i, j, -label));
+                                row_entries.push_back(label);  
+                            }
+                        }
+                        j++;
+                    }
+                    // Compute the negative of the i-th row sum
+                    T row_sum = 0; 
+                    if (use_kahan_sum)
+                    {
+                        row_sum = kahanVectorSum(row_entries);
+                    }
+                    else 
+                    {
+                        for (const T entry : row_entries)
+                            row_sum += entry; 
+                    } 
+                    laplacian_triplets.push_back(Triplet<T>(i, i, row_sum)); 
+                    i++;
+                }
+                laplacian.setFromTriplets(laplacian_triplets.begin(), laplacian_triplets.end());
+
+                // Then run the Chebotarev-Agaev recurrence to get the two-root
+                // forest matrix 
+                forest_two_roots = this->getSpanningForestMatrixSparse(
+                    this->numnodes - 2, laplacian, use_kahan_sum
+                );
+
+                // Then run the Chebotarev-Agaev recurrence one more time to get 
+                // the one-root forest (tree) matrix  
+                forest_one_root = chebotarevAgaevRecurrence<T>(
+                    laplacian, forest_two_roots, this->numnodes - 2, use_kahan_sum
+                );
+            }
+            else 
+            {
+                // Instantiate a *dense* Laplacian matrix ...
+                //
+                // Initialize a zero matrix with #rows = #cols = #nodes
+                Matrix<T, Dynamic, Dynamic> laplacian = Matrix<T, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
+
+                // Populate the off-diagonal entries of the matrix first: 
+                // (i,j)-th entry is the *negative* of the label of the edge i -> j
+                unsigned i = 0;
+                for (auto&& v : this->order)
+                {
+                    unsigned j = 0;
+                    for (auto&& w : this->order)
+                    {
+                        if (i != j)
+                        {
+                            // Get the edge label for i -> j, omitting all edges
+                            // for which i is the target node 
+                            if (v != target && this->edges[v].find(w) != this->edges[v].end())
+                            {
+                                T label(this->edges[v][w]);
+                                laplacian(i, j) = -label;
+                            }
+                        }
+                        j++;
+                    }
+                    i++;
+                }
+
+                // Populate diagonal entries as negative sums of the off-diagonal
+                // entries in each row
+                if (use_kahan_sum)
+                {
+                    for (unsigned i = 0; i < this->numnodes; ++i)
+                        laplacian(i, i) = -kahanRowSum(laplacian, i);
+                }
+                else
+                { 
+                    for (unsigned i = 0; i < this->numnodes; ++i)
+                        laplacian(i, i) = -(laplacian.row(i).sum());
+                }
+
+                // Then run the Chebotarev-Agaev recurrence to get the two-root
+                // forest matrix 
+                forest_two_roots = this->getSpanningForestMatrix(
+                    this->numnodes - 2, laplacian, use_kahan_sum
+                );
+
+                // Then run the Chebotarev-Agaev recurrence one more time to get 
+                // the one-root forest (tree) matrix  
+                forest_one_root = chebotarevAgaevRecurrence<T>(
+                    laplacian, forest_two_roots, this->numnodes - 2, use_kahan_sum
+                );
+            }
+
+            // Now compute the desired first moments (means) and second moments 
+            // of the first-passage times ...
+            int t;
+            Matrix<T, Dynamic, 1> mean_times = Matrix<T, Dynamic, 1>::Zero(this->numnodes);
+            Matrix<T, Dynamic, 1> second_moments = Matrix<T, Dynamic, 1>::Zero(this->numnodes);
+            Matrix<T, Dynamic, Dynamic> forest_two_roots_squared; 
+            if (use_kahan_sum)
+                forest_two_roots_squared = kahanMultiply(forest_two_roots, forest_two_roots); 
+            else 
+                forest_two_roots_squared = forest_two_roots * forest_two_roots;
+            for (auto it = this->order.begin(); it != this->order.end(); ++it)
+            {
+                if (*it == target)
+                {
+                    t = std::distance(this->order.begin(), it); 
+                    break;
+                }
+            }
+            int z = this->numnodes - 1 - t; 
+            if (use_kahan_sum)
+            {
+                if (t == 0)
+                {
+                    mean_times.tail(z) = kahanRowSum(forest_two_roots.block(1, 1, z, z)); 
+                    second_moments.tail(z) = kahanRowSum(forest_two_roots_squared.block(1, 1, z, z)); 
+                }
+                else if (z == 0)
+                {
+                    mean_times.head(t) = kahanRowSum(forest_two_roots.block(0, 0, t, t)); 
+                    second_moments.head(t) = kahanRowSum(forest_two_roots_squared.block(0, 0, t, t)); 
+                }
+                else 
+                { 
+                    mean_times.head(t) = kahanRowSum(forest_two_roots.block(0, 0, t, t)); 
+                    mean_times.head(t) += kahanRowSum(forest_two_roots.block(0, t + 1, t, z)); 
+                    mean_times.tail(z) = kahanRowSum(forest_two_roots.block(t + 1, 0, z, t)); 
+                    mean_times.tail(z) += kahanRowSum(forest_two_roots.block(t + 1, t + 1, z, z));
+                    second_moments.head(t) = kahanRowSum(forest_two_roots_squared.block(0, 0, t, t)); 
+                    second_moments.head(t) += kahanRowSum(forest_two_roots_squared.block(0, t + 1, t, z)); 
+                    second_moments.tail(z) = kahanRowSum(forest_two_roots_squared.block(t + 1, 0, z, t)); 
+                    second_moments.tail(z) += kahanRowSum(forest_two_roots_squared.block(t + 1, t + 1, z, z));
+                } 
+            }
+            else
+            {
+                if (t == 0)
+                {
+                    mean_times.tail(z) = forest_two_roots.block(1, 1, z, z).rowwise().sum();  
+                    second_moments.tail(z) = forest_two_roots_squared.block(1, 1, z, z).rowwise().sum(); 
+                }
+                else if (z == 0)
+                {
+                    mean_times.head(t) = forest_two_roots.block(0, 0, t, t).rowwise().sum(); 
+                    second_moments.head(t) = forest_two_roots_squared.block(0, 0, t, t).rowwise().sum(); 
+                }
+                else 
+                {
+                    mean_times.head(t) = forest_two_roots.block(0, 0, t, t).rowwise().sum(); 
+                    mean_times.head(t) += forest_two_roots.block(0, t + 1, t, z).rowwise().sum(); 
+                    mean_times.tail(z) = forest_two_roots.block(t + 1, 0, z, t).rowwise().sum(); 
+                    mean_times.tail(z) += forest_two_roots.block(t + 1, t + 1, z, z).rowwise().sum();
+                    second_moments.head(t) = forest_two_roots_squared.block(0, 0, t, t).rowwise().sum(); 
+                    second_moments.head(t) += forest_two_roots_squared.block(0, t + 1, t, z).rowwise().sum(); 
+                    second_moments.tail(z) = forest_two_roots_squared.block(t + 1, 0, z, t).rowwise().sum(); 
+                    second_moments.tail(z) += forest_two_roots_squared.block(t + 1, t + 1, z, z).rowwise().sum();
+                } 
+            } 
+            mean_times /= forest_one_root(t, t);
+            second_moments /= forest_one_root(t, t); 
+
+            return second_moments - (mean_times.array() * mean_times.array()).matrix();  
         } 
 };
 
