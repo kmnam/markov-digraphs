@@ -1138,7 +1138,8 @@ class LabeledDigraph
             return forest_matrix.row(0) / norm; 
         }
 
-        Matrix<T, Dynamic, 1> getMeanFirstPassageTimesFromQRD(Node* target)
+        Matrix<T, Dynamic, 1> getMeanFirstPassageTimesFromSolver(Node* target,
+                                                                 std::string method)
         {
             /*
              * Return the mean first-passage time to the given target node from 
@@ -1151,6 +1152,11 @@ class LabeledDigraph
              * In other words, for any node in the graph with a path from the
              * source node, there must also exist a path from that node to the
              * target node.
+             *
+             * The linear solvers that can be used here are LU decomposition 
+             * ("lud" or "LUD") and QR decomposition ("qrd" or "QRD"). An 
+             * exception (std::invalid_argument) is thrown if any other value 
+             * is specified for method.  
              */
             // Get the index of the target node 
             int t; 
@@ -1200,9 +1206,22 @@ class LabeledDigraph
                     b(i - 1) = this->edges[this->order[i]][target]; 
             }
 
-            // Solve the linear system and return the coordinate corresponding 
-            // to the given source node 
-            Matrix<T, Dynamic, 1> solution = solveByQRD<T>(A, b);
+            // Solve the linear system with the specified method 
+            Matrix<T, Dynamic, 1> solution;
+            if (method == "qrd" || method == "QRD") 
+            {
+                solution = solveByQRD<T>(A, b);
+            }
+            else if (method == "lud" || method == "LUD")
+            {
+                solution = solveByLUD<T>(A, b);
+            }
+            else 
+            {
+                std::stringstream ss; 
+                ss << "Invalid linear system solution method specified: " << method; 
+                throw std::invalid_argument(ss.str());
+            } 
 
             // Return an augmented vector with the zero mean FPT from the 
             // target node to itself
@@ -1401,7 +1420,8 @@ class LabeledDigraph
             return mean_times;  
         }
 
-        Matrix<T, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromQRD(Node* target)
+        Matrix<T, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromSolver(Node* target, 
+                                                                            std::string method)
         {
             /*
              * Return the vector of second moments of the first-passage times
@@ -1414,6 +1434,11 @@ class LabeledDigraph
              * In other words, for any node in the graph with a path from the
              * source node, there must also exist a path from that node to the
              * target node.
+             *
+             * The linear solvers that can be used here are LU decomposition 
+             * ("lud" or "LUD") and QR decomposition ("qrd" or "QRD"). An 
+             * exception (std::invalid_argument) is thrown if any other value 
+             * is specified for method.  
              */
             // Get the index of the target node 
             int t; 
@@ -1463,9 +1488,22 @@ class LabeledDigraph
                     b(i - 1) = this->edges[this->order[i]][target]; 
             }
 
-            // Solve the linear system and return the coordinate corresponding 
-            // to the given source node 
-            Matrix<T, Dynamic, 1> solution = solveByQRD<T>(A, b);
+            // Solve the linear system with the specified method 
+            Matrix<T, Dynamic, 1> solution; 
+            if (method == "qrd" || method == "QRD")
+            { 
+                solution = solveByQRD<T>(A, b);
+            }
+            else if (method == "lud" || method == "LUD")
+            { 
+                solution = solveByLUD<T>(A, b);
+            }
+            else
+            {
+                std::stringstream ss; 
+                ss << "Invalid linear system solution method specified: " << method; 
+                throw std::invalid_argument(ss.str());
+            } 
 
             // Return an augmented vector with the zero mean FPT from the 
             // target node to itself
