@@ -237,11 +237,9 @@ T kahanDotProduct(const SparseMatrix<T, RowMajor>& A, const MatrixBase<Derived>&
     return sum; 
 }
 
-template <typename T, int RowsAtCompileTimeA, int ColsAtCompileTimeA,
-          int RowsAtCompileTimeB, int ColsAtCompileTimeB>
-Matrix<T, RowsAtCompileTimeA, ColsAtCompileTimeB> kahanMultiply(
-    const Ref<const Matrix<T, RowsAtCompileTimeA, ColsAtCompileTimeA> >& A, 
-    const Ref<const Matrix<T, RowsAtCompileTimeB, ColsAtCompileTimeB> >& B)
+template <typename DerivedA, typename DerivedB, typename T = typename DerivedA::Scalar>
+Matrix<T, DerivedA::RowsAtCompileTime, DerivedB::ColsAtCompileTime> kahanMultiply(const MatrixBase<DerivedA>& A,
+                                                                                  const MatrixBase<DerivedB>& B) 
 {
     /*
      * Return the matrix product A * B, computed using Kahan's compensated 
@@ -253,7 +251,7 @@ Matrix<T, RowsAtCompileTimeA, ColsAtCompileTimeB> kahanMultiply(
      * Note that this algorithm may not be effective at preserving floating-
      * point accuracy if the compiler is overly aggressive at optimization.  
      */ 
-    Matrix<T, RowsAtCompileTimeA, ColsAtCompileTimeB> prod(A.rows(), B.cols());
+    Matrix<T, DerivedA::RowsAtCompileTime, DerivedB::ColsAtCompileTime> prod(A.rows(), B.cols());
     for (unsigned i = 0; i < A.rows(); ++i)
     {
         for (unsigned j = 0; j < B.cols(); ++j)
