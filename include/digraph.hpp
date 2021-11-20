@@ -19,7 +19,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     11/19/2021
+ *     11/20/2021
  */
 using namespace Eigen;
 
@@ -37,7 +37,7 @@ bool isclose(T a, T b, T tol)
 }
 
 template <typename T>
-Matrix<T, Dynamic, 1> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A)
+Matrix<T, Dynamic, 1> getOneDimNullspaceFromSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A)
 {
     /*
      * Compute the nullspace of A by performing a singular value decomposition.
@@ -58,7 +58,7 @@ Matrix<T, Dynamic, 1> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >
 }
 
 template <typename T>
-Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, const T tol)
+Matrix<T, Dynamic, Dynamic> getNullspaceFromSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, const T tol)
 {
     /*
      * Compute the nullspace of A by performing a singular value decomposition.
@@ -93,6 +93,30 @@ Matrix<T, Dynamic, Dynamic> nullspaceSVD(const Ref<const Matrix<T, Dynamic, Dyna
 }
 
 template <typename T>
+Matrix<T, Dynamic, 1> solveByLUD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A,
+                                 const Ref<const Matrix<T, Dynamic, 1> >& b)
+{
+    /*
+     * Solve the non-homogeneous linear system Ax = b by obtaining an LU 
+     * decomposition of A. 
+     *
+     * A is assumed to be square. 
+     */
+    // Obtain a full-pivot LU decomposition of A 
+    FullPivLU<Matrix<T, Dynamic, Dynamic> > lud(A); 
+
+    // Get and return the solution to Ax = b
+    return lud.solve(b); 
+}
+
+/*
+ * NOTE (11/20/2021): The Eigen/SparseLU module offers an implementation of 
+ * LU decomposition for sparse matrices, but (1) it does not allow for 
+ * coefficients more precise than double, and (2) it is not designed for
+ * row-major matrices. 
+ */
+
+template <typename T>
 Matrix<T, Dynamic, 1> solveByQRD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, 
                                  const Ref<const Matrix<T, Dynamic, 1> >& b)
 {
@@ -103,11 +127,17 @@ Matrix<T, Dynamic, 1> solveByQRD(const Ref<const Matrix<T, Dynamic, Dynamic> >& 
      * A is assumed to be square.  
      */
     // Obtain a QR decomposition of A 
-    Eigen::ColPivHouseholderQR<Matrix<T, Dynamic, Dynamic> > qrd(A);
+    ColPivHouseholderQR<Matrix<T, Dynamic, Dynamic> > qrd(A);
 
     // Get and return the solution to Ax = b
     return qrd.solve(b); 
-} 
+}
+
+/* 
+ * NOTE (11/20/2021): Likewise, the Eigen/SparseQR module offers an
+ * implementation of QR decomposition for sparse matrices, but it requires 
+ * that the input matrix is column-major.  
+ */
 
 template <typename T>
 Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian,
@@ -1060,7 +1090,7 @@ class LabeledDigraph
             Matrix<T, Dynamic, Dynamic> nullmat;
             try
             {
-                nullmat = nullspaceSVD<T>(laplacian);
+                nullmat = getOneDimNullspaceFromSVD<T>(laplacian);
             }
             catch (const std::runtime_error& e)
             {
