@@ -251,6 +251,9 @@ struct Node
 // An Edge is simply a pair of Node pointers
 using Edge = std::pair<Node*, Node*>;
 
+// ----------------------------------------------------- //
+//               THE LABELEDDIGRAPH CLASS                //
+// ----------------------------------------------------- //
 template <typename T>
 class LabeledDigraph
 {
@@ -1398,15 +1401,92 @@ class LabeledDigraph
             return mean_times;  
         }
 
-        Matrix<T, Dynamic, 1> getVarianceOfFirstPassageTimesFromRecurrence(Node* target,
-                                                                           bool sparse,
-                                                                           bool use_kahan_sum) 
+        Matrix<T, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromQRD(Node* target)
         {
             /*
-             * Return the mean first-passage time to the given target node from 
-             * *every node* (including itself), assuming that the target node
-             * will always eventually be reached, no matter which starting node
-             * is chosen.  
+             * Return the vector of second moments of the first-passage times
+             * to the given target node from *every node* (including itself),
+             * assuming that the target node will always eventually be reached,
+             * no matter which starting node is chosen.  
+             *
+             * This quantity is only well-defined if there are no alternative 
+             * terminal SCCs to which a path from the source node can travel.
+             * In other words, for any node in the graph with a path from the
+             * source node, there must also exist a path from that node to the
+             * target node.
+             */
+            // Get the index of the target node 
+            int t; 
+            for (auto it = this->order.begin(); it != this->order.end(); ++it)
+            {
+                if (*it == target)
+                {
+                    t = std::distance(this->order.begin(), it);
+                    break;
+                }
+            } 
+
+            // Get the Laplacian matrix of the graph and drop the row and column
+            // corresponding to the target node 
+            Matrix<T, Dynamic, Dynamic> laplacian = this->getLaplacian();
+            Matrix<T, Dynamic, Dynamic> sublaplacian(this->numnodes - 1, this->numnodes - 1);
+            int z = this->numnodes - 1 - t;
+            if (t == 0)
+            {
+                sublaplacian = laplacian.block(1, 1, z, z);
+            }
+            else if (z == 0)
+            {
+                sublaplacian = laplacian.block(0, 0, t, t); 
+            }
+            else 
+            { 
+                sublaplacian.block(0, 0, t, t) = laplacian.block(0, 0, t, t);
+                sublaplacian.block(0, t, t, z) = laplacian.block(0, t + 1, t, z); 
+                sublaplacian.block(t, 0, z, t) = laplacian.block(t + 1, 0, z, t); 
+                sublaplacian.block(t, t, z, z) = laplacian.block(t + 1, t + 1, z, z);
+            } 
+
+            // Get the left-hand matrix in the first-passage time linear system
+            Matrix<T, Dynamic, Dynamic> A = sublaplacian.transpose() * sublaplacian.transpose() * sublaplacian.transpose();
+
+            // Get the right-hand vector in the first-passage time linear system 
+            Matrix<T, Dynamic, 1> b = Matrix<T, Dynamic, 1>::Zero(this->numnodes - 1); 
+            for (unsigned i = 0; i < t; ++i)
+            {
+                if (this->hasEdge(this->order[i], target))
+                    b(i) = this->edges[this->order[i]][target];
+            }
+            for (unsigned i = t + 1; i < this->numnodes; ++i)
+            {
+                if (this->hasEdge(this->order[i], target))
+                    b(i - 1) = this->edges[this->order[i]][target]; 
+            }
+
+            // Solve the linear system and return the coordinate corresponding 
+            // to the given source node 
+            Matrix<T, Dynamic, 1> solution = solveByQRD<T>(A, b);
+
+            // Return an augmented vector with the zero mean FPT from the 
+            // target node to itself
+            Matrix<T, Dynamic, 1> fpt_vec = Matrix<T, Dynamic, 1>::Zero(this->numnodes);
+            for (unsigned i = 0; i < t; ++i)
+                fpt_vec(i) = solution(i); 
+            for (unsigned i = t + 1; i < this->numnodes; ++i)
+                fpt_vec(i) = solution(i - 1);
+
+            return fpt_vec / 2;  
+        }
+
+        Matrix<T, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromRecurrence(Node* target,
+                                                                                bool sparse,
+                                                                                bool use_kahan_sum) 
+        {
+            /*
+             * Return the vector of second moments of the first-passage times
+             * to the given target node from *every node* (including itself),
+             * assuming that the target node will always eventually be reached,
+             * no matter which starting node is chosen.  
              *
              * This quantity is only well-defined if there are no alternative 
              * terminal SCCs to which a path from the source node can travel.
@@ -1531,10 +1611,8 @@ class LabeledDigraph
                 );
             }
 
-            // Now compute the desired first moments (means) and second moments 
-            // of the first-passage times ...
+            // Now compute the desired second moments of the first-passage times ...
             int t;
-            Matrix<T, Dynamic, 1> mean_times = Matrix<T, Dynamic, 1>::Zero(this->numnodes);
             Matrix<T, Dynamic, 1> second_moments = Matrix<T, Dynamic, 1>::Zero(this->numnodes);
             Matrix<T, Dynamic, Dynamic> forest_two_roots_squared; 
             if (use_kahan_sum)
@@ -1554,20 +1632,14 @@ class LabeledDigraph
             {
                 if (t == 0)
                 {
-                    mean_times.tail(z) = kahanRowSum(forest_two_roots.block(1, 1, z, z)); 
                     second_moments.tail(z) = kahanRowSum(forest_two_roots_squared.block(1, 1, z, z)); 
                 }
                 else if (z == 0)
                 {
-                    mean_times.head(t) = kahanRowSum(forest_two_roots.block(0, 0, t, t)); 
                     second_moments.head(t) = kahanRowSum(forest_two_roots_squared.block(0, 0, t, t)); 
                 }
                 else 
                 { 
-                    mean_times.head(t) = kahanRowSum(forest_two_roots.block(0, 0, t, t)); 
-                    mean_times.head(t) += kahanRowSum(forest_two_roots.block(0, t + 1, t, z)); 
-                    mean_times.tail(z) = kahanRowSum(forest_two_roots.block(t + 1, 0, z, t)); 
-                    mean_times.tail(z) += kahanRowSum(forest_two_roots.block(t + 1, t + 1, z, z));
                     second_moments.head(t) = kahanRowSum(forest_two_roots_squared.block(0, 0, t, t)); 
                     second_moments.head(t) += kahanRowSum(forest_two_roots_squared.block(0, t + 1, t, z)); 
                     second_moments.tail(z) = kahanRowSum(forest_two_roots_squared.block(t + 1, 0, z, t)); 
@@ -1578,30 +1650,23 @@ class LabeledDigraph
             {
                 if (t == 0)
                 {
-                    mean_times.tail(z) = forest_two_roots.block(1, 1, z, z).rowwise().sum();  
                     second_moments.tail(z) = forest_two_roots_squared.block(1, 1, z, z).rowwise().sum(); 
                 }
                 else if (z == 0)
                 {
-                    mean_times.head(t) = forest_two_roots.block(0, 0, t, t).rowwise().sum(); 
                     second_moments.head(t) = forest_two_roots_squared.block(0, 0, t, t).rowwise().sum(); 
                 }
                 else 
                 {
-                    mean_times.head(t) = forest_two_roots.block(0, 0, t, t).rowwise().sum(); 
-                    mean_times.head(t) += forest_two_roots.block(0, t + 1, t, z).rowwise().sum(); 
-                    mean_times.tail(z) = forest_two_roots.block(t + 1, 0, z, t).rowwise().sum(); 
-                    mean_times.tail(z) += forest_two_roots.block(t + 1, t + 1, z, z).rowwise().sum();
                     second_moments.head(t) = forest_two_roots_squared.block(0, 0, t, t).rowwise().sum(); 
                     second_moments.head(t) += forest_two_roots_squared.block(0, t + 1, t, z).rowwise().sum(); 
                     second_moments.tail(z) = forest_two_roots_squared.block(t + 1, 0, z, t).rowwise().sum(); 
                     second_moments.tail(z) += forest_two_roots_squared.block(t + 1, t + 1, z, z).rowwise().sum();
                 } 
             } 
-            mean_times /= forest_one_root(t, t);
             second_moments /= forest_one_root(t, t); 
 
-            return second_moments - (mean_times.array() * mean_times.array()).matrix();  
+            return second_moments;
         } 
 };
 
