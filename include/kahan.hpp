@@ -263,9 +263,9 @@ Matrix<T, DerivedA::RowsAtCompileTime, DerivedB::ColsAtCompileTime> kahanMultipl
     return prod; 
 }
 
-template <typename T, int RowsAtCompileTimeB, int ColsAtCompileTimeB> 
-Matrix<T, Dynamic, ColsAtCompileTimeB> kahanMultiply(const SparseMatrix<T, RowMajor>& A,
-                                                     const Ref<const Matrix<T, RowsAtCompileTimeB, ColsAtCompileTimeB> >& B)
+template <typename T, typename Derived>
+Matrix<T, Dynamic, Derived::ColsAtCompileTime> kahanMultiply(const SparseMatrix<T, RowMajor>& A,
+                                                             const MatrixBase<Derived>& B)
 {
     /*
      * Return the matrix product A * B, computed using Kahan's compensated 
@@ -278,7 +278,7 @@ Matrix<T, Dynamic, ColsAtCompileTimeB> kahanMultiply(const SparseMatrix<T, RowMa
      * Note that this algorithm may not be effective at preserving floating-
      * point accuracy if the compiler is overly aggressive at optimization.  
      */
-    Matrix<T, Dynamic, ColsAtCompileTimeB> prod(A.rows(), B.cols());
+    Matrix<T, Dynamic, Derived::ColsAtCompileTime> prod(A.rows(), B.cols());
     for (unsigned i = 0; i < A.rows(); ++i)
     {
         for (unsigned j = 0; j < B.cols(); ++j)
