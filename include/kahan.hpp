@@ -179,6 +179,33 @@ T colSum(const Eigen::MatrixBase<Derived>& A, const int i)
 }
 
 template <typename Derived, typename T = typename Derived::Scalar>
+T sum(const Eigen::MatrixBase<Derived>& A)
+{
+    /*
+     * Return the sum of the entries in a matrix, computed using Kahan's
+     * compensated summation algorithm. 
+     *
+     * Note that this algorithm may not be effective at preserving floating-
+     * point accuracy if the compiler is overly aggressive at optimization. 
+     */
+    T sum, err, delta, newsum; 
+    sum = 0; 
+    err = 0;
+    for (unsigned i = 0; i < A.rows(); ++i)
+    {
+        for (unsigned j = 0; j < A.cols(); ++j)
+        {
+            delta = A(i, j) - err; 
+            newsum = sum + delta;
+            err = (newsum - sum) - delta; 
+            sum = newsum; 
+        }
+    }
+    
+    return sum; 
+}
+
+template <typename Derived, typename T = typename Derived::Scalar>
 T dotProduct(const Eigen::MatrixBase<Derived>& A, const Eigen::MatrixBase<Derived>& B,
              const int i, const int j)
 {
