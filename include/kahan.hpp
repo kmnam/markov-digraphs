@@ -205,8 +205,8 @@ T sum(const Eigen::MatrixBase<Derived>& A)
     return sum; 
 }
 
-template <typename Derived, typename T = typename Derived::Scalar>
-T dotProduct(const Eigen::MatrixBase<Derived>& A, const Eigen::MatrixBase<Derived>& B,
+template <typename DerivedA, typename DerivedB, typename T = typename DerivedA::Scalar>
+T dotProduct(const Eigen::MatrixBase<DerivedA>& A, const Eigen::MatrixBase<DerivedB>& B,
              const int i, const int j)
 {
     /*
