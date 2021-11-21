@@ -13,12 +13,14 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School 
  * Last updated:
- *     11/19/2021
+ *     11/21/2021
  */
-using namespace Eigen;
+namespace Eigen {
+
+namespace Kahan {
 
 template <typename T>
-T kahanVectorSum(const std::vector<T>& v)
+T vectorSum(const std::vector<T>& v)
 {
     /*
      * Return the sum of the entries in the given vector, computed using 
@@ -42,7 +44,7 @@ T kahanVectorSum(const std::vector<T>& v)
 }
 
 template <typename Derived, typename T = typename Derived::Scalar>
-T kahanTrace(const MatrixBase<Derived>& A)
+T trace(const Eigen::MatrixBase<Derived>& A)
 {
     /*
      * Return the trace of A, computed using Kahan's compensated summation
@@ -67,7 +69,7 @@ T kahanTrace(const MatrixBase<Derived>& A)
 }
 
 template <typename Derived, typename T = typename Derived::Scalar>
-Matrix<T, Derived::RowsAtCompileTime, 1> kahanRowSum(const MatrixBase<Derived>& A)
+Eigen::Matrix<T, Derived::RowsAtCompileTime, 1> rowSum(const Eigen::MatrixBase<Derived>& A)
 {
     /*
      * Return the column vector containing the row sums of A, computed using
@@ -78,7 +80,7 @@ Matrix<T, Derived::RowsAtCompileTime, 1> kahanRowSum(const MatrixBase<Derived>& 
      * Note that this algorithm may not be effective at preserving floating-
      * point accuracy if the compiler is overly aggressive at optimization. 
      */
-    Matrix<T, Derived::RowsAtCompileTime, 1> row_sums(A.rows());
+    Eigen::Matrix<T, Derived::RowsAtCompileTime, 1> row_sums(A.rows());
     T sum, err, delta, newsum;  
     for (unsigned i = 0; i < A.rows(); ++i)
     {
@@ -98,7 +100,7 @@ Matrix<T, Derived::RowsAtCompileTime, 1> kahanRowSum(const MatrixBase<Derived>& 
 }
 
 template <typename Derived, typename T = typename Derived::Scalar>
-T kahanRowSum(const MatrixBase<Derived>& A, const int i)
+T rowSum(const Eigen::MatrixBase<Derived>& A, const int i)
 {
     /*
      * Return the i-th row sum of A, computed using Kahan's compensated
@@ -122,7 +124,7 @@ T kahanRowSum(const MatrixBase<Derived>& A, const int i)
 }
 
 template <typename Derived, typename T = typename Derived::Scalar>
-Matrix<T, 1, Derived::ColsAtCompileTime> kahanColSum(const MatrixBase<Derived>& A)
+Eigen::Matrix<T, 1, Derived::ColsAtCompileTime> colSum(const Eigen::MatrixBase<Derived>& A)
 {
     /*
      * Return the row vector containing the column sums of A, computed using
@@ -133,7 +135,7 @@ Matrix<T, 1, Derived::ColsAtCompileTime> kahanColSum(const MatrixBase<Derived>& 
      * Note that this algorithm may not be effective at preserving floating-
      * point accuracy if the compiler is overly aggressive at optimization. 
      */
-    Matrix<T, 1, Derived::ColsAtCompileTime> col_sums(A.cols());
+    Eigen::Matrix<T, 1, Derived::ColsAtCompileTime> col_sums(A.cols());
     T sum, err, delta, newsum;  
     for (unsigned i = 0; i < A.cols(); ++i)
     {
@@ -153,7 +155,7 @@ Matrix<T, 1, Derived::ColsAtCompileTime> kahanColSum(const MatrixBase<Derived>& 
 }
 
 template <typename Derived, typename T = typename Derived::Scalar>
-T kahanColSum(const MatrixBase<Derived>& A, const int i)
+T colSum(const Eigen::MatrixBase<Derived>& A, const int i)
 {
     /*
      * Return the i-th column sum of A, computed using Kahan's compensated
@@ -177,8 +179,8 @@ T kahanColSum(const MatrixBase<Derived>& A, const int i)
 }
 
 template <typename Derived, typename T = typename Derived::Scalar>
-T kahanDotProduct(const MatrixBase<Derived>& A, const MatrixBase<Derived>& B,
-                  const int i, const int j)
+T dotProduct(const Eigen::MatrixBase<Derived>& A, const Eigen::MatrixBase<Derived>& B,
+             const int i, const int j)
 {
     /*
      * Return the dot product of the i-th row of A and the j-th column of B,
@@ -206,8 +208,8 @@ T kahanDotProduct(const MatrixBase<Derived>& A, const MatrixBase<Derived>& B,
 }
 
 template <typename Derived, typename T = typename Derived::Scalar>
-T kahanDotProduct(const SparseMatrix<T, RowMajor>& A, const MatrixBase<Derived>& B,
-                  const int i, const int j)
+T dotProduct(const Eigen::SparseMatrix<T, Eigen::RowMajor>& A, const Eigen::MatrixBase<Derived>& B,
+             const int i, const int j)
 {
     /*
      * Return the dot product of the i-th row of A and the j-th column of B,
@@ -225,7 +227,7 @@ T kahanDotProduct(const SparseMatrix<T, RowMajor>& A, const MatrixBase<Derived>&
     err = 0;
 
     // Pick out only the nonzero entries in the i-th row of A
-    for (typename SparseMatrix<T, RowMajor>::InnerIterator it(A, i); it; ++it) 
+    for (typename Eigen::SparseMatrix<T, Eigen::RowMajor>::InnerIterator it(A, i); it; ++it) 
     {
         prod = it.value() * B(it.col(), j);
         delta = prod - err; 
@@ -238,8 +240,8 @@ T kahanDotProduct(const SparseMatrix<T, RowMajor>& A, const MatrixBase<Derived>&
 }
 
 template <typename DerivedA, typename DerivedB, typename T = typename DerivedA::Scalar>
-Matrix<T, DerivedA::RowsAtCompileTime, DerivedB::ColsAtCompileTime> kahanMultiply(const MatrixBase<DerivedA>& A,
-                                                                                  const MatrixBase<DerivedB>& B) 
+Eigen::Matrix<T, DerivedA::RowsAtCompileTime, DerivedB::ColsAtCompileTime> multiply(const Eigen::MatrixBase<DerivedA>& A,
+                                                                                    const Eigen::MatrixBase<DerivedB>& B) 
 {
     /*
      * Return the matrix product A * B, computed using Kahan's compensated 
@@ -251,12 +253,12 @@ Matrix<T, DerivedA::RowsAtCompileTime, DerivedB::ColsAtCompileTime> kahanMultipl
      * Note that this algorithm may not be effective at preserving floating-
      * point accuracy if the compiler is overly aggressive at optimization.  
      */ 
-    Matrix<T, DerivedA::RowsAtCompileTime, DerivedB::ColsAtCompileTime> prod(A.rows(), B.cols());
+    Eigen::Matrix<T, DerivedA::RowsAtCompileTime, DerivedB::ColsAtCompileTime> prod(A.rows(), B.cols());
     for (unsigned i = 0; i < A.rows(); ++i)
     {
         for (unsigned j = 0; j < B.cols(); ++j)
         {
-            prod(i, j) = kahanDotProduct(A, B, i, j); 
+            prod(i, j) = Eigen::Kahan::dotProduct(A, B, i, j); 
         }
     }
     
@@ -264,8 +266,8 @@ Matrix<T, DerivedA::RowsAtCompileTime, DerivedB::ColsAtCompileTime> kahanMultipl
 }
 
 template <typename T, typename Derived>
-Matrix<T, Dynamic, Derived::ColsAtCompileTime> kahanMultiply(const SparseMatrix<T, RowMajor>& A,
-                                                             const MatrixBase<Derived>& B)
+Eigen::Matrix<T, Eigen::Dynamic, Derived::ColsAtCompileTime> multiply(const Eigen::SparseMatrix<T, Eigen::RowMajor>& A,
+                                                                      const Eigen::MatrixBase<Derived>& B)
 {
     /*
      * Return the matrix product A * B, computed using Kahan's compensated 
@@ -278,16 +280,20 @@ Matrix<T, Dynamic, Derived::ColsAtCompileTime> kahanMultiply(const SparseMatrix<
      * Note that this algorithm may not be effective at preserving floating-
      * point accuracy if the compiler is overly aggressive at optimization.  
      */
-    Matrix<T, Dynamic, Derived::ColsAtCompileTime> prod(A.rows(), B.cols());
+    Eigen::Matrix<T, Eigen::Dynamic, Derived::ColsAtCompileTime> prod(A.rows(), B.cols());
     for (unsigned i = 0; i < A.rows(); ++i)
     {
         for (unsigned j = 0; j < B.cols(); ++j)
         {
-            prod(i, j) = kahanDotProduct(A, B, i, j); 
+            prod(i, j) = Eigen::Kahan::dotProduct(A, B, i, j); 
         }
     }
     
     return prod; 
 }
+
+}   // namespace Kahan
+
+}   // namespace Eigen
 
 #endif

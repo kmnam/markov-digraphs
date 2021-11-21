@@ -19,7 +19,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     11/20/2021
+ *     11/21/2021
  */
 using namespace Eigen;
 
@@ -159,8 +159,8 @@ Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const Ref<const Matrix<T, 
     T sigma; 
     if (use_kahan_sum)
     {
-        product = kahanMultiply(laplacian, curr);
-        sigma = kahanTrace(product) / K;
+        product = Kahan::multiply(laplacian, curr);
+        sigma = Kahan::trace(product) / K;
     } 
     else
     {
@@ -193,8 +193,8 @@ Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const SparseMatrix<T, RowM
     T sigma; 
     if (use_kahan_sum)
     {
-        product = kahanMultiply(laplacian, curr);
-        sigma = kahanTrace(product) / K;
+        product = Kahan::multiply(laplacian, curr);
+        sigma = Kahan::trace(product) / K;
     } 
     else
     {
@@ -997,7 +997,7 @@ class LabeledDigraph
             if (use_kahan_sum)
             {
                 for (unsigned i = 0; i < this->numnodes; ++i)
-                    laplacian(i, i) = -kahanRowSum(laplacian, i);
+                    laplacian(i, i) = -Kahan::rowSum(laplacian, i);
             }
             else
             { 
@@ -1054,7 +1054,7 @@ class LabeledDigraph
                 T row_sum = 0; 
                 if (use_kahan_sum)
                 {
-                    row_sum = kahanVectorSum(row_entries);
+                    row_sum = Kahan::vectorSum(row_entries);
                 }
                 else 
                 {
@@ -1132,7 +1132,7 @@ class LabeledDigraph
             // its entries)
             T norm;
             if (use_kahan_sum)
-                norm = kahanRowSum(forest_matrix, 0); 
+                norm = Kahan::rowSum(forest_matrix, 0); 
             else 
                 norm = forest_matrix.row(0).sum(); 
             return forest_matrix.row(0) / norm; 
@@ -1287,7 +1287,7 @@ class LabeledDigraph
                     T row_sum = 0; 
                     if (use_kahan_sum)
                     {
-                        row_sum = kahanVectorSum(row_entries);
+                        row_sum = Kahan::vectorSum(row_entries);
                     }
                     else 
                     {
@@ -1346,7 +1346,7 @@ class LabeledDigraph
                 if (use_kahan_sum)
                 {
                     for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -kahanRowSum(laplacian, i);
+                        laplacian(i, i) = -Kahan::rowSum(laplacian, i);
                 }
                 else
                 { 
@@ -1383,18 +1383,18 @@ class LabeledDigraph
             {
                 if (t == 0)
                 {
-                    mean_times.tail(z) = kahanRowSum(forest_two_roots.block(1, 1, z, z)); 
+                    mean_times.tail(z) = Kahan::rowSum(forest_two_roots.block(1, 1, z, z)); 
                 }
                 else if (z == 0)
                 {
-                    mean_times.head(t) = kahanRowSum(forest_two_roots.block(0, 0, t, t)); 
+                    mean_times.head(t) = Kahan::rowSum(forest_two_roots.block(0, 0, t, t)); 
                 }
                 else
                 { 
-                    mean_times.head(t) = kahanRowSum(forest_two_roots.block(0, 0, t, t)); 
-                    mean_times.head(t) += kahanRowSum(forest_two_roots.block(0, t + 1, t, z)); 
-                    mean_times.tail(z) = kahanRowSum(forest_two_roots.block(t + 1, 0, z, t)); 
-                    mean_times.tail(z) += kahanRowSum(forest_two_roots.block(t + 1, t + 1, z, z));
+                    mean_times.head(t) = Kahan::rowSum(forest_two_roots.block(0, 0, t, t)); 
+                    mean_times.head(t) += Kahan::rowSum(forest_two_roots.block(0, t + 1, t, z)); 
+                    mean_times.tail(z) = Kahan::rowSum(forest_two_roots.block(t + 1, 0, z, t)); 
+                    mean_times.tail(z) += Kahan::rowSum(forest_two_roots.block(t + 1, t + 1, z, z));
                 }
             }
             else
@@ -1569,7 +1569,7 @@ class LabeledDigraph
                     T row_sum = 0; 
                     if (use_kahan_sum)
                     {
-                        row_sum = kahanVectorSum(row_entries);
+                        row_sum = Kahan::vectorSum(row_entries);
                     }
                     else 
                     {
@@ -1628,7 +1628,7 @@ class LabeledDigraph
                 if (use_kahan_sum)
                 {
                     for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -kahanRowSum(laplacian, i);
+                        laplacian(i, i) = -Kahan::rowSum(laplacian, i);
                 }
                 else
                 { 
@@ -1654,7 +1654,7 @@ class LabeledDigraph
             Matrix<T, Dynamic, 1> second_moments = Matrix<T, Dynamic, 1>::Zero(this->numnodes);
             Matrix<T, Dynamic, Dynamic> forest_two_roots_squared; 
             if (use_kahan_sum)
-                forest_two_roots_squared = kahanMultiply(forest_two_roots, forest_two_roots); 
+                forest_two_roots_squared = Kahan::multiply(forest_two_roots, forest_two_roots); 
             else 
                 forest_two_roots_squared = forest_two_roots * forest_two_roots;
             for (auto it = this->order.begin(); it != this->order.end(); ++it)
@@ -1670,18 +1670,18 @@ class LabeledDigraph
             {
                 if (t == 0)
                 {
-                    second_moments.tail(z) = kahanRowSum(forest_two_roots_squared.block(1, 1, z, z)); 
+                    second_moments.tail(z) = Kahan::rowSum(forest_two_roots_squared.block(1, 1, z, z)); 
                 }
                 else if (z == 0)
                 {
-                    second_moments.head(t) = kahanRowSum(forest_two_roots_squared.block(0, 0, t, t)); 
+                    second_moments.head(t) = Kahan::rowSum(forest_two_roots_squared.block(0, 0, t, t)); 
                 }
                 else 
                 { 
-                    second_moments.head(t) = kahanRowSum(forest_two_roots_squared.block(0, 0, t, t)); 
-                    second_moments.head(t) += kahanRowSum(forest_two_roots_squared.block(0, t + 1, t, z)); 
-                    second_moments.tail(z) = kahanRowSum(forest_two_roots_squared.block(t + 1, 0, z, t)); 
-                    second_moments.tail(z) += kahanRowSum(forest_two_roots_squared.block(t + 1, t + 1, z, z));
+                    second_moments.head(t) = Kahan::rowSum(forest_two_roots_squared.block(0, 0, t, t)); 
+                    second_moments.head(t) += Kahan::rowSum(forest_two_roots_squared.block(0, t + 1, t, z)); 
+                    second_moments.tail(z) = Kahan::rowSum(forest_two_roots_squared.block(t + 1, 0, z, t)); 
+                    second_moments.tail(z) += Kahan::rowSum(forest_two_roots_squared.block(t + 1, t + 1, z, z));
                 } 
             }
             else
