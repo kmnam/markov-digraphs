@@ -19,7 +19,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     11/21/2021
+ *     11/22/2021
  */
 using namespace Eigen;
 
@@ -506,7 +506,7 @@ class LabeledDigraph
              */
             // Check that a node with the given id doesn't exist already
             if (this->nodes.find(id) != this->nodes.end())
-                throw std::runtime_error("Node exists with specified id");
+                throw std::runtime_error("Node already exists"); 
 
             Node* node = new Node(id);
             this->order.push_back(node); 
@@ -524,11 +524,11 @@ class LabeledDigraph
              * Throw std::runtime_error if node with given id does not exist. 
              */
             // Check that a node with the given id exists
-            if (this->nodes.find(id) == this->nodes.end())
-                throw std::runtime_error("Node does not exist with specified id");
+            Node* node = this->getNode(id);
+            if (node == nullptr)
+                throw std::runtime_error("Specified node does not exist; use LabeledDigraph<T>::addNode() to add node");
 
             // Find and delete node in this->order
-            Node* node = this->getNode(id);
             for (auto it = this->order.begin(); it != this->order.end(); ++it)
             {
                 if (*it == node)
@@ -578,7 +578,7 @@ class LabeledDigraph
              */
             auto it = this->nodes.find(id);
             if (it == this->nodes.end()) return nullptr;
-            else return it->second; 
+            else                         return it->second; 
         }
 
         bool hasNode(std::string id) const 
@@ -607,14 +607,26 @@ class LabeledDigraph
              *
              * If either id does not correspond to a node in the graph,
              * instantiate them.
+             *
+             * Throw std::runtime_error if the edge already exists. 
              */
-            // Look for the two nodes ...
+            // Look for the two nodes
             Node* source = this->getNode(source_id);
             Node* target = this->getNode(target_id);
 
-            // ... and if they don't exist, define them 
-            if (source == nullptr) source = this->addNode(source_id);
-            if (target == nullptr) target = this->addNode(target_id);
+            // Then see if the edge already exists (in which case the two nodes
+            // obviously already exist) 
+            if (source != nullptr && target != nullptr &&
+                this->edges[source].find(target) != this->edges[source].end())
+            {
+                throw std::runtime_error("Edge already exists; use LabeledDigraph<T>::setEdgeLabel() to change label");
+            }
+
+            // If the nodes do not exist, then add the nodes  
+            if (source == nullptr)
+                source = this->addNode(source_id);
+            if (target == nullptr)
+                target = this->addNode(target_id);
 
             // Then define the edge
             this->edges[source][target] = label;
@@ -625,18 +637,22 @@ class LabeledDigraph
             /*
              * Remove the edge between the two given nodes.
              *
-             * Throw std::runtime_error if node with either given id does
+             * This method does nothing if the edge does not exist to
+             * begin with.
+             *
+             * Throw std::runtime_error if either of the two nodes does 
              * not exist. 
              */
-            // Check that nodes with the given ids exist
-            if (this->nodes.find(source_id) == this->nodes.end())
-                throw std::runtime_error("Node does not exist with specified id");
-            if (this->nodes.find(target_id) == this->nodes.end())
-                throw std::runtime_error("Node does not exist with specified id");
-
-            // Does the given edge exist? 
             Node* source = this->getNode(source_id);
             Node* target = this->getNode(target_id);
+
+            // Check that both nodes exist 
+            if (source == nullptr)
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
+            if (target == nullptr)
+                throw std::runtime_error("Specified target node does not exist; use LabeledDigraph<T>::addNode() to add node");
+
+            // Does the given edge exist? 
             if (this->edges[source].find(target) != this->edges[source].end())
             {
                 // If so, then get rid of it 
@@ -649,16 +665,22 @@ class LabeledDigraph
         {
             /*
              * Return the edge between the specified nodes, along with the
-             * edge label.  
+             * edge label.
+             *
+             * Return a pair of nullptrs and zero edge label if the edge 
+             * does not exist (but the nodes do). 
+             *
+             * Throw std::runtime_error if either of the two nodes does 
+             * not exist. 
              */
             Node* source = this->getNode(source_id);
             Node* target = this->getNode(target_id);
 
             // Check that both nodes exist 
             if (source == nullptr)
-                throw std::runtime_error("Specified source node does not exist");
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
             if (target == nullptr)
-                throw std::runtime_error("Specified target node does not exist");
+                throw std::runtime_error("Specified target node does not exist; use LabeledDigraph<T>::addNode() to add node");
 
             // Check that the edge exists 
             auto it = this->edges[source].find(target);
@@ -679,7 +701,7 @@ class LabeledDigraph
 
             // Check that the given node exists
             if (source == nullptr)
-                throw std::runtime_error("Specified source node does not exist");
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
 
             // Run through all nodes in this->order ...
             for (auto&& node : this->order)
@@ -707,7 +729,7 @@ class LabeledDigraph
 
             // Check that the given node exists
             if (source == nullptr)
-                throw std::runtime_error("Specified source node does not exist");
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
 
             // Run through all nodes in this->order ...
             for (auto&& node : this->order)
@@ -782,7 +804,6 @@ class LabeledDigraph
              */
             return (this->edges.count(source) && (this->edges.find(source))->second.count(target)); 
         }
-
 
         void setEdgeLabel(std::string source_id, std::string target_id, T value)
         {
@@ -1473,7 +1494,7 @@ class LabeledDigraph
             } 
 
             // Get the left-hand matrix in the first-passage time linear system
-            Matrix<T, Dynamic, Dynamic> A = sublaplacian.transpose() * sublaplacian.transpose() * sublaplacian.transpose();
+            Matrix<T, Dynamic, Dynamic> A = -(sublaplacian.transpose() * sublaplacian.transpose() * sublaplacian.transpose());
 
             // Get the right-hand vector in the first-passage time linear system 
             Matrix<T, Dynamic, 1> b = Matrix<T, Dynamic, 1>::Zero(this->numnodes - 1); 
@@ -1513,7 +1534,7 @@ class LabeledDigraph
             for (unsigned i = t + 1; i < this->numnodes; ++i)
                 fpt_vec(i) = solution(i - 1);
 
-            return fpt_vec / 2;  
+            return fpt_vec * 2;  
         }
 
         Matrix<T, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromRecurrence(Node* target,
@@ -1649,14 +1670,8 @@ class LabeledDigraph
                 );
             }
 
-            // Now compute the desired second moments of the first-passage times ...
+            // Identify the index of the target node 
             int t;
-            Matrix<T, Dynamic, 1> second_moments = Matrix<T, Dynamic, 1>::Zero(this->numnodes);
-            Matrix<T, Dynamic, Dynamic> forest_two_roots_squared; 
-            if (use_kahan_sum)
-                forest_two_roots_squared = Kahan::multiply(forest_two_roots, forest_two_roots); 
-            else 
-                forest_two_roots_squared = forest_two_roots * forest_two_roots;
             for (auto it = this->order.begin(); it != this->order.end(); ++it)
             {
                 if (*it == target)
@@ -1666,45 +1681,78 @@ class LabeledDigraph
                 }
             }
             int z = this->numnodes - 1 - t; 
+
+            // Finally compute the desired second moments ...
+            Matrix<T, Dynamic, 1> second_moments = Matrix<T, Dynamic, 1>::Zero(this->numnodes);
+
+            // 1) Get the sub-matrix of the two-root forest matrix obtained by deleting 
+            // the row and column corresponding to the target node 
+            Matrix<T, Dynamic, Dynamic> forest_two_roots_sub =
+                Matrix<T, Dynamic, Dynamic>::Zero(this->numnodes - 1, this->numnodes - 1);
+            if (t == 0)
+            {
+                forest_two_roots_sub = forest_two_roots.block(1, 1, z, z); 
+            }
+            else if (z == 0)
+            {
+                forest_two_roots_sub = forest_two_roots.block(0, 0, t, t); 
+            }
+            else 
+            {
+                forest_two_roots_sub.block(0, 0, t, t) = forest_two_roots.block(0, 0, t, t); 
+                forest_two_roots_sub.block(0, t, t, z) = forest_two_roots.block(0, t + 1, t, z); 
+                forest_two_roots_sub.block(t, 0, z, t) = forest_two_roots.block(t + 1, 0, z, t); 
+                forest_two_roots_sub.block(t, t, z, z) = forest_two_roots.block(t + 1, t + 1, z, z); 
+            }
+
+            // 2) Get the square of this sub-matrix 
+            Matrix<T, Dynamic, Dynamic> forest_two_roots_sub_squared;
+            if (use_kahan_sum)
+                forest_two_roots_sub_squared = Kahan::multiply(forest_two_roots_sub, forest_two_roots_sub);
+            else
+                forest_two_roots_sub_squared = forest_two_roots_sub * forest_two_roots_sub;
+
+            // 3) The second moments of each FPT to the target node is given by the
+            // corresponding row sum in this squared sub-matrix  
             if (use_kahan_sum)
             {
                 if (t == 0)
                 {
-                    second_moments.tail(z) = Kahan::rowSum(forest_two_roots_squared.block(1, 1, z, z)); 
+                    second_moments.tail(z) = Kahan::rowSum(forest_two_roots_sub_squared.block(1, 1, z, z)); 
                 }
                 else if (z == 0)
                 {
-                    second_moments.head(t) = Kahan::rowSum(forest_two_roots_squared.block(0, 0, t, t)); 
+                    second_moments.head(t) = Kahan::rowSum(forest_two_roots_sub_squared.block(0, 0, t, t)); 
                 }
                 else 
                 { 
-                    second_moments.head(t) = Kahan::rowSum(forest_two_roots_squared.block(0, 0, t, t)); 
-                    second_moments.head(t) += Kahan::rowSum(forest_two_roots_squared.block(0, t + 1, t, z)); 
-                    second_moments.tail(z) = Kahan::rowSum(forest_two_roots_squared.block(t + 1, 0, z, t)); 
-                    second_moments.tail(z) += Kahan::rowSum(forest_two_roots_squared.block(t + 1, t + 1, z, z));
+                    second_moments.head(t) = Kahan::rowSum(forest_two_roots_sub_squared.block(0, 0, t, t)); 
+                    second_moments.head(t) += Kahan::rowSum(forest_two_roots_sub_squared.block(0, t + 1, t, z)); 
+                    second_moments.tail(z) = Kahan::rowSum(forest_two_roots_sub_squared.block(t + 1, 0, z, t)); 
+                    second_moments.tail(z) += Kahan::rowSum(forest_two_roots_sub_squared.block(t + 1, t + 1, z, z));
                 } 
             }
             else
             {
                 if (t == 0)
                 {
-                    second_moments.tail(z) = forest_two_roots_squared.block(1, 1, z, z).rowwise().sum(); 
+                    second_moments.tail(z) = forest_two_roots_sub_squared.block(1, 1, z, z).rowwise().sum(); 
                 }
                 else if (z == 0)
                 {
-                    second_moments.head(t) = forest_two_roots_squared.block(0, 0, t, t).rowwise().sum(); 
+                    second_moments.head(t) = forest_two_roots_sub_squared.block(0, 0, t, t).rowwise().sum(); 
                 }
                 else 
                 {
-                    second_moments.head(t) = forest_two_roots_squared.block(0, 0, t, t).rowwise().sum(); 
-                    second_moments.head(t) += forest_two_roots_squared.block(0, t + 1, t, z).rowwise().sum(); 
-                    second_moments.tail(z) = forest_two_roots_squared.block(t + 1, 0, z, t).rowwise().sum(); 
-                    second_moments.tail(z) += forest_two_roots_squared.block(t + 1, t + 1, z, z).rowwise().sum();
+                    second_moments.head(t) = forest_two_roots_sub_squared.block(0, 0, t, t).rowwise().sum(); 
+                    second_moments.head(t) += forest_two_roots_sub_squared.block(0, t + 1, t, z).rowwise().sum(); 
+                    second_moments.tail(z) = forest_two_roots_sub_squared.block(t + 1, 0, z, t).rowwise().sum(); 
+                    second_moments.tail(z) += forest_two_roots_sub_squared.block(t + 1, t + 1, z, z).rowwise().sum();
                 } 
             } 
-            second_moments /= forest_one_root(t, t); 
+            second_moments /= (forest_one_root(t, t) * forest_one_root(t, t)); 
 
-            return second_moments;
+            return second_moments * 2;
         } 
 };
 
