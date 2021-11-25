@@ -1,7 +1,6 @@
 #ifndef KAHAN_SUMMATION_LINEAR_ALGEBRA_HPP 
 #define KAHAN_SUMMATION_LINEAR_ALGEBRA_HPP 
 
-#include <cmath>
 #include <vector>
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
@@ -13,11 +12,11 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School 
  * Last updated:
- *     11/21/2021
+ *     11/25/2021
  */
 namespace Eigen {
 
-namespace Kahan {
+namespace KahanSum {
 
 template <typename T>
 T vectorSum(const std::vector<T>& v)
@@ -32,9 +31,9 @@ T vectorSum(const std::vector<T>& v)
     T sum, err, delta, newsum; 
     sum = 0; 
     err = 0; 
-    for (const T entry : v)
+    for (const T x : v)
     {
-        delta = entry - err; 
+        delta = x - err; 
         newsum = sum + delta; 
         err = (newsum - sum) - delta; 
         sum = newsum; 
@@ -198,7 +197,7 @@ T sum(const Eigen::MatrixBase<Derived>& A)
             delta = A(i, j) - err; 
             newsum = sum + delta;
             err = (newsum - sum) - delta; 
-            sum = newsum; 
+            sum = newsum;
         }
     }
     
@@ -285,7 +284,7 @@ Eigen::Matrix<T, DerivedA::RowsAtCompileTime, DerivedB::ColsAtCompileTime> multi
     {
         for (unsigned j = 0; j < B.cols(); ++j)
         {
-            prod(i, j) = Eigen::Kahan::dotProduct(A, B, i, j); 
+            prod(i, j) = dotProduct(A, B, i, j); 
         }
     }
     
@@ -312,14 +311,14 @@ Eigen::Matrix<T, Eigen::Dynamic, Derived::ColsAtCompileTime> multiply(const Eige
     {
         for (unsigned j = 0; j < B.cols(); ++j)
         {
-            prod(i, j) = Eigen::Kahan::dotProduct(A, B, i, j); 
+            prod(i, j) = dotProduct(A, B, i, j); 
         }
     }
     
     return prod; 
 }
 
-}   // namespace Kahan
+}   // namespace KahanSum
 
 }   // namespace Eigen
 
