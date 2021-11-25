@@ -12,6 +12,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include "kahan.hpp"
+#include "KBNSum.hpp"
 
 /*
  * An implementation of a labeled directed graph.  
@@ -19,9 +20,22 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     11/22/2021
+ *     11/25/2021
  */
 using namespace Eigen;
+
+enum SolverMethod {        // All non-homogeneous linear system solver methods 
+    LUDecomposition,
+    QRDecomposition
+};
+
+enum SummationMethod {     // All supported summation methods 
+    NaiveSummation, 
+    KahanSummation, 
+    PairwiseSummation,
+    LogTypeSummation, 
+    KBNSummation
+}; 
 
 // ----------------------------------------------------- //
 //       LINEAR ALGEBRA AND OTHER HELPER FUNCTIONS       //
@@ -142,30 +156,43 @@ Matrix<T, Dynamic, 1> solveByQRD(const Ref<const Matrix<T, Dynamic, Dynamic> >& 
 template <typename T>
 Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian,
                                                       const Ref<const Matrix<T, Dynamic, Dynamic> >& curr,
-                                                      int k, 
-                                                      bool use_kahan_sum)
+                                                      const int k, 
+                                                      const SummationMethod method = NaiveSummation) 
 {
     /*
      * Apply one iteration of the recurrence of Chebotarev & Agaev (Lin Alg
      * Appl, 2002, Eqs. 17-18) for the in-forest matrices of the graph.
      *
      * This function takes and outputs *dense* matrices.
-     *
-     * This function also allows for usage of Kahan's compensated summation 
-     * algorithm for matrix multiplication and trace evaluation.  
      */
     T K(k + 1);
     Matrix<T, Dynamic, Dynamic> product;
     T sigma; 
-    if (use_kahan_sum)
+    switch (method)
     {
-        product = Kahan::multiply(laplacian, curr);
-        sigma = Kahan::trace(product) / K;
-    } 
-    else
-    {
-        product = laplacian * curr;
-        sigma = product.trace() / K; 
+        case KahanSummation: {
+            product = KahanSum::multiply(laplacian, curr);
+            sigma = KahanSum::trace(product) / K;
+            break;
+        }
+
+        case NaiveSummation: {
+            product = laplacian * curr;
+            sigma = product.trace() / K;
+            break;
+        }
+
+        case KBNSummation: {
+            product = KBNSum::multiply(laplacian, curr); 
+            sigma = KBNSum::trace(product) / K;
+            break;
+        }
+
+        default: {
+            std::stringstream ss; 
+            ss << "Unrecognized summation method: " << method; 
+            throw std::invalid_argument(ss.str());
+        }  
     }
     Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(laplacian.rows(), laplacian.cols());
 
@@ -175,8 +202,8 @@ Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const Ref<const Matrix<T, 
 template <typename T>
 Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const SparseMatrix<T, RowMajor>& laplacian, 
                                                       const Ref<const Matrix<T, Dynamic, Dynamic> >& curr,
-                                                      int k,
-                                                      bool use_kahan_sum)
+                                                      const int k,
+                                                      const SummationMethod method = NaiveSummation)
 {
     /*
      * Apply one iteration of the recurrence of Chebotarev & Agaev (Lin Alg
@@ -184,22 +211,35 @@ Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const SparseMatrix<T, RowM
      *
      * This function takes a *compressed sparse row-major* Laplacian matrix
      * as input, but takes and computes *dense* forest matrices.
-     *
-     * This function also allows for usage of Kahan's compensated summation 
-     * algorithm for matrix multiplication and trace evaluation.  
      */
     T K(k + 1);
     Matrix<T, Dynamic, Dynamic> product;
     T sigma; 
-    if (use_kahan_sum)
+    switch (method)
     {
-        product = Kahan::multiply(laplacian, curr);
-        sigma = Kahan::trace(product) / K;
-    } 
-    else
-    {
-        product = laplacian * curr;
-        sigma = product.trace() / K; 
+        case KahanSummation: {
+            product = KahanSum::multiply(laplacian, curr);
+            sigma = KahanSum::trace(product) / K;
+            break;
+        }
+
+        case NaiveSummation: {
+            product = laplacian * curr;
+            sigma = product.trace() / K;
+            break;
+        }
+
+        case KBNSummation: {
+            product = KBNSum::multiply(laplacian, curr); 
+            sigma = KBNSum::trace(product) / K;
+            break;
+        }
+
+        default: {
+            std::stringstream ss; 
+            ss << "Unrecognized summation method: " << method; 
+            throw std::invalid_argument(ss.str());
+        }  
     }
     Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(laplacian.rows(), laplacian.cols());
 
@@ -281,7 +321,7 @@ class LabeledDigraph
         // ----------------------------------------------------- //
         Matrix<T, Dynamic, Dynamic> getSpanningForestMatrix(int k,
                                                             const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian,
-                                                            bool use_kahan_sum)
+                                                            const SummationMethod method = NaiveSummation)
         {
             /*
              * Compute the k-th spanning forest matrix, using the recurrence
@@ -297,14 +337,14 @@ class LabeledDigraph
 
             // Apply the recurrence ...
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i, use_kahan_sum);
+                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i, method);
 
             return curr; 
         }
 
         Matrix<T, Dynamic, Dynamic> getSpanningForestMatrixSparse(int k,
                                                                   const SparseMatrix<T, RowMajor>& laplacian,
-                                                                  bool use_kahan_sum)
+                                                                  const SummationMethod method = NaiveSummation)
         {
             /*
              * Compute the k-th spanning forest matrix, using the recurrence
@@ -320,7 +360,7 @@ class LabeledDigraph
 
             // Apply the recurrence ...
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i, use_kahan_sum); 
+                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i, method); 
 
             return curr; 
         }
@@ -977,7 +1017,8 @@ class LabeledDigraph
             return laplacian;
         }
 
-        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrix(int k, bool use_kahan_sum)
+        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrix(const int k,
+                                                            const SummationMethod method = NaiveSummation)
         {
             /*
              * Compute the k-th spanning forest matrix, using the recurrence
@@ -1015,25 +1056,43 @@ class LabeledDigraph
 
             // Populate diagonal entries as negative sums of the off-diagonal
             // entries in each row
-            if (use_kahan_sum)
+            switch (method)
             {
-                for (unsigned i = 0; i < this->numnodes; ++i)
-                    laplacian(i, i) = -Kahan::rowSum(laplacian, i);
-            }
-            else
-            { 
-                for (unsigned i = 0; i < this->numnodes; ++i)
-                    laplacian(i, i) = -(laplacian.row(i).sum());
+                case NaiveSummation: { 
+                    for (unsigned i = 0; i < this->numnodes; ++i)
+                        laplacian(i, i) = -(laplacian.row(i).sum());
+                    break;
+                }
+
+                case KahanSummation: {
+                    for (unsigned i = 0; i < this->numnodes; ++i)
+                        laplacian(i, i) = -KahanSum::rowSum(laplacian, i);
+                    break;
+                }
+
+                case KBNSummation: {
+                    for (unsigned i = 0; i < this->numnodes; ++i)
+                        laplacian(i, i) = -KBNSum::rowSum(laplacian, i);
+                    break;
+                }
+
+                default: {
+                    std::stringstream ss; 
+                    ss << "Unrecognized summation method: " << method; 
+                    throw std::invalid_argument(ss.str());
+                    break;
+                }  
             }
 
             // Apply the recurrence ...
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i, use_kahan_sum);
+                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i, method);
 
             return curr; 
         }
 
-        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrixSparse(int k, bool use_kahan_sum)
+        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrixSparse(const int k,
+                                                                  const SummationMethod method = NaiveSummation)
         {
             /*
              * Compute the k-th spanning forest matrix, using the recurrence
@@ -1073,15 +1132,29 @@ class LabeledDigraph
 
                 // Compute the negative of the i-th row sum
                 T row_sum = 0; 
-                if (use_kahan_sum)
+                switch (method)
                 {
-                    row_sum = Kahan::vectorSum(row_entries);
+                    case NaiveSummation: {
+                        for (const T entry : row_entries)
+                            row_sum += entry;
+                        break;  
+                    }
+
+                    case KahanSummation: 
+                        row_sum = KahanSum::vectorSum(row_entries);
+                        break;
+
+                    case KBNSummation:
+                        row_sum = KBNSum::vectorSum(row_entries);
+                        break;
+
+                    default: {
+                        std::stringstream ss; 
+                        ss << "Unrecognized summation method: " << method; 
+                        throw std::invalid_argument(ss.str());
+                        break;
+                    }  
                 }
-                else 
-                {
-                    for (const T entry : row_entries)
-                        row_sum += entry; 
-                } 
                 laplacian_triplets.push_back(Triplet<T>(i, i, row_sum)); 
                 i++;
             }
@@ -1089,7 +1162,7 @@ class LabeledDigraph
 
             // Apply the recurrence ...
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i, use_kahan_sum); 
+                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i, method); 
 
             return curr; 
         }
@@ -1130,7 +1203,8 @@ class LabeledDigraph
             return steady_state / norm;
         }
 
-        Matrix<T, Dynamic, 1> getSteadyStateFromRecurrence(bool sparse, bool use_kahan_sum)
+        Matrix<T, Dynamic, 1> getSteadyStateFromRecurrence(const bool sparse,
+                                                           const SummationMethod method = NaiveSummation)
         {
             /*
              * Return a *normalized* steady-state vector for the Laplacian 
@@ -1145,22 +1219,40 @@ class LabeledDigraph
             // Obtain the spanning tree weight matrix from the row Laplacian matrix
             Matrix<T, Dynamic, Dynamic> forest_matrix; 
             if (sparse)
-                forest_matrix = this->getSpanningForestMatrixSparse(this->numnodes - 1, use_kahan_sum); 
+                forest_matrix = this->getSpanningForestMatrixSparse(this->numnodes - 1, method); 
             else 
-                forest_matrix = this->getSpanningForestMatrix(this->numnodes - 1, use_kahan_sum);
+                forest_matrix = this->getSpanningForestMatrix(this->numnodes - 1, method); 
 
             // Return any row of the matrix (after normalizing by the sum of 
             // its entries)
             T norm;
-            if (use_kahan_sum)
-                norm = Kahan::rowSum(forest_matrix, 0); 
-            else 
-                norm = forest_matrix.row(0).sum(); 
+            switch (method)
+            {
+                case NaiveSummation: 
+                    norm = forest_matrix.row(0).sum();
+                    break;  
+
+                case KahanSummation:
+                    norm = KahanSum::rowSum(forest_matrix, 0);
+                    break;
+
+                case KBNSummation:
+                    norm = KBNSum::rowSum(forest_matrix, 0);
+                    break; 
+
+                default: { 
+                    std::stringstream ss; 
+                    ss << "Unrecognized summation method: " << method; 
+                    throw std::invalid_argument(ss.str());
+                    break;
+                }  
+            }
+            
             return forest_matrix.row(0) / norm; 
         }
 
         Matrix<T, Dynamic, 1> getMeanFirstPassageTimesFromSolver(Node* target,
-                                                                 std::string method)
+                                                                 const SolverMethod method = QRDecomposition) 
         {
             /*
              * Return the mean first-passage time to the given target node from 
@@ -1175,9 +1267,8 @@ class LabeledDigraph
              * target node.
              *
              * The linear solvers that can be used here are LU decomposition 
-             * ("lud" or "LUD") and QR decomposition ("qrd" or "QRD"). An 
-             * exception (std::invalid_argument) is thrown if any other value 
-             * is specified for method.  
+             * or QR decomposition. An exception (std::invalid_argument) is
+             * thrown if an invalid method is specified. 
              */
             // Get the index of the target node 
             int t; 
@@ -1229,11 +1320,11 @@ class LabeledDigraph
 
             // Solve the linear system with the specified method 
             Matrix<T, Dynamic, 1> solution;
-            if (method == "qrd" || method == "QRD") 
+            if (method == QRDecomposition)
             {
                 solution = solveByQRD<T>(A, b);
             }
-            else if (method == "lud" || method == "LUD")
+            else if (method == LUDecomposition)
             {
                 solution = solveByLUD<T>(A, b);
             }
@@ -1256,8 +1347,8 @@ class LabeledDigraph
         }
 
         Matrix<T, Dynamic, 1> getMeanFirstPassageTimesFromRecurrence(Node* target,
-                                                                     bool sparse,
-                                                                     bool use_kahan_sum)
+                                                                     const bool sparse,
+                                                                     const SummationMethod method = NaiveSummation)
         {
             /*
              * Return the mean first-passage time to the given target node from 
@@ -1306,15 +1397,29 @@ class LabeledDigraph
                     }
                     // Compute the negative of the i-th row sum
                     T row_sum = 0; 
-                    if (use_kahan_sum)
+                    switch (method)
                     {
-                        row_sum = Kahan::vectorSum(row_entries);
+                        case NaiveSummation: {
+                            for (const T entry : row_entries)
+                                row_sum += entry;
+                            break; 
+                        }
+
+                        case KahanSummation: 
+                            row_sum = KahanSum::vectorSum(row_entries);
+                            break;
+
+                        case KBNSummation:
+                            row_sum = KBNSum::vectorSum(row_entries);
+                            break;
+
+                        default: {
+                            std::stringstream ss; 
+                            ss << "Unrecognized summation method: " << method; 
+                            throw std::invalid_argument(ss.str());
+                            break;
+                        }  
                     }
-                    else 
-                    {
-                        for (const T entry : row_entries)
-                            row_sum += entry; 
-                    } 
                     laplacian_triplets.push_back(Triplet<T>(i, i, row_sum)); 
                     i++;
                 }
@@ -1323,13 +1428,13 @@ class LabeledDigraph
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // forest matrix 
                 forest_two_roots = this->getSpanningForestMatrixSparse(
-                    this->numnodes - 2, laplacian, use_kahan_sum
+                    this->numnodes - 2, laplacian, method
                 );
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root forest (tree) matrix  
                 forest_one_root = chebotarevAgaevRecurrence<T>(
-                    laplacian, forest_two_roots, this->numnodes - 2, use_kahan_sum
+                    laplacian, forest_two_roots, this->numnodes - 2, method
                 );
             }
             else 
@@ -1364,27 +1469,45 @@ class LabeledDigraph
 
                 // Populate diagonal entries as negative sums of the off-diagonal
                 // entries in each row
-                if (use_kahan_sum)
+                T row_sum = 0; 
+                switch (method)
                 {
-                    for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -Kahan::rowSum(laplacian, i);
-                }
-                else
-                { 
-                    for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -(laplacian.row(i).sum());
+                    case NaiveSummation: { 
+                        for (unsigned i = 0; i < this->numnodes; ++i)
+                            laplacian(i, i) = -(laplacian.row(i).sum());
+                        break;
+                    }
+
+                    case KahanSummation: {
+                        for (unsigned i = 0; i < this->numnodes; ++i)
+                            laplacian(i, i) = -KahanSum::rowSum(laplacian, i);
+                        break;
+                    }
+
+                    case KBNSummation: {
+                        for (unsigned i = 0; i < this->numnodes; ++i)
+                            laplacian(i, i) = -KBNSum::rowSum(laplacian, i);
+                        break;
+                    }
+
+                    default: {
+                        std::stringstream ss; 
+                        ss << "Unrecognized summation method: " << method; 
+                        throw std::invalid_argument(ss.str());
+                        break;
+                    }
                 }
 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // forest matrix 
                 forest_two_roots = this->getSpanningForestMatrix(
-                    this->numnodes - 2, laplacian, use_kahan_sum
+                    this->numnodes - 2, laplacian, method
                 );
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root forest (tree) matrix  
                 forest_one_root = chebotarevAgaevRecurrence<T>(
-                    laplacian, forest_two_roots, this->numnodes - 2, use_kahan_sum
+                    laplacian, forest_two_roots, this->numnodes - 2, method
                 );
             }
 
@@ -1400,25 +1523,7 @@ class LabeledDigraph
                 }
             }
             int z = this->numnodes - 1 - t;
-            if (use_kahan_sum)
-            {
-                if (t == 0)
-                {
-                    mean_times.tail(z) = Kahan::rowSum(forest_two_roots.block(1, 1, z, z)); 
-                }
-                else if (z == 0)
-                {
-                    mean_times.head(t) = Kahan::rowSum(forest_two_roots.block(0, 0, t, t)); 
-                }
-                else
-                { 
-                    mean_times.head(t) = Kahan::rowSum(forest_two_roots.block(0, 0, t, t)); 
-                    mean_times.head(t) += Kahan::rowSum(forest_two_roots.block(0, t + 1, t, z)); 
-                    mean_times.tail(z) = Kahan::rowSum(forest_two_roots.block(t + 1, 0, z, t)); 
-                    mean_times.tail(z) += Kahan::rowSum(forest_two_roots.block(t + 1, t + 1, z, z));
-                }
-            }
-            else
+            if (method == NaiveSummation)
             {
                 if (t == 0)
                 {
@@ -1436,13 +1541,55 @@ class LabeledDigraph
                     mean_times.tail(z) += forest_two_roots.block(t + 1, t + 1, z, z).rowwise().sum();
                 } 
             } 
+            else if (method == KahanSummation)
+            {
+                if (t == 0)
+                {
+                    mean_times.tail(z) = KahanSum::rowSum(forest_two_roots.block(1, 1, z, z)); 
+                }
+                else if (z == 0)
+                {
+                    mean_times.head(t) = KahanSum::rowSum(forest_two_roots.block(0, 0, t, t)); 
+                }
+                else
+                { 
+                    mean_times.head(t) = KahanSum::rowSum(forest_two_roots.block(0, 0, t, t)); 
+                    mean_times.head(t) += KahanSum::rowSum(forest_two_roots.block(0, t + 1, t, z)); 
+                    mean_times.tail(z) = KahanSum::rowSum(forest_two_roots.block(t + 1, 0, z, t)); 
+                    mean_times.tail(z) += KahanSum::rowSum(forest_two_roots.block(t + 1, t + 1, z, z));
+                }
+            }
+            else if (method == KBNSummation)
+            {
+                if (t == 0)
+                {
+                    mean_times.tail(z) = KBNSum::rowSum(forest_two_roots.block(1, 1, z, z)); 
+                }
+                else if (z == 0)
+                {
+                    mean_times.head(t) = KBNSum::rowSum(forest_two_roots.block(0, 0, t, t)); 
+                }
+                else
+                { 
+                    mean_times.head(t) = KBNSum::rowSum(forest_two_roots.block(0, 0, t, t)); 
+                    mean_times.head(t) += KBNSum::rowSum(forest_two_roots.block(0, t + 1, t, z)); 
+                    mean_times.tail(z) = KBNSum::rowSum(forest_two_roots.block(t + 1, 0, z, t)); 
+                    mean_times.tail(z) += KBNSum::rowSum(forest_two_roots.block(t + 1, t + 1, z, z));
+                }
+            }
+            else 
+            {
+                std::stringstream ss; 
+                ss << "Unrecognized summation method: " << method; 
+                throw std::invalid_argument(ss.str());
+            }
             mean_times /= forest_one_root(t, t); 
 
             return mean_times;  
         }
 
         Matrix<T, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromSolver(Node* target, 
-                                                                            std::string method)
+                                                                            const SolverMethod method = QRDecomposition)
         {
             /*
              * Return the vector of second moments of the first-passage times
@@ -1457,9 +1604,8 @@ class LabeledDigraph
              * target node.
              *
              * The linear solvers that can be used here are LU decomposition 
-             * ("lud" or "LUD") and QR decomposition ("qrd" or "QRD"). An 
-             * exception (std::invalid_argument) is thrown if any other value 
-             * is specified for method.  
+             * or QR decomposition. An exception (std::invalid_argument) is
+             * thrown if an invalid method is specified. 
              */
             // Get the index of the target node 
             int t; 
@@ -1511,11 +1657,11 @@ class LabeledDigraph
 
             // Solve the linear system with the specified method 
             Matrix<T, Dynamic, 1> solution; 
-            if (method == "qrd" || method == "QRD")
+            if (method == QRDecomposition)
             { 
                 solution = solveByQRD<T>(A, b);
             }
-            else if (method == "lud" || method == "LUD")
+            else if (method == LUDecomposition)
             { 
                 solution = solveByLUD<T>(A, b);
             }
@@ -1538,8 +1684,8 @@ class LabeledDigraph
         }
 
         Matrix<T, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromRecurrence(Node* target,
-                                                                                bool sparse,
-                                                                                bool use_kahan_sum) 
+                                                                                const bool sparse,
+                                                                                const SummationMethod method = NaiveSummation)
         {
             /*
              * Return the vector of second moments of the first-passage times
@@ -1588,15 +1734,29 @@ class LabeledDigraph
                     }
                     // Compute the negative of the i-th row sum
                     T row_sum = 0; 
-                    if (use_kahan_sum)
+                    switch (method)
                     {
-                        row_sum = Kahan::vectorSum(row_entries);
+                        case NaiveSummation: {
+                            for (const T entry : row_entries)
+                                row_sum += entry;
+                            break; 
+                        }
+
+                        case KahanSummation: 
+                            row_sum = KahanSum::vectorSum(row_entries);
+                            break;
+
+                        case KBNSummation:
+                            row_sum = KBNSum::vectorSum(row_entries);
+                            break;
+
+                        default: {
+                            std::stringstream ss; 
+                            ss << "Unrecognized summation method: " << method; 
+                            throw std::invalid_argument(ss.str());
+                            break;
+                        }  
                     }
-                    else 
-                    {
-                        for (const T entry : row_entries)
-                            row_sum += entry; 
-                    } 
                     laplacian_triplets.push_back(Triplet<T>(i, i, row_sum)); 
                     i++;
                 }
@@ -1605,13 +1765,13 @@ class LabeledDigraph
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // forest matrix 
                 forest_two_roots = this->getSpanningForestMatrixSparse(
-                    this->numnodes - 2, laplacian, use_kahan_sum
+                    this->numnodes - 2, laplacian, method 
                 );
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root forest (tree) matrix  
                 forest_one_root = chebotarevAgaevRecurrence<T>(
-                    laplacian, forest_two_roots, this->numnodes - 2, use_kahan_sum
+                    laplacian, forest_two_roots, this->numnodes - 2, method 
                 );
             }
             else 
@@ -1646,27 +1806,45 @@ class LabeledDigraph
 
                 // Populate diagonal entries as negative sums of the off-diagonal
                 // entries in each row
-                if (use_kahan_sum)
+                T row_sum = 0; 
+                switch (method)
                 {
-                    for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -Kahan::rowSum(laplacian, i);
-                }
-                else
-                { 
-                    for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -(laplacian.row(i).sum());
+                    case NaiveSummation: { 
+                        for (unsigned i = 0; i < this->numnodes; ++i)
+                            laplacian(i, i) = -(laplacian.row(i).sum());
+                        break;
+                    }
+
+                    case KahanSummation: {
+                        for (unsigned i = 0; i < this->numnodes; ++i)
+                            laplacian(i, i) = -KahanSum::rowSum(laplacian, i);
+                        break;
+                    }
+
+                    case KBNSummation: {
+                        for (unsigned i = 0; i < this->numnodes; ++i)
+                            laplacian(i, i) = -KBNSum::rowSum(laplacian, i);
+                        break;
+                    }
+
+                    default: {
+                        std::stringstream ss; 
+                        ss << "Unrecognized summation method: " << method; 
+                        throw std::invalid_argument(ss.str());
+                        break;
+                    }
                 }
 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // forest matrix 
                 forest_two_roots = this->getSpanningForestMatrix(
-                    this->numnodes - 2, laplacian, use_kahan_sum
+                    this->numnodes - 2, laplacian, method
                 );
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root forest (tree) matrix  
                 forest_one_root = chebotarevAgaevRecurrence<T>(
-                    laplacian, forest_two_roots, this->numnodes - 2, use_kahan_sum
+                    laplacian, forest_two_roots, this->numnodes - 2, method
                 );
             }
 
@@ -1707,32 +1885,31 @@ class LabeledDigraph
 
             // 2) Get the square of this sub-matrix 
             Matrix<T, Dynamic, Dynamic> forest_two_roots_sub_squared;
-            if (use_kahan_sum)
-                forest_two_roots_sub_squared = Kahan::multiply(forest_two_roots_sub, forest_two_roots_sub);
-            else
-                forest_two_roots_sub_squared = forest_two_roots_sub * forest_two_roots_sub;
+            switch (method) 
+            {
+                case NaiveSummation:
+                    forest_two_roots_sub_squared = forest_two_roots_sub * forest_two_roots_sub;
+                    break;
+
+                case KahanSummation: 
+                    forest_two_roots_sub_squared = KahanSum::multiply(forest_two_roots_sub, forest_two_roots_sub);
+                    break;
+
+                case KBNSummation: 
+                    forest_two_roots_sub_squared = KBNSum::multiply(forest_two_roots_sub, forest_two_roots_sub);
+                    break;
+
+                default: {
+                    std::stringstream ss; 
+                    ss << "Unrecognized summation method: " << method; 
+                    throw std::invalid_argument(ss.str());
+                    break;
+                }
+            }
 
             // 3) The second moments of each FPT to the target node is given by the
-            // corresponding row sum in this squared sub-matrix  
-            if (use_kahan_sum)
-            {
-                if (t == 0)
-                {
-                    second_moments.tail(z) = Kahan::rowSum(forest_two_roots_sub_squared.block(1, 1, z, z)); 
-                }
-                else if (z == 0)
-                {
-                    second_moments.head(t) = Kahan::rowSum(forest_two_roots_sub_squared.block(0, 0, t, t)); 
-                }
-                else 
-                { 
-                    second_moments.head(t) = Kahan::rowSum(forest_two_roots_sub_squared.block(0, 0, t, t)); 
-                    second_moments.head(t) += Kahan::rowSum(forest_two_roots_sub_squared.block(0, t + 1, t, z)); 
-                    second_moments.tail(z) = Kahan::rowSum(forest_two_roots_sub_squared.block(t + 1, 0, z, t)); 
-                    second_moments.tail(z) += Kahan::rowSum(forest_two_roots_sub_squared.block(t + 1, t + 1, z, z));
-                } 
-            }
-            else
+            // corresponding row sum in this squared sub-matrix
+            if (method == NaiveSummation)
             {
                 if (t == 0)
                 {
@@ -1750,6 +1927,48 @@ class LabeledDigraph
                     second_moments.tail(z) += forest_two_roots_sub_squared.block(t + 1, t + 1, z, z).rowwise().sum();
                 } 
             } 
+            else if (method == KahanSummation)
+            {
+                if (t == 0)
+                {
+                    second_moments.tail(z) = KahanSum::rowSum(forest_two_roots_sub_squared.block(1, 1, z, z)); 
+                }
+                else if (z == 0)
+                {
+                    second_moments.head(t) = KahanSum::rowSum(forest_two_roots_sub_squared.block(0, 0, t, t)); 
+                }
+                else 
+                { 
+                    second_moments.head(t) = KahanSum::rowSum(forest_two_roots_sub_squared.block(0, 0, t, t)); 
+                    second_moments.head(t) += KahanSum::rowSum(forest_two_roots_sub_squared.block(0, t + 1, t, z)); 
+                    second_moments.tail(z) = KahanSum::rowSum(forest_two_roots_sub_squared.block(t + 1, 0, z, t)); 
+                    second_moments.tail(z) += KahanSum::rowSum(forest_two_roots_sub_squared.block(t + 1, t + 1, z, z));
+                } 
+            }
+            else if (method == KBNSummation)
+            {
+                if (t == 0)
+                {
+                    second_moments.tail(z) = KBNSum::rowSum(forest_two_roots_sub_squared.block(1, 1, z, z)); 
+                }
+                else if (z == 0)
+                {
+                    second_moments.head(t) = KBNSum::rowSum(forest_two_roots_sub_squared.block(0, 0, t, t)); 
+                }
+                else 
+                { 
+                    second_moments.head(t) = KBNSum::rowSum(forest_two_roots_sub_squared.block(0, 0, t, t)); 
+                    second_moments.head(t) += KBNSum::rowSum(forest_two_roots_sub_squared.block(0, t + 1, t, z)); 
+                    second_moments.tail(z) = KBNSum::rowSum(forest_two_roots_sub_squared.block(t + 1, 0, z, t)); 
+                    second_moments.tail(z) += KBNSum::rowSum(forest_two_roots_sub_squared.block(t + 1, t + 1, z, z));
+                } 
+            }
+            else 
+            {
+                std::stringstream ss; 
+                ss << "Unrecognized summation method: " << method; 
+                throw std::invalid_argument(ss.str());
+            }
             second_moments /= (forest_one_root(t, t) * forest_one_root(t, t)); 
 
             return second_moments * 2;
