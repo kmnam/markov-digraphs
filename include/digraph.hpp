@@ -1,3 +1,43 @@
+/** \file include/digraph.hpp
+ *
+ *  Main header file for MarkovDigraphs.
+ *
+ *  Author:
+ *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
+ *  Last updated: 
+ *      12/1/2021 
+ *
+ *  \mainpage MarkovDigraphs 
+ *
+ *  This header-only C++ package implements a class, `LabeledDigraph`, for 
+ *  manipulating and performing computations with directed graphs with labeled
+ *  edges as representations of both biochemical systems.
+ *
+ *  \section Introduction
+ *
+ *  This approach stems from the "linear framework," which originated as a 
+ *  framework for [performing timescale separation in biochemical systems]
+ *  (https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0036321)
+ *  that could be viewed as "macroscopic" aqueous mixtures of chemical
+ *  species---the approach usually taken to model, e.g., enzymatic
+ *  reactions---but can also be used to [study the steady-state properties of
+ *  a single molecule]
+ *  (https://link.springer.com/article/10.1007%2Fs11538-013-9884-8),
+ *  such as a gene, whose state evolves according to a Markov process. In either 
+ *  setting, the system can be represented in terms of a directed graph with
+ *  labeled edges, in which the vertices represent combinations of chemical 
+ *  species or molecular states, edges represent chemical reactions or state
+ *  transitions, and labels represent reaction/transition rates. From here, 
+ *  the properties of the underlying dynamical system or Markov process can 
+ *  be revealed from the graph's structure. The linear framework has proved 
+ *  useful for studying the [capacity for bistability of post-translational
+ *  modification systems]
+ *  (https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1007573)
+ *  and the [sharpness of gene regulation]
+ *  (https://www.sciencedirect.com/science/article/pii/S0092867416307413),
+ *  among [various other subjects](https://vcp.med.harvard.edu/papers.html).
+ */
+
 #ifndef LABELED_DIGRAPHS_HPP
 #define LABELED_DIGRAPHS_HPP
 
@@ -14,53 +54,55 @@
 #include "kahan.hpp"
 #include "KBNSum.hpp"
 
-/*
- * An implementation of a labeled directed graph.  
- *
- * Authors:
- *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
- * Last updated:
- *     11/25/2021
- */
 using namespace Eigen;
 
-enum SolverMethod {        // All non-homogeneous linear system solver methods 
+/** All non-homogeneous linear system solver methods. */
+enum SolverMethod {  
     LUDecomposition,
     QRDecomposition
 };
 
-enum SummationMethod {     // All supported summation methods 
+/** All supported summation methods. */  
+enum SummationMethod {
     NaiveSummation, 
     KahanSummation, 
     PairwiseSummation,
-    LogTypeSummation, 
     KBNSummation
-}; 
+};
 
 // ----------------------------------------------------- //
 //       LINEAR ALGEBRA AND OTHER HELPER FUNCTIONS       //
 // ----------------------------------------------------- //
+/** 
+ * Return true if abs(a - b) < tol.
+ *
+ * @param a   first scalar. 
+ * @param b   second scalar. 
+ * @param tol tolerance.
+ * @returns   true if abs(a - b) < tol, false otherwise.  
+ */
 template <typename T>
 bool isclose(T a, T b, T tol)
 {
-    /*
-     * Return true if abs(a - b) < tol.
-     */
     T c = a - b;
     return ((c >= 0 && c < tol) || (c < 0 && -c < tol));
 }
 
+/**
+ * Compute the nullspace of A by performing a singular value decomposition.
+ * 
+ * This function returns the column of V in the SVD of A = USV corresponding
+ * to the least singular value (recall that singular values are always
+ * non-negative). It therefore effectively assumes that the A has a 
+ * nullspace of dimension one.
+ * 
+ * @param A Input matrix to be decomposed. 
+ * @returns The column of V in the singular value decomposition A = USV 
+ *          corresponding to the least singular value. 
+ */
 template <typename T>
 Matrix<T, Dynamic, 1> getOneDimNullspaceFromSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A)
 {
-    /*
-     * Compute the nullspace of A by performing a singular value decomposition.
-     *
-     * This function returns the column of V in the SVD of A = USV corresponding
-     * to the least singular value (recall that singular values are always
-     * non-negative). It therefore effectively assumes that the A has a 
-     * nullspace of dimension one.
-     */
     // Perform a singular value decomposition of A, only computing V in full
     Eigen::BDCSVD<Matrix<T, Dynamic, Dynamic> > svd(A, Eigen::ComputeFullV);
 
@@ -71,15 +113,21 @@ Matrix<T, Dynamic, 1> getOneDimNullspaceFromSVD(const Ref<const Matrix<T, Dynami
     return V.col(singular.rows() - 1); 
 }
 
+/**
+ * Compute the nullspace of A by performing a singular value decomposition.
+ * 
+ * This function returns the column(s) of V in the SVD of A = USV
+ * corresponding to singular values with absolute value < tol.
+ *
+ * @param A   Input matrix to be decomposed. 
+ * @param tol Tolerance for singular value to be treated as sufficiently 
+ *            close to zero.
+ * @returns   The matrix of columns in V in the singular value decomposition
+ *            A = USV corresponding to singular values less than tol.  
+ */
 template <typename T>
 Matrix<T, Dynamic, Dynamic> getNullspaceFromSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, const T tol)
 {
-    /*
-     * Compute the nullspace of A by performing a singular value decomposition.
-     *
-     * This function returns the column(s) of V in the SVD of A = USV
-     * corresponding to singular values with absolute value < tol.
-     */
     // Perform a singular value decomposition of A, only computing V in full
     Eigen::BDCSVD<Matrix<T, Dynamic, Dynamic> > svd(A, Eigen::ComputeFullV);
 
@@ -106,16 +154,18 @@ Matrix<T, Dynamic, Dynamic> getNullspaceFromSVD(const Ref<const Matrix<T, Dynami
     return nullmat;
 }
 
+/**
+ * Solve the non-homogeneous linear system Ax = b by obtaining an LU 
+ * decomposition of a matrix A. 
+ * 
+ * @param A Input matrix. 
+ * @param b Input vector.
+ * @returns Solution vector to Ax = b.  
+ */
 template <typename T>
 Matrix<T, Dynamic, 1> solveByLUD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A,
                                  const Ref<const Matrix<T, Dynamic, 1> >& b)
 {
-    /*
-     * Solve the non-homogeneous linear system Ax = b by obtaining an LU 
-     * decomposition of A. 
-     *
-     * A is assumed to be square. 
-     */
     // Obtain a full-pivot LU decomposition of A 
     FullPivLU<Matrix<T, Dynamic, Dynamic> > lud(A); 
 
@@ -123,23 +173,25 @@ Matrix<T, Dynamic, 1> solveByLUD(const Ref<const Matrix<T, Dynamic, Dynamic> >& 
     return lud.solve(b); 
 }
 
-/*
+/**
  * NOTE (11/20/2021): The Eigen/SparseLU module offers an implementation of 
  * LU decomposition for sparse matrices, but (1) it does not allow for 
  * coefficients more precise than double, and (2) it is not designed for
  * row-major matrices. 
  */
 
+/**
+ * Solve the non-homogeneous linear system Ax = b by obtaining a QR 
+ * decomposition of A. 
+ *
+ * @param A Input matrix. 
+ * @param b Input vector. 
+ * @returns Solution vector to Ax = b. 
+ */
 template <typename T>
 Matrix<T, Dynamic, 1> solveByQRD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, 
                                  const Ref<const Matrix<T, Dynamic, 1> >& b)
 {
-    /*
-     * Solve the non-homogeneous linear system Ax = b by obtaining a QR 
-     * decomposition of A. 
-     *
-     * A is assumed to be square.  
-     */
     // Obtain a QR decomposition of A 
     ColPivHouseholderQR<Matrix<T, Dynamic, Dynamic> > qrd(A);
 
@@ -153,93 +205,98 @@ Matrix<T, Dynamic, 1> solveByQRD(const Ref<const Matrix<T, Dynamic, Dynamic> >& 
  * that the input matrix is column-major.  
  */
 
+/**
+ * Apply one iteration of the recurrence of Chebotarev & Agaev (Lin Alg
+ * Appl, 2002, Eqs.\ 17-18) for the spanning forest matrices of the graph,
+ * using a *dense* Laplacian matrix.
+ *
+ * @param laplacian Input Laplacian matrix. 
+ * @param curr      k-th spanning forest matrix obtained from previous
+ *                  applications of the Chebotarev-Agaev recurrence. 
+ * @param k         Index of current iteration. 
+ * @param method    Summation method.
+ * @returns         (k+1)-th spanning forest matrix.  
+ */
 template <typename T>
 Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian,
                                                       const Ref<const Matrix<T, Dynamic, Dynamic> >& curr,
                                                       const int k, 
                                                       const SummationMethod method = NaiveSummation) 
 {
-    /*
-     * Apply one iteration of the recurrence of Chebotarev & Agaev (Lin Alg
-     * Appl, 2002, Eqs. 17-18) for the in-forest matrices of the graph.
-     *
-     * This function takes and outputs *dense* matrices.
-     */
     T K(k + 1);
     Matrix<T, Dynamic, Dynamic> product;
     T sigma; 
     switch (method)
     {
-        case KahanSummation: {
-            product = KahanSum::multiply(laplacian, curr);
-            sigma = KahanSum::trace(product) / K;
-            break;
-        }
-
-        case NaiveSummation: {
+        case NaiveSummation:
             product = laplacian * curr;
             sigma = product.trace() / K;
             break;
-        }
 
-        case KBNSummation: {
+        case KahanSummation:
+            product = KahanSum::multiply(laplacian, curr);
+            sigma = KahanSum::trace(product) / K;
+            break;
+
+        case KBNSummation:
             product = KBNSum::multiply(laplacian, curr); 
             sigma = KBNSum::trace(product) / K;
             break;
-        }
 
-        default: {
+        default:
             std::stringstream ss; 
             ss << "Unrecognized summation method: " << method; 
             throw std::invalid_argument(ss.str());
-        }  
+            break; 
     }
     Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(laplacian.rows(), laplacian.cols());
 
     return (sigma * identity) - product;
 }
 
+/**
+ * Apply one iteration of the recurrence of Chebotarev & Agaev (Lin Alg
+ * Appl, 2002, Eqs.\ 17-18) for the spanning forest matrices of the graph,
+ * using a *compressed sparse row-major* Laplacian matrix.
+ *
+ * @param laplacian Input Laplacian matrix (compressed sparse row-major).
+ * @param curr      k-th spanning forest matrix obtained from previous
+ *                  applications of the Chebotarev-Agaev recurrence. 
+ * @param k         Index of current iteration. 
+ * @param method    Summation method.
+ * @returns         (k+1)-th spanning forest matrix. 
+ */
 template <typename T>
 Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const SparseMatrix<T, RowMajor>& laplacian, 
                                                       const Ref<const Matrix<T, Dynamic, Dynamic> >& curr,
                                                       const int k,
                                                       const SummationMethod method = NaiveSummation)
 {
-    /*
-     * Apply one iteration of the recurrence of Chebotarev & Agaev (Lin Alg
-     * Appl, 2002, Eqs. 17-18) for the in-forest matrices of the graph.
-     *
-     * This function takes a *compressed sparse row-major* Laplacian matrix
-     * as input, but takes and computes *dense* forest matrices.
-     */
     T K(k + 1);
     Matrix<T, Dynamic, Dynamic> product;
     T sigma; 
     switch (method)
     {
-        case KahanSummation: {
-            product = KahanSum::multiply(laplacian, curr);
-            sigma = KahanSum::trace(product) / K;
-            break;
-        }
-
-        case NaiveSummation: {
+        case NaiveSummation:
             product = laplacian * curr;
             sigma = product.trace() / K;
             break;
-        }
 
-        case KBNSummation: {
+        case KahanSummation:
+            product = KahanSum::multiply(laplacian, curr);
+            sigma = KahanSum::trace(product) / K;
+            break;
+
+        case KBNSummation:
             product = KBNSum::multiply(laplacian, curr); 
             sigma = KBNSum::trace(product) / K;
             break;
-        }
 
-        default: {
+        default:
             std::stringstream ss; 
             ss << "Unrecognized summation method: " << method; 
             throw std::invalid_argument(ss.str());
-        }  
+            break; 
     }
     Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(laplacian.rows(), laplacian.cols());
 
@@ -249,89 +306,98 @@ Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const SparseMatrix<T, RowM
 // ----------------------------------------------------- //
 //                    NODES AND EDGES                    //
 // ----------------------------------------------------- //
+
+/**
+ * A minimal struct that represents a vertex or node. 
+ */
 struct Node
 {
-    /*
-     * A minimal struct that represents a vertex or node. 
-     */
-    std::string id;       // String identifier
+    std::string id;       /**< String identifier. */
 
+    /**
+     * Trivial constructor. 
+     */
     Node(std::string id)
     {
-        /*
-         * Trivial constructor.
-         */
         this->id = id;
     }
 
+    /**
+     * Trivial destructor. 
+     */
     ~Node()
     {
-        /*
-         * Trivial destructor. 
-         */
     }
 
+    /**
+     * Equality operator. 
+     */
     bool operator==(const Node& other) const
     {
-        /*
-         * Trivial equality operator.
-         */
         return (!this->id.compare(other.id));
     }
 
+    /**
+     * Inequality operator. 
+     */
     bool operator!=(const Node& other) const
     {
-        /*
-         * Trivial inequality operator.
-         */ 
         return (this->id.compare(other.id));
     }
 };
 
-// An Edge is simply a pair of Node pointers
+/**
+ * Edges are simply pairs of Node pointers. 
+ */
 using Edge = std::pair<Node*, Node*>;
 
 // ----------------------------------------------------- //
 //               THE LABELEDDIGRAPH CLASS                //
 // ----------------------------------------------------- //
+
+/**
+ * An implementation of a labeled digraph.  
+ */
 template <typename T>
 class LabeledDigraph
 {
-    /*
-     * An implementation of a labeled digraph.  
-     */
     protected:
         // ----------------------------------------------------- //
         //                       ATTRIBUTES                      //
         // ----------------------------------------------------- //
-        // Number of nodes 
+        /** Number of nodes in the graph. */ 
         unsigned numnodes = 0;
 
-        // Store a canonical ordering of nodes 
-        std::vector<Node*> order; 
+        /** Canonical ordering of nodes. */ 
+        std::vector<Node*> order;
 
-        // Dictionary mapping string (ids) to Node pointers 
+        /** Dictionary that maps `Node` IDs to `Node` pointers. */  
         std::unordered_map<std::string, Node*> nodes;
 
-        // Maintain edges in a nested dictionary of adjacency "dictionaries"  
+        /** Dictionary that maps outgoing edges from each `Node`, along with edge labels. */ 
         std::unordered_map<Node*, std::unordered_map<Node*, T> > edges;
 
         // ----------------------------------------------------- //
         //                     PRIVATE METHODS                   //
         // ----------------------------------------------------- //
+
+        /**
+         * Compute the k-th spanning forest matrix, using the recurrence
+         * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18), with 
+         * a *dense* Laplacian matrix. 
+         *
+         * A private version of the corresponding public method, in which 
+         * a pre-computed Laplacian matrix is provided as an argument.
+         * 
+         * @param k         Index of desired spanning forest matrix.  
+         * @param laplacian Input Laplacian matrix.
+         * @param method    Summation method.
+         * @returns         k-th spanning forest matrix. 
+         */
         Matrix<T, Dynamic, Dynamic> getSpanningForestMatrix(int k,
                                                             const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian,
                                                             const SummationMethod method = NaiveSummation)
         {
-            /*
-             * Compute the k-th spanning forest matrix, using the recurrence
-             * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs. 17-18).
-             *
-             * A private version of the corresponding public method, in which 
-             * a pre-computed Laplacian matrix is provided as an argument. 
-             *
-             * This method uses a *dense* Laplacian matrix.
-             */
             // Begin with the identity matrix 
             Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes);
 
@@ -342,19 +408,23 @@ class LabeledDigraph
             return curr; 
         }
 
+        /**
+         * Compute the k-th spanning forest matrix, using the recurrence
+         * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18), with 
+         * a *compressed sparse row-major* Laplacian matrix. 
+         *
+         * A private version of the corresponding public method, in which 
+         * a pre-computed Laplacian matrix is provided as an argument.
+         * 
+         * @param k         Index of desired spanning forest matrix.  
+         * @param laplacian Input Laplacian matrix (compressed sparse row-major).
+         * @param method    Summation method.
+         * @returns         k-th spanning forest matrix. 
+         */
         Matrix<T, Dynamic, Dynamic> getSpanningForestMatrixSparse(int k,
                                                                   const SparseMatrix<T, RowMajor>& laplacian,
                                                                   const SummationMethod method = NaiveSummation)
         {
-            /*
-             * Compute the k-th spanning forest matrix, using the recurrence
-             * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs. 17-18).
-             *
-             * A private version of the corresponding public method, in which 
-             * a pre-computed Laplacian matrix is provided as an argument. 
-             *
-             * This method uses a *compressed sparse row-major* Laplacian matrix.  
-             */
             // Begin with the identity matrix
             Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes); 
 
@@ -365,185 +435,46 @@ class LabeledDigraph
             return curr; 
         }
 
-        std::vector<Node*> DFS(Node* init)
-        {
-            /*
-             * Perform a DFS starting from the given node.
-             */
-            std::vector<Node*> order;
-            std::stack<Node*> stack;
-            std::unordered_map<Node*, bool> visited;
-
-            // Initialize every node as having been unvisited
-            for (auto&& edge_set : this->edges)
-                visited[edge_set.first] = false;
-
-            // Starting from init, run until the current node has no 
-            // unvisited neighbors
-            Node* curr;
-            stack.push(init);
-            visited[init] = true;
-            while (!stack.empty())
-            {
-                // Pop topmost node from the stack 
-                curr = stack.top();
-                stack.pop();
-                order.push_back(curr);
-
-                // Push every unvisited neighbor onto the stack
-                for (auto&& dest : this->edges[curr])
-                {
-                    if (!visited[dest.first])
-                    {
-                        stack.push(dest.first);
-                        visited[dest.first] = true;
-                    }
-                }
-            }
-
-            return order; 
-        }
-
-        void tarjanIter(Node* node, int curr, std::unordered_map<Node*, int>& index,
-                        std::unordered_map<Node*, int>& lowlink, std::stack<Node*>& stack,
-                        std::unordered_map<Node*, bool>& onstack,
-                        std::vector<std::unordered_set<Node*> >& components)
-        {
-            /*
-             * Recursive function to be called as part of Tarjan's algorithm. 
-             */
-            index[node] = curr;
-            lowlink[node] = curr;
-            curr++;
-            stack.push(node);
-            onstack[node] = true; 
-
-            // Run through all the edges leaving the given node
-            for (auto&& dest : this->edges[node])
-            {
-                if (index[dest.first] == -1)
-                {
-                    tarjanIter(dest.first, curr, index, lowlink, stack, onstack, components);
-                    if (lowlink[dest.first] < lowlink[node])
-                        lowlink[node] = lowlink[dest.first];
-                }
-                else if (onstack[dest.first])
-                {
-                    if (index[dest.first] < lowlink[node])
-                        lowlink[node] = index[dest.first];
-                }
-            }
-
-            // If the given node is a root (index[node] == lowlink[node]), 
-            // pop successively from the stack until node is reached
-            if (index[node] == lowlink[node])
-            {
-                std::unordered_set<Node*> component; 
-                Node* next;
-                while (next != node && !stack.empty())
-                {
-                    next = stack.top();
-                    onstack[next] = false;
-                    component.insert(next);
-                    stack.pop();
-                }
-                
-                // Append new component onto vector of components
-                components.push_back(component);
-            }
-        }
-
-        bool isTerminal(Node* node, std::vector<std::unordered_set<Node*> >& components,
-                        unsigned component_index)
-        {
-            /*
-             * Return true if the node lies in a terminal strongly connected
-             * component.
-             *
-             * Search, via DFS, for another node outside the given node's SCC.
-             */
-            // Perform a DFS of the graph starting from the given node
-            std::vector<Node*> traversal = this->DFS(node);
-
-            // Is there a node in the traversal that does not fall into the
-            // given node's SCC?
-            for (auto&& v : traversal)
-            {
-                if (components[component_index].find(v) == components[component_index].end())
-                    return false;
-            }
-            return true;
-        }
-
-        std::vector<std::unordered_set<Node*> > enumStronglyConnectedComponents()
-        {
-            /*
-             * Run Tarjan's algorithm to enumerate the strongly connected
-             * components (SCCs) of the graph. 
-             */
-            std::vector<std::unordered_set<Node*> > components; 
-            std::stack<Node*> stack;
-            std::unordered_map<Node*, int> index; 
-            std::unordered_map<Node*, int> lowlink;
-            std::unordered_map<Node*, bool> onstack;
-
-            // Initialize index, lowlink, onstack dictionaries 
-            for (auto&& edge_set : this->edges)
-            {
-                Node* node = edge_set.first;
-                index[node] = -1;
-                lowlink[node] = -1;
-                onstack[node] = false;
-            }
-
-            // Traverse the nodes in the graph with DFS
-            for (auto&& edge_set : this->edges)
-            {
-                Node* node = edge_set.first;
-
-                // If not yet visited, call the recursive function on the node 
-                if (index[node] == -1)
-                    tarjanIter(node, 0, index, lowlink, stack, onstack, components);
-            }
-
-            return components;
-        }
-
     public:
+        /**
+         * Empty constructor. 
+         */
         LabeledDigraph()
         {
-            /*
-             * Empty constructor.
-             */
         }
 
+        /**
+         * Destructor; de-allocates each node from heap memory.
+         */
         ~LabeledDigraph()
         {
-            /*
-             * Destructor; de-allocates each node from heap memory.
-             */
             for (auto&& edge_set : this->edges) delete edge_set.first;
         }
 
+        /**
+         * Return the number of nodes in the graph.
+         *
+         * @returns Number of nodes in the graph.  
+         */
         unsigned getNumNodes() const 
         {
-            /*
-             * Return the number of nodes in the graph. 
-             */
             return this->numnodes; 
         }
 
         // ----------------------------------------------------- //
         //              NODE-ADDING/GETTING METHODS              //
         // ----------------------------------------------------- //
+        
+        /**
+         * Add a node to the graph with the given ID, and return a pointer
+         * to the new node.
+         *
+         * @param id ID for new node. 
+         * @returns  A pointer to new node. 
+         * @throws std::runtime_error if node already exists with the given ID. 
+         */
         Node* addNode(std::string id)
         {
-            /*
-             * Add a node to the graph with the given id, and return pointer
-             * to the new node.
-             *
-             * Throw std::runtime_error if node with given id already exists.
-             */
             // Check that a node with the given id doesn't exist already
             if (this->nodes.find(id) != this->nodes.end())
                 throw std::runtime_error("Node already exists"); 
@@ -556,13 +487,14 @@ class LabeledDigraph
             return node;
         }
 
+        /**
+         * Remove a node from the graph with the given ID.
+         *
+         * @param id ID of node to be removed. 
+         * @throws std::runtime_error if node with given ID does not exist.  
+         */
         void removeNode(std::string id)
         {
-            /*
-             * Remove a node from the graph with the given id.
-             *
-             * Throw std::runtime_error if node with given id does not exist. 
-             */
             // Check that a node with the given id exists
             Node* node = this->getNode(id);
             if (node == nullptr)
@@ -611,45 +543,59 @@ class LabeledDigraph
             this->numnodes--;
         }
 
+        /**
+         * Return a pointer to the node with the given ID; return `nullptr` if 
+         * a node with the given ID does not exist. 
+         *
+         * @param id ID of desired node. 
+         * @returns  A pointer to node with the given ID (`nullptr` if such a node
+         *           does not exist). 
+         */
         Node* getNode(std::string id) const
         {
-            /*
-             * Return pointer to node with given id.
-             */
             auto it = this->nodes.find(id);
             if (it == this->nodes.end()) return nullptr;
             else                         return it->second; 
         }
 
+        /**
+         * Return true if node with given ID exists in the graph.
+         *
+         * @param id ID of desired node. 
+         * @returns  true if node exists with the given ID, false otherwise.  
+         */
         bool hasNode(std::string id) const 
         {
-            /*
-             * Return true if node with given id exists in the graph. 
-             */
             return this->nodes.count(id);
         }
 
+        /**
+         * Return the canonical ordering of nodes in the graph (`this->order`). 
+         *
+         * @returns A copy of `this->order`. 
+         */
         std::vector<Node*> getAllNodes() const 
         {
-            /*
-             * Return this->order. 
-             */
             return this->order; 
         }
 
         // ----------------------------------------------------- //
         //              EDGE-ADDING/GETTING METHODS              //
         // ----------------------------------------------------- //
+
+        /**
+         * Add an edge between two nodes.
+         *
+         * If either ID does not correspond to a node in the graph, this function
+         * instantiates these nodes. 
+         *
+         * @param source_id ID of source node of new edge. 
+         * @param target_id ID of target node of new edge. 
+         * @param label     Label on new edge.
+         * @throws std::runtime_error if the edge already exists. 
+         */
         void addEdge(std::string source_id, std::string target_id, T label = 1)
         {
-            /*
-             * Add an edge between two nodes.
-             *
-             * If either id does not correspond to a node in the graph,
-             * instantiate them.
-             *
-             * Throw std::runtime_error if the edge already exists. 
-             */
             // Look for the two nodes
             Node* source = this->getNode(source_id);
             Node* target = this->getNode(target_id);
@@ -672,17 +618,18 @@ class LabeledDigraph
             this->edges[source][target] = label;
         }
 
+        /**
+         * Remove the edge between the two given nodes.
+         *
+         * This method does nothing if the edge does not exist but the nodes 
+         * do, but throws an exception if either node does not exist. 
+         *
+         * @param source_id ID of source node of edge to be removed. 
+         * @param target_id ID of target node of edge to be removed.
+         * @throws std::runtime_error if either node does not exist.  
+         */
         void removeEdge(std::string source_id, std::string target_id)
         {
-            /*
-             * Remove the edge between the two given nodes.
-             *
-             * This method does nothing if the edge does not exist to
-             * begin with.
-             *
-             * Throw std::runtime_error if either of the two nodes does 
-             * not exist. 
-             */
             Node* source = this->getNode(source_id);
             Node* target = this->getNode(target_id);
 
@@ -700,19 +647,23 @@ class LabeledDigraph
             }
             // If not, then do nothing!
         }
-        
+
+        /**
+         * Return the edge between the specified nodes, along with the
+         * edge label.
+         *
+         * This method returns a `nullptr` pair and zero for the edge label
+         * if the edge does not exist but the nodes do, but throws an 
+         * exception if either node does not exist.
+         *
+         * @param source_id ID of source node. 
+         * @param target_id ID of target node. 
+         * @returns         A pair containing the edge (as a `<Node*, Node*>`
+         *                  pair) and the edge label.
+         * @throws std::runtime_error if either node does not exist. 
+         */
         std::pair<Edge, T> getEdge(std::string source_id, std::string target_id)
         {
-            /*
-             * Return the edge between the specified nodes, along with the
-             * edge label.
-             *
-             * Return a pair of nullptrs and zero edge label if the edge 
-             * does not exist (but the nodes do). 
-             *
-             * Throw std::runtime_error if either of the two nodes does 
-             * not exist. 
-             */
             Node* source = this->getNode(source_id);
             Node* target = this->getNode(target_id);
 
@@ -730,12 +681,17 @@ class LabeledDigraph
                 return std::make_pair(std::make_pair(nullptr, nullptr), 0);
         }
 
+        /**
+         * Return a vector of outgoing edges from the given source node, given
+         * the ID of the source node. 
+         *
+         * @param source_id ID of source node. 
+         * @returns         `std::vector` of pairs containing each edge (as a 
+         *                  `<Node*, Node*>` pair) and edge label
+         * @throws std::runtime_error if a node with the given ID does not exist. 
+         */
         std::vector<std::pair<Edge, T> > getAllEdgesFromNode(std::string source_id) 
         {
-            /*
-             * Return the std::vector of edges leaving the given node, given 
-             * the *id* of the source node.  
-             */
             std::vector<std::pair<Edge, T> > edges_from_node;
             Node* source = this->getNode(source_id);
 
@@ -759,12 +715,17 @@ class LabeledDigraph
             return edges_from_node; 
         }
 
+        /**
+         * Return a vector of outgoing edges from the given source node, given
+         * a pointer to the source node. 
+         *
+         * @param source Pointer to source node. 
+         * @returns      `std::vector` of pairs containing each edge (as a 
+         *               `<Node*, Node*>` pair) and edge label
+         * @throws std::runtime_error if the given node does not exist. 
+         */
         std::vector<std::pair<Edge, T> > getAllEdgesFromNode(Node* source) 
         {
-            /*
-             * Return the std::vector of edges leaving the given node, 
-             * given the *pointer* to the source Node object itself.  
-             */
             std::vector<std::pair<Edge, T> > edges_from_node;
 
             // Check that the given node exists
@@ -787,21 +748,23 @@ class LabeledDigraph
             return edges_from_node; 
         }
 
+        /**
+         * Return a vector of outgoing edges from the given source node, given
+         * the index of the source node in the canonical ordering (`this->order`). 
+         *
+         * @param source_idx Index of source node in the canonical ordering. 
+         * @returns          `std::vector` of pairs containing the target node 
+         *                   index and label of each edge
+         * @throws std::runtime_error if the given node does not exist. 
+         */
         std::vector<std::pair<int, T> > getAllEdgesFromNode(int source_idx) 
         {
-            /*
-             * Return the std::vector of edges leaving the given node. 
-             *
-             * This method takes the *index* of the source node in this->order 
-             * and returns the *indices* of the target nodes with an edge from
-             * the source node in this->order.  
-             */
+            // Check that the given node exists
+            if (source_idx < 0 || source_idx > this->order.size() - 1)
+                throw std::runtime_error("Specified source node does not exist");
+            
             std::vector<std::pair<int, T> > edges_from_node;
             Node* source = this->order[source_idx];
-
-            // Check that the given node exists
-            if (source == nullptr)
-                throw std::runtime_error("Specified source node does not exist");
 
             // Run through all nodes in this->order ...
             for (int i = 0; i < this->numnodes; ++i)
@@ -819,12 +782,18 @@ class LabeledDigraph
             return edges_from_node; 
         }
 
+        /**
+         * Return true if the specified edge exists, given the IDs of the 
+         * two nodes, and false otherwise.
+         *
+         * This method also returns false if either node does not exist.  
+         *
+         * @param source_id ID of source node. 
+         * @param target_id ID of target node. 
+         * @returns         true if the edge exists, false otherwise.  
+         */
         bool hasEdge(std::string source_id, std::string target_id) const
         {
-            /*
-             * Given the *ids* of two nodes, return true if the given edge
-             * exists in the graph.  
-             */
             // Check that the two nodes exist 
             if (this->nodes.count(source_id) && this->nodes.count(target_id))
             {
@@ -836,22 +805,34 @@ class LabeledDigraph
             return false;
         }
 
+        /**
+         * Return true if the specified edge exists, given pointers to the 
+         * two nodes, and false otherwise.
+         *
+         * This method also returns false if either node does not exist.  
+         *
+         * @param source Pointer to source node. 
+         * @param target Pointer to target node. 
+         * @returns      true if the edge exists, false otherwise.  
+         */
         bool hasEdge(Node* source, Node* target) const 
         {
-            /*
-             * Given the *pointers* to two nodes, return true if the given
-             * edge exists in the graph. 
-             */
             return (this->edges.count(source) && (this->edges.find(source))->second.count(target)); 
         }
 
+        /**
+         * Set the label on the specified edge to the given value. 
+         *
+         * This method throws an exception if either node does not exist, and 
+         * also if the specified edge does not exist. 
+         *
+         * @param source_id ID of source node. 
+         * @param target_id ID of target node. 
+         * @param value     New edge label. 
+         * @throws std::runtime_error if either node or the edge does not exist.
+         */
         void setEdgeLabel(std::string source_id, std::string target_id, T value)
         {
-            /*
-             * Update the numerical value of the given edge label. 
-             * 
-             * Throw std::runtime_error if either node or the edge does not exist.
-             */
             Node* source = this->getNode(source_id);
             Node* target = this->getNode(target_id);
 
@@ -873,11 +854,21 @@ class LabeledDigraph
         // ----------------------------------------------------- //
         //                     OTHER METHODS                     //
         // ----------------------------------------------------- //
+        
+        /**
+         * Return a pointer to a new (dynamically allocated) subgraph induced
+         * by the given subset of nodes.
+         *
+         * An exception is thrown if a node in the given subset does not exist. 
+         *
+         * @param nodes An unordered set of pointers to nodes in the graph. 
+         * @returns     A pointer to the induced subgraph (instantiated as a 
+         *              new `LabeledDigraph` object). 
+         * @throws std::runtime_error if the given subset contains a node that
+         *                            does not exist in the graph.  
+         */
         LabeledDigraph<T>* subgraph(std::unordered_set<Node*> nodes)
         {
-            /*
-             * Return the subgraph induced by the given subset of nodes.
-             */
             LabeledDigraph<T>* subgraph = new LabeledDigraph<T>();
 
             // For each node in the subset ...
@@ -908,28 +899,30 @@ class LabeledDigraph
 
             return subgraph; 
         }
-        
+
+        /**
+         * Clears the graph's contents.  
+         */        
         void clear()
         {
-            /* 
-             * Clear the graph's contents.
-             */
             // De-allocate all Nodes from heap memory
             for (auto&& edge_set : this->edges) delete edge_set.first;
 
             // Clear all attributes
+            this->numnodes = 0; 
             this->nodes.clear();
             this->edges.clear();
         }
 
+        /**
+         * Return pointer to a new (dynamically allocated) copy of the graph, 
+         * possibly with a different scalar type.
+         *
+         * @returns A pointer to a new copy of the graph.
+         */
         template <typename U = T>
         LabeledDigraph<U>* copy() const
         {
-            /*
-             * Return pointer to a new LabeledDigraph object, possibly
-             * with a different scalar type, with the same graph structure
-             * and edge label values.
-             */
             LabeledDigraph<U>* graph = new LabeledDigraph<U>();
 
             // Copy over nodes with the same ids
@@ -949,13 +942,15 @@ class LabeledDigraph
             return graph;
         }
 
+        /**
+         * Copy over the contents of this graph to another (dynamically
+         * allocated) graph, possibly with a different scalar type.
+         *
+         * @param graph A pointer to another graph instance. 
+         */
         template <typename U = T>
         void copy(LabeledDigraph<U>* graph) const
         {
-            /*
-             * Given pointer to an existing LabeledDigraph object, possibly
-             * with a different scalar type, copy over the graph details.  
-             */
             // Clear the input graph's contents
             graph->clear();
 
@@ -974,14 +969,14 @@ class LabeledDigraph
             }
         }
 
+        /**
+         * Return the Laplacian matrix with the given scalar type, according 
+         * to the graph's canonical ordering of nodes.
+         *
+         * @returns Laplacian matrix of the graph (as a dense matrix). 
+         */ 
         Matrix<T, Dynamic, Dynamic> getLaplacian()
         {
-            /*
-             * Return a numerical Laplacian matrix with the given scalar type,
-             * according to the given node ordering.
-             *
-             * The ordering is assumed to include every node in the graph once.
-             */
             // Initialize a zero matrix with #rows = #cols = #nodes
             Matrix<T, Dynamic, Dynamic> laplacian = Matrix<T, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
 
@@ -1017,15 +1012,19 @@ class LabeledDigraph
             return laplacian;
         }
 
+        /**
+         * Compute the k-th spanning forest matrix, using the recurrence
+         * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18), with
+         * a *dense* Laplacian matrix.
+         *
+         * @param k      Index of the desired spanning forest matrix. 
+         * @param method Summation method. 
+         * @returns      k-th spanning forest matrix.
+         * @throws std::invalid_argument if summation method is not recognized. 
+         */
         Matrix<T, Dynamic, Dynamic> getSpanningForestMatrix(const int k,
                                                             const SummationMethod method = NaiveSummation)
         {
-            /*
-             * Compute the k-th spanning forest matrix, using the recurrence
-             * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs. 17-18).
-             *
-             * This method uses a *dense* Laplacian matrix.  
-             */
             // Begin with the identity matrix 
             Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes);
 
@@ -1058,30 +1057,26 @@ class LabeledDigraph
             // entries in each row
             switch (method)
             {
-                case NaiveSummation: { 
+                case NaiveSummation:
                     for (unsigned i = 0; i < this->numnodes; ++i)
                         laplacian(i, i) = -(laplacian.row(i).sum());
                     break;
-                }
 
-                case KahanSummation: {
+                case KahanSummation:
                     for (unsigned i = 0; i < this->numnodes; ++i)
                         laplacian(i, i) = -KahanSum::rowSum(laplacian, i);
                     break;
-                }
 
-                case KBNSummation: {
+                case KBNSummation:
                     for (unsigned i = 0; i < this->numnodes; ++i)
                         laplacian(i, i) = -KBNSum::rowSum(laplacian, i);
                     break;
-                }
 
-                default: {
+                default:
                     std::stringstream ss; 
                     ss << "Unrecognized summation method: " << method; 
                     throw std::invalid_argument(ss.str());
                     break;
-                }  
             }
 
             // Apply the recurrence ...
@@ -1091,15 +1086,19 @@ class LabeledDigraph
             return curr; 
         }
 
+        /**
+         * Compute the k-th spanning forest matrix, using the recurrence
+         * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18), with
+         * a *compressed row-major sparse* Laplacian matrix.
+         *
+         * @param k      Index of the desired spanning forest matrix. 
+         * @param method Summation method. 
+         * @returns      k-th spanning forest matrix.
+         * @throws std::invalid_argument if summation method is not recognized.
+         */
         Matrix<T, Dynamic, Dynamic> getSpanningForestMatrixSparse(const int k,
                                                                   const SummationMethod method = NaiveSummation)
         {
-            /*
-             * Compute the k-th spanning forest matrix, using the recurrence
-             * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs. 17-18).
-             *
-             * This method uses a *sparse* Laplacian matrix.  
-             */
             // Begin with the identity matrix
             Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes); 
 
@@ -1134,11 +1133,10 @@ class LabeledDigraph
                 T row_sum = 0; 
                 switch (method)
                 {
-                    case NaiveSummation: {
+                    case NaiveSummation:
                         for (const T entry : row_entries)
                             row_sum += entry;
                         break;  
-                    }
 
                     case KahanSummation: 
                         row_sum = KahanSum::vectorSum(row_entries);
@@ -1167,55 +1165,62 @@ class LabeledDigraph
             return curr; 
         }
 
+        /**
+         * Compute a vector in the kernel of the Laplacian matrix of the 
+         * graph, normalized by its 1-norm, by singular value decomposition 
+         * of the Laplacian matrix.
+         *
+         * This vector coincides with the vector of steady-state probabilities 
+         * of the nodes in the Markov process associated with the graph.
+         *
+         * This method *assumes* that this graph is strongly connected, in which 
+         * case the Laplacian matrix has a one-dimensional kernel and so the 
+         * returned vector serves as a basis for this kernel. 
+         *
+         * @returns Vector in the kernel of the graph's Laplacian matrix, 
+         *          normalized by its 1-norm.
+         */
         Matrix<T, Dynamic, 1> getSteadyStateFromSVD()
         {
-            /*
-             * Return a *normalized* steady-state vector for the Laplacian 
-             * dynamics on the graph, with the nodes ordered according to the
-             * canonical ordering, by solving for the nullspace of the Laplacian
-             * matrix.
-             *
-             * This method assumes that the graph is strongly connected, in
-             * which case there is a unique (up to normalization) steady-state
-             * vector. If the graph is not strongly connected, then this 
-             * method returns only one basis vector for the nullspace of 
-             * the Laplacian matrix.   
-             */
             Matrix<T, Dynamic, Dynamic> laplacian = this->getLaplacian();
             
-            // Obtain the nullspace matrix of the Laplacian matrix
-            Matrix<T, Dynamic, Dynamic> nullmat;
+            // Obtain the steady-state vector of the Laplacian matrix
+            Matrix<T, Dynamic, 1> steady_state;
             try
             {
-                nullmat = getOneDimNullspaceFromSVD<T>(laplacian);
+                steady_state = getOneDimNullspaceFromSVD<T>(laplacian);
             }
             catch (const std::runtime_error& e)
             {
                 throw;
             }
 
-            // Each column is a nullspace basis vector (for each SCC) and
-            // each row corresponds to a node in the graph
-            Matrix<T, Dynamic, 1> steady_state = nullmat.array().rowwise().sum().matrix();
-           
             // Normalize by the sum of its entries and return 
             T norm = steady_state.sum();
             return steady_state / norm;
         }
 
+        /**
+         * Compute a vector in the kernel of the Laplacian matrix of the 
+         * graph, normalized by its 1-norm, by the recurrence of Chebotarev
+         * and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18).
+         *
+         * This vector coincides with the vector of steady-state probabilities 
+         * of the nodes in the Markov process associated with the graph.
+         *
+         * This method *assumes* that this graph is strongly connected, in which 
+         * case the Laplacian matrix has a one-dimensional kernel and so the 
+         * returned vector serves as a basis for this kernel. 
+         *
+         * @param sparse If true, use a sparse Laplacian matrix in the calculations. 
+         * @param method Summation method. 
+         * @returns      Vector in the kernel of the graph's Laplacian matrix, 
+         *               normalized by its 1-norm.
+         * @throws std::invalid_argument if summation method is not recognized. 
+         */
         Matrix<T, Dynamic, 1> getSteadyStateFromRecurrence(const bool sparse,
                                                            const SummationMethod method = NaiveSummation)
         {
-            /*
-             * Return a *normalized* steady-state vector for the Laplacian 
-             * dynamics on the graph, with the nodes ordered according to the
-             * canonical ordering, by solving the recurrence relation of 
-             * Chebotarev & Agaev for the k-th forest matrix (Chebotarev & Agaev,
-             * Lin Alg Appl, 2002, Eqs. 17-18).
-             *
-             * Setting sparse = true enforces the use of a sparse Laplacian
-             * matrix in the calculations. 
-             */
             // Obtain the spanning tree weight matrix from the row Laplacian matrix
             Matrix<T, Dynamic, Dynamic> forest_matrix; 
             if (sparse)
@@ -1251,25 +1256,26 @@ class LabeledDigraph
             return forest_matrix.row(0) / norm; 
         }
 
+        /**
+         * Compute the vector of *unconditional* mean first-passage times in 
+         * the Markov process associated with the graph from each node to the 
+         * target node, using the given linear solver method.
+         *
+         * This method assumes that the associated Markov process certainly 
+         * eventually reaches the target node from each node in the graph,
+         * meaning that there are no alternative terminal nodes (or rather
+         * SCCs) to which the process can travel and get "stuck".   
+         *
+         * @param target Pointer to target node. 
+         * @param method Linear solver method for computing the mean first-passage
+         *               time vector. 
+         * @returns Vector of mean first-passage times to the target node from
+         *          every node in the graph.
+         * @throws std::invalid_argument if solver method is not recognized.  
+         */
         Matrix<T, Dynamic, 1> getMeanFirstPassageTimesFromSolver(Node* target,
                                                                  const SolverMethod method = QRDecomposition) 
         {
-            /*
-             * Return the mean first-passage time to the given target node from 
-             * *every node* (including itself), assuming that the target node
-             * will always eventually be reached, no matter which starting node
-             * is chosen.  
-             *
-             * This quantity is only well-defined if there are no alternative 
-             * terminal SCCs to which a path from the source node can travel.
-             * In other words, for any node in the graph with a path from the
-             * source node, there must also exist a path from that node to the
-             * target node.
-             *
-             * The linear solvers that can be used here are LU decomposition 
-             * or QR decomposition. An exception (std::invalid_argument) is
-             * thrown if an invalid method is specified. 
-             */
             // Get the index of the target node 
             int t; 
             for (auto it = this->order.begin(); it != this->order.end(); ++it)
@@ -1346,22 +1352,28 @@ class LabeledDigraph
             return fpt_vec;  
         }
 
+        /**
+         * Compute the vector of *unconditional* mean first-passage times in 
+         * the Markov process associated with the graph from each node to the 
+         * target node, using the recurrence of Chebotarev and Agaev (Lin Alg
+         * Appl, 2002, Eqs.\ 17-18).
+         *
+         * This method assumes that the associated Markov process certainly 
+         * eventually reaches the target node from each node in the graph,
+         * meaning that there are no alternative terminal nodes (or rather
+         * SCCs) to which the process can travel and get "stuck".   
+         *
+         * @param target Pointer to target node.
+         * @param sparse If true, use a sparse Laplacian matrix in the calculations. 
+         * @param method Summation method. 
+         * @returns Vector of mean first-passage times to the target node from
+         *          every node in the graph.
+         * @throws std::invalid_argument if summation method is not recognized.  
+         */
         Matrix<T, Dynamic, 1> getMeanFirstPassageTimesFromRecurrence(Node* target,
                                                                      const bool sparse,
                                                                      const SummationMethod method = NaiveSummation)
         {
-            /*
-             * Return the mean first-passage time to the given target node from 
-             * *every node* (including itself), assuming that the target node
-             * will always eventually be reached, no matter which starting node
-             * is chosen.  
-             *
-             * This quantity is only well-defined if there are no alternative 
-             * terminal SCCs to which a path from the source node can travel.
-             * In other words, for any node in the graph with a path from the
-             * source node, there must also exist a path from that node to the
-             * target node.  
-             */
             // Compute the required spanning forest matrices ...
             Matrix<T, Dynamic, Dynamic> forest_one_root, forest_two_roots;
             if (sparse)
@@ -1472,30 +1484,26 @@ class LabeledDigraph
                 T row_sum = 0; 
                 switch (method)
                 {
-                    case NaiveSummation: { 
+                    case NaiveSummation: 
                         for (unsigned i = 0; i < this->numnodes; ++i)
                             laplacian(i, i) = -(laplacian.row(i).sum());
                         break;
-                    }
 
-                    case KahanSummation: {
+                    case KahanSummation:
                         for (unsigned i = 0; i < this->numnodes; ++i)
                             laplacian(i, i) = -KahanSum::rowSum(laplacian, i);
                         break;
-                    }
 
-                    case KBNSummation: {
+                    case KBNSummation:
                         for (unsigned i = 0; i < this->numnodes; ++i)
                             laplacian(i, i) = -KBNSum::rowSum(laplacian, i);
                         break;
-                    }
 
-                    default: {
+                    default:
                         std::stringstream ss; 
                         ss << "Unrecognized summation method: " << method; 
                         throw std::invalid_argument(ss.str());
                         break;
-                    }
                 }
 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
@@ -1588,25 +1596,27 @@ class LabeledDigraph
             return mean_times;  
         }
 
+        /**
+         * Compute the vector of second moments of the *unconditional* 
+         * first-passage times in the Markov process associated with the
+         * graph from each node to the target node, using the given linear
+         * solver method.
+         *
+         * This method assumes that the associated Markov process certainly 
+         * eventually reaches the target node from each node in the graph,
+         * meaning that there are no alternative terminal nodes (or rather
+         * SCCs) to which the process can travel and get "stuck".   
+         *
+         * @param target Pointer to target node. 
+         * @param method Linear solver method for computing the second-moment
+         *               time vector. 
+         * @returns Vector of first-passage time second moments to the target
+         *          node from every node in the graph.
+         * @throws std::invalid_argument if solver method is not recognized.  
+         */
         Matrix<T, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromSolver(Node* target, 
                                                                             const SolverMethod method = QRDecomposition)
         {
-            /*
-             * Return the vector of second moments of the first-passage times
-             * to the given target node from *every node* (including itself),
-             * assuming that the target node will always eventually be reached,
-             * no matter which starting node is chosen.  
-             *
-             * This quantity is only well-defined if there are no alternative 
-             * terminal SCCs to which a path from the source node can travel.
-             * In other words, for any node in the graph with a path from the
-             * source node, there must also exist a path from that node to the
-             * target node.
-             *
-             * The linear solvers that can be used here are LU decomposition 
-             * or QR decomposition. An exception (std::invalid_argument) is
-             * thrown if an invalid method is specified. 
-             */
             // Get the index of the target node 
             int t; 
             for (auto it = this->order.begin(); it != this->order.end(); ++it)
@@ -1683,22 +1693,28 @@ class LabeledDigraph
             return fpt_vec * 2;  
         }
 
+        /**
+         * Compute the vector of second moments of the *unconditional* 
+         * first-passage times in the Markov process associated with the
+         * graph from each node to the target node, using the recurrence 
+         * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18).
+         *
+         * This method assumes that the associated Markov process certainly 
+         * eventually reaches the target node from each node in the graph,
+         * meaning that there are no alternative terminal nodes (or rather
+         * SCCs) to which the process can travel and get "stuck". 
+         *
+         * @param target Pointer to target node.
+         * @param sparse If true, use a sparse Laplacian matrix in the calculations. 
+         * @param method Summation method. 
+         * @returns Vector of first-passage time second moments to the target
+         *          node from every node in the graph.
+         * @throws std::invalid_argument if summation method is not recognized. 
+         */
         Matrix<T, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromRecurrence(Node* target,
                                                                                 const bool sparse,
                                                                                 const SummationMethod method = NaiveSummation)
         {
-            /*
-             * Return the vector of second moments of the first-passage times
-             * to the given target node from *every node* (including itself),
-             * assuming that the target node will always eventually be reached,
-             * no matter which starting node is chosen.  
-             *
-             * This quantity is only well-defined if there are no alternative 
-             * terminal SCCs to which a path from the source node can travel.
-             * In other words, for any node in the graph with a path from the
-             * source node, there must also exist a path from that node to the
-             * target node.  
-             */
             // Compute the required spanning forest matrices ...
             Matrix<T, Dynamic, Dynamic> forest_one_root, forest_two_roots;
             if (sparse)
@@ -1809,30 +1825,26 @@ class LabeledDigraph
                 T row_sum = 0; 
                 switch (method)
                 {
-                    case NaiveSummation: { 
+                    case NaiveSummation: 
                         for (unsigned i = 0; i < this->numnodes; ++i)
                             laplacian(i, i) = -(laplacian.row(i).sum());
                         break;
-                    }
 
-                    case KahanSummation: {
+                    case KahanSummation:
                         for (unsigned i = 0; i < this->numnodes; ++i)
                             laplacian(i, i) = -KahanSum::rowSum(laplacian, i);
                         break;
-                    }
 
-                    case KBNSummation: {
+                    case KBNSummation:
                         for (unsigned i = 0; i < this->numnodes; ++i)
                             laplacian(i, i) = -KBNSum::rowSum(laplacian, i);
                         break;
-                    }
 
-                    default: {
+                    default:
                         std::stringstream ss; 
                         ss << "Unrecognized summation method: " << method; 
                         throw std::invalid_argument(ss.str());
                         break;
-                    }
                 }
 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
@@ -1974,5 +1986,22 @@ class LabeledDigraph
             return second_moments * 2;
         } 
 };
+
+// ----------------------------------------------------- //
+//               THE PRECISEDIGRAPH CLASS                //
+// ----------------------------------------------------- //
+
+#include <boost/multiprecision/mpfr.hpp>
+
+/**
+ * An implementation of a labeled digraph with boost::multiprecision::number 
+ * scalar types, for which the template parameter is the number of mantissa
+ * digits available to the scalar. 
+ */
+template <int P>
+class PreciseDigraph<P> : public LabeledDigraph<boost::multiprecision::number<boost::multiprecision::mpfr_float_backend<P> > >
+{
+    // No additional methods to be defined 
+}; 
 
 #endif
