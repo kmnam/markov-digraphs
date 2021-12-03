@@ -4,14 +4,14 @@
 # Authors:
 #     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
 # Last updated:
-#     4/11/2019
+#     12/23/2020
 # ------------------------------------------------------------ #
 
-CXX = g++-8
+CXX = g++-10
 
-CXXFLAGS = --std=c++11 -frounding-math -march=native -fopenmp
+CXXFLAGS = --std=c++11 -frounding-math 
 
-INCLUDES = -I/usr/local/Cellar/boost/1.71.0/include -I/usr/local/Cellar/eigen/3.3.7/include/eigen3 -I/Users/kmnam/Dropbox/gene-regulation/projects/dual-numbers/include
+INCLUDES = -I/usr/local/Cellar/boost/1.71.0/include -I/usr/local/Cellar/eigen/3.3.7/include/eigen3
 
 LDFLAGS = -L/usr/local/Cellar/boost/1.71.0/lib 
 
@@ -19,7 +19,7 @@ LIBS = -lmpfr -lboost_unit_test_framework
 
 SRC_DIR = src
 
-SRC_FILES = src/testLinAlg.cpp src/testDigraph.cpp
+SRC_FILES = src/testDigraph.cpp #src/testEnumSpanningTrees.cpp src/testCopyNumberGraph.cpp src/testLinAlg.cpp  
 
 BIN_DIR = bin
 
