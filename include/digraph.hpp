@@ -568,16 +568,17 @@ class LabeledDigraph
          * @param method    Summation method.
          * @returns         k-th spanning forest matrix. 
          */
-        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrix(int k,
-                                                            const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian,
+        template <typename U = T>
+        Matrix<U, Dynamic, Dynamic> getSpanningForestMatrix(int k,
+                                                            const Ref<const Matrix<U, Dynamic, Dynamic> >& laplacian,
                                                             const SummationMethod method = NaiveSummation)
         {
             // Begin with the identity matrix 
-            Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes);
+            Matrix<U, Dynamic, Dynamic> curr = Matrix<U, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes);
 
             // Apply the recurrence ...
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i, method);
+                curr = chebotarevAgaevRecurrence<U>(laplacian, curr, i, method);
 
             return curr; 
         }
@@ -595,16 +596,17 @@ class LabeledDigraph
          * @param method    Summation method.
          * @returns         k-th spanning forest matrix. 
          */
-        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrixSparse(int k,
-                                                                  const SparseMatrix<T, RowMajor>& laplacian,
+        template <typename U = T>
+        Matrix<U, Dynamic, Dynamic> getSpanningForestMatrixSparse(int k,
+                                                                  const SparseMatrix<U, RowMajor>& laplacian,
                                                                   const SummationMethod method = NaiveSummation)
         {
             // Begin with the identity matrix
-            Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes); 
+            Matrix<U, Dynamic, Dynamic> curr = Matrix<U, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes); 
 
             // Apply the recurrence ...
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i, method); 
+                curr = chebotarevAgaevRecurrence<U>(laplacian, curr, i, method); 
 
             return curr; 
         }
@@ -997,15 +999,20 @@ class LabeledDigraph
         }
 
         /**
-         * Return the Laplacian matrix with the given scalar type, according 
-         * to the graph's canonical ordering of nodes.
+         * Return the Laplacian matrix with a possibly different scalar type,
+         * according to the graph's canonical ordering of nodes.
          *
-         * @returns Laplacian matrix of the graph (as a dense matrix). 
-         */ 
-        Matrix<T, Dynamic, Dynamic> getLaplacian()
+         * The scalar type of the Laplacian matrix is by default the scalar 
+         * type of the graph (T), unless another type is specified. 
+         *
+         * @returns Laplacian matrix of the graph (as a dense matrix with
+         *          scalar type U). 
+         */
+        template <typename U = T> 
+        Matrix<U, Dynamic, Dynamic> getLaplacian()
         {
             // Initialize a zero matrix with #rows = #cols = #nodes
-            Matrix<T, Dynamic, Dynamic> laplacian = Matrix<T, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
+            Matrix<U, Dynamic, Dynamic> laplacian = Matrix<U, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
 
             // Populate the off-diagonal entries of the matrix first: 
             // (i,j)-th entry is the label of the edge j -> i
@@ -1020,7 +1027,7 @@ class LabeledDigraph
                         // Get the edge label for j -> i
                         if (this->edges[w].find(v) != this->edges[w].end())
                         {
-                            T label(this->edges[w][v]);
+                            U label = static_cast<U>(this->edges[w][v]);
                             laplacian(i,j) = label;
                             if (laplacian(i,j) < 0)
                                 throw std::runtime_error("Negative edge label found");
@@ -1044,19 +1051,23 @@ class LabeledDigraph
          * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18), with
          * a *dense* Laplacian matrix.
          *
+         * The scalar type of the returned matrix is by default the scalar 
+         * type of the graph (T), unless another type is specified. 
+         *
          * @param k      Index of the desired spanning forest matrix. 
          * @param method Summation method. 
          * @returns      k-th spanning forest matrix.
          * @throws std::invalid_argument if summation method is not recognized. 
          */
-        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrix(const int k,
+        template <typename U = T>
+        Matrix<U, Dynamic, Dynamic> getSpanningForestMatrix(const int k,
                                                             const SummationMethod method = NaiveSummation)
         {
             // Begin with the identity matrix 
-            Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes);
+            Matrix<U, Dynamic, Dynamic> curr = Matrix<U, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes);
 
             // Initialize a zero matrix with #rows = #cols = #nodes
-            Matrix<T, Dynamic, Dynamic> laplacian = Matrix<T, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
+            Matrix<U, Dynamic, Dynamic> laplacian = Matrix<U, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
 
             // Populate the off-diagonal entries of the matrix first: 
             // (i,j)-th entry is the *negative* of the label of the edge i -> j
@@ -1071,7 +1082,7 @@ class LabeledDigraph
                         // Get the edge label for i -> j
                         if (this->edges[v].find(w) != this->edges[v].end())
                         {
-                            T label(this->edges[v][w]);
+                            U label = static_cast<U>(this->edges[v][w]);
                             laplacian(i, j) = -label;
                         }
                     }
@@ -1108,7 +1119,7 @@ class LabeledDigraph
 
             // Apply the recurrence ...
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i, method);
+                curr = chebotarevAgaevRecurrence<U>(laplacian, curr, i, method);
 
             return curr; 
         }
@@ -1118,28 +1129,32 @@ class LabeledDigraph
          * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18), with
          * a *compressed row-major sparse* Laplacian matrix.
          *
+         * The scalar type of the returned matrix is by default the scalar 
+         * type of the graph (T), unless another type is specified. 
+         *
          * @param k      Index of the desired spanning forest matrix. 
          * @param method Summation method. 
          * @returns      k-th spanning forest matrix.
          * @throws std::invalid_argument if summation method is not recognized.
          */
-        Matrix<T, Dynamic, Dynamic> getSpanningForestMatrixSparse(const int k,
+        template <typename U = T>
+        Matrix<U, Dynamic, Dynamic> getSpanningForestMatrixSparse(const int k,
                                                                   const SummationMethod method = NaiveSummation)
         {
             // Begin with the identity matrix
-            Matrix<T, Dynamic, Dynamic> curr = Matrix<T, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes); 
+            Matrix<U, Dynamic, Dynamic> curr = Matrix<U, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes); 
 
             // Initialize a zero matrix with #rows = #cols = #nodes
-            SparseMatrix<T, RowMajor> laplacian(this->numnodes, this->numnodes); 
+            SparseMatrix<U, RowMajor> laplacian(this->numnodes, this->numnodes); 
 
             // Populate the entries of the matrix: the off-diagonal (i,j)-th  
             // entry is the *negative* of the label of the edge i -> j, and 
             // the diagonal entries are set so that each *row* sum is zero 
-            std::vector<Triplet<T> > laplacian_triplets; 
+            std::vector<Triplet<U> > laplacian_triplets; 
             unsigned i = 0;
             for (auto&& v : this->order)
             {
-                std::vector<T> row_entries;    // All nonzero off-diagonal entries in i-th row
+                std::vector<U> row_entries;    // All nonzero off-diagonal entries in i-th row
                 unsigned j = 0;
                 for (auto&& w : this->order)
                 {
@@ -1148,8 +1163,8 @@ class LabeledDigraph
                         // Get the edge label for i -> j
                         if (this->edges[v].find(w) != this->edges[v].end())
                         {
-                            T label(this->edges[v][w]);
-                            laplacian_triplets.push_back(Triplet<T>(i, j, -label));
+                            U label = static_cast<U>(this->edges[v][w]);
+                            laplacian_triplets.push_back(Triplet<U>(i, j, -label));
                             row_entries.push_back(label);  
                         }
                     }
@@ -1157,11 +1172,11 @@ class LabeledDigraph
                 }
 
                 // Compute the negative of the i-th row sum
-                T row_sum = 0; 
+                U row_sum = 0; 
                 switch (method)
                 {
                     case NaiveSummation:
-                        for (const T entry : row_entries)
+                        for (const U entry : row_entries)
                             row_sum += entry;
                         break;  
 
@@ -1180,14 +1195,14 @@ class LabeledDigraph
                         break;
                     }  
                 }
-                laplacian_triplets.push_back(Triplet<T>(i, i, row_sum)); 
+                laplacian_triplets.push_back(Triplet<U>(i, i, row_sum)); 
                 i++;
             }
             laplacian.setFromTriplets(laplacian_triplets.begin(), laplacian_triplets.end());
 
             // Apply the recurrence ...
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<T>(laplacian, curr, i, method); 
+                curr = chebotarevAgaevRecurrence<U>(laplacian, curr, i, method); 
 
             return curr; 
         }
@@ -1204,18 +1219,22 @@ class LabeledDigraph
          * case the Laplacian matrix has a one-dimensional kernel and so the 
          * returned vector serves as a basis for this kernel. 
          *
+         * The scalar type of the returned vector is by default the scalar 
+         * type of the graph (T), unless another type is specified. 
+         *
          * @returns Vector in the kernel of the graph's Laplacian matrix, 
          *          normalized by its 1-norm.
          */
-        Matrix<T, Dynamic, 1> getSteadyStateFromSVD()
+        template <typename U = T>
+        Matrix<U, Dynamic, 1> getSteadyStateFromSVD()
         {
-            Matrix<T, Dynamic, Dynamic> laplacian = this->getLaplacian();
+            Matrix<U, Dynamic, Dynamic> laplacian = this->getLaplacian<U>();
             
             // Obtain the steady-state vector of the Laplacian matrix
             Matrix<T, Dynamic, 1> steady_state;
             try
             {
-                steady_state = getOneDimNullspaceFromSVD<T>(laplacian);
+                steady_state = getOneDimNullspaceFromSVD(laplacian);
             }
             catch (const std::runtime_error& e)
             {
@@ -1223,7 +1242,7 @@ class LabeledDigraph
             }
 
             // Normalize by the sum of its entries and return 
-            T norm = steady_state.sum();
+            U norm = steady_state.sum();
             return steady_state / norm;
         }
 
@@ -1237,7 +1256,10 @@ class LabeledDigraph
          *
          * This method *assumes* that this graph is strongly connected, in which 
          * case the Laplacian matrix has a one-dimensional kernel and so the 
-         * returned vector serves as a basis for this kernel. 
+         * returned vector serves as a basis for this kernel.
+         *
+         * The scalar type of the returned vector is by default the scalar 
+         * type of the graph (T), unless another type is specified. 
          *
          * @param sparse If true, use a sparse Laplacian matrix in the calculations. 
          * @param method Summation method. 
@@ -1245,19 +1267,20 @@ class LabeledDigraph
          *               normalized by its 1-norm.
          * @throws std::invalid_argument if summation method is not recognized. 
          */
-        Matrix<T, Dynamic, 1> getSteadyStateFromRecurrence(const bool sparse,
+        template <typename U = T>
+        Matrix<U, Dynamic, 1> getSteadyStateFromRecurrence(const bool sparse,
                                                            const SummationMethod method = NaiveSummation)
         {
             // Obtain the spanning tree weight matrix from the row Laplacian matrix
-            Matrix<T, Dynamic, Dynamic> forest_matrix; 
+            Matrix<U, Dynamic, Dynamic> forest_matrix; 
             if (sparse)
-                forest_matrix = this->getSpanningForestMatrixSparse(this->numnodes - 1, method); 
+                forest_matrix = this->getSpanningForestMatrixSparse<U>(this->numnodes - 1, method); 
             else 
-                forest_matrix = this->getSpanningForestMatrix(this->numnodes - 1, method); 
+                forest_matrix = this->getSpanningForestMatrix<U>(this->numnodes - 1, method); 
 
             // Return any row of the matrix (after normalizing by the sum of 
             // its entries)
-            T norm;
+            U norm;
             switch (method)
             {
                 case NaiveSummation: 
@@ -1291,7 +1314,10 @@ class LabeledDigraph
          * This method assumes that the associated Markov process certainly 
          * eventually reaches the target node from each node in the graph,
          * meaning that there are no alternative terminal nodes (or rather
-         * SCCs) to which the process can travel and get "stuck".   
+         * SCCs) to which the process can travel and get "stuck".
+         *
+         * The scalar type of the returned vector is by default the scalar 
+         * type of the graph (T), unless another type is specified.
          *
          * @param target Pointer to target node. 
          * @param method Linear solver method for computing the mean first-passage
@@ -1300,7 +1326,8 @@ class LabeledDigraph
          *          every node in the graph.
          * @throws std::invalid_argument if solver method is not recognized.  
          */
-        Matrix<T, Dynamic, 1> getMeanFirstPassageTimesFromSolver(Node* target,
+        template <typename U = T>
+        Matrix<U, Dynamic, 1> getMeanFirstPassageTimesFromSolver(Node* target,
                                                                  const SolverMethod method = QRDecomposition) 
         {
             // Get the index of the target node 
@@ -1316,8 +1343,8 @@ class LabeledDigraph
 
             // Get the Laplacian matrix of the graph and drop the row and column
             // corresponding to the target node 
-            Matrix<T, Dynamic, Dynamic> laplacian = this->getLaplacian();
-            Matrix<T, Dynamic, Dynamic> sublaplacian(this->numnodes - 1, this->numnodes - 1);
+            Matrix<U, Dynamic, Dynamic> laplacian = this->getLaplacian<U>();
+            Matrix<U, Dynamic, Dynamic> sublaplacian(this->numnodes - 1, this->numnodes - 1);
             int z = this->numnodes - 1 - t;
             if (t == 0)
             {
@@ -1336,30 +1363,30 @@ class LabeledDigraph
             } 
 
             // Get the left-hand matrix in the first-passage time linear system
-            Matrix<T, Dynamic, Dynamic> A = sublaplacian.transpose() * sublaplacian.transpose();
+            Matrix<U, Dynamic, Dynamic> A = sublaplacian.transpose() * sublaplacian.transpose();
 
             // Get the right-hand vector in the first-passage time linear system 
-            Matrix<T, Dynamic, 1> b = Matrix<T, Dynamic, 1>::Zero(this->numnodes - 1); 
+            Matrix<U, Dynamic, 1> b = Matrix<U, Dynamic, 1>::Zero(this->numnodes - 1); 
             for (unsigned i = 0; i < t; ++i)
             {
                 if (this->hasEdge(this->order[i], target))
-                    b(i) = this->edges[this->order[i]][target];
+                    b(i) = static_cast<U>(this->edges[this->order[i]][target]);
             }
             for (unsigned i = t + 1; i < this->numnodes; ++i)
             {
                 if (this->hasEdge(this->order[i], target))
-                    b(i - 1) = this->edges[this->order[i]][target]; 
+                    b(i - 1) = static_cast<U>(this->edges[this->order[i]][target]); 
             }
 
             // Solve the linear system with the specified method 
-            Matrix<T, Dynamic, 1> solution;
+            Matrix<U, Dynamic, 1> solution;
             if (method == QRDecomposition)
             {
-                solution = solveByQRD<T>(A, b);
+                solution = solveByQRD<U>(A, b);
             }
             else if (method == LUDecomposition)
             {
-                solution = solveByLUD<T>(A, b);
+                solution = solveByLUD<U>(A, b);
             }
             else 
             {
@@ -1370,7 +1397,7 @@ class LabeledDigraph
 
             // Return an augmented vector with the zero mean FPT from the 
             // target node to itself
-            Matrix<T, Dynamic, 1> fpt_vec = Matrix<T, Dynamic, 1>::Zero(this->numnodes);
+            Matrix<U, Dynamic, 1> fpt_vec = Matrix<U, Dynamic, 1>::Zero(this->numnodes);
             for (unsigned i = 0; i < t; ++i)
                 fpt_vec(i) = solution(i); 
             for (unsigned i = t + 1; i < this->numnodes; ++i)
@@ -1390,6 +1417,9 @@ class LabeledDigraph
          * meaning that there are no alternative terminal nodes (or rather
          * SCCs) to which the process can travel and get "stuck".   
          *
+         * The scalar type of the returned vector is by default the scalar 
+         * type of the graph (T), unless another type is specified.
+         *
          * @param target Pointer to target node.
          * @param sparse If true, use a sparse Laplacian matrix in the calculations. 
          * @param method Summation method. 
@@ -1397,27 +1427,28 @@ class LabeledDigraph
          *          every node in the graph.
          * @throws std::invalid_argument if summation method is not recognized.  
          */
-        Matrix<T, Dynamic, 1> getMeanFirstPassageTimesFromRecurrence(Node* target,
+        template <typename U = T>
+        Matrix<U, Dynamic, 1> getMeanFirstPassageTimesFromRecurrence(Node* target,
                                                                      const bool sparse,
                                                                      const SummationMethod method = NaiveSummation)
         {
             // Compute the required spanning forest matrices ...
-            Matrix<T, Dynamic, Dynamic> forest_one_root, forest_two_roots;
+            Matrix<U, Dynamic, Dynamic> forest_one_root, forest_two_roots;
             if (sparse)
             {
                 // Instantiate a *sparse row-major* Laplacian matrix ...
                 //
                 // Initialize a zero matrix with #rows = #cols = #nodes
-                SparseMatrix<T, RowMajor> laplacian(this->numnodes, this->numnodes); 
+                SparseMatrix<U, RowMajor> laplacian(this->numnodes, this->numnodes); 
 
                 // Populate the entries of the matrix: the off-diagonal (i,j)-th  
                 // entry is the *negative* of the label of the edge i -> j, and 
                 // the diagonal entries are set so that each *row* sum is zero 
-                std::vector<Triplet<T> > laplacian_triplets; 
+                std::vector<Triplet<U> > laplacian_triplets; 
                 unsigned i = 0;
                 for (auto&& v : this->order)
                 {
-                    std::vector<T> row_entries;    // All nonzero off-diagonal entries in i-th row
+                    std::vector<U> row_entries;    // All nonzero off-diagonal entries in i-th row
                     unsigned j = 0;
                     for (auto&& w : this->order)
                     {
@@ -1427,19 +1458,19 @@ class LabeledDigraph
                             // for which i is the target node 
                             if (v != target && this->edges[v].find(w) != this->edges[v].end())
                             {
-                                T label(this->edges[v][w]);
-                                laplacian_triplets.push_back(Triplet<T>(i, j, -label));
+                                U label = static_cast<U>(this->edges[v][w]);
+                                laplacian_triplets.push_back(Triplet<U>(i, j, -label));
                                 row_entries.push_back(label);  
                             }
                         }
                         j++;
                     }
                     // Compute the negative of the i-th row sum
-                    T row_sum = 0; 
+                    U row_sum = 0; 
                     switch (method)
                     {
                         case NaiveSummation: {
-                            for (const T entry : row_entries)
+                            for (const U entry : row_entries)
                                 row_sum += entry;
                             break; 
                         }
@@ -1459,20 +1490,20 @@ class LabeledDigraph
                             break;
                         }  
                     }
-                    laplacian_triplets.push_back(Triplet<T>(i, i, row_sum)); 
+                    laplacian_triplets.push_back(Triplet<U>(i, i, row_sum)); 
                     i++;
                 }
                 laplacian.setFromTriplets(laplacian_triplets.begin(), laplacian_triplets.end());
 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // forest matrix 
-                forest_two_roots = this->getSpanningForestMatrixSparse(
+                forest_two_roots = this->getSpanningForestMatrixSparse<U>(
                     this->numnodes - 2, laplacian, method
                 );
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root forest (tree) matrix  
-                forest_one_root = chebotarevAgaevRecurrence<T>(
+                forest_one_root = chebotarevAgaevRecurrence<U>(
                     laplacian, forest_two_roots, this->numnodes - 2, method
                 );
             }
@@ -1481,7 +1512,7 @@ class LabeledDigraph
                 // Instantiate a *dense* Laplacian matrix ...
                 //
                 // Initialize a zero matrix with #rows = #cols = #nodes
-                Matrix<T, Dynamic, Dynamic> laplacian = Matrix<T, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
+                Matrix<U, Dynamic, Dynamic> laplacian = Matrix<U, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
 
                 // Populate the off-diagonal entries of the matrix first: 
                 // (i,j)-th entry is the *negative* of the label of the edge i -> j
@@ -1497,7 +1528,7 @@ class LabeledDigraph
                             // for which i is the target node 
                             if (v != target && this->edges[v].find(w) != this->edges[v].end())
                             {
-                                T label(this->edges[v][w]);
+                                U label = static_cast<U>(this->edges[v][w]);
                                 laplacian(i, j) = -label;
                             }
                         }
@@ -1508,7 +1539,7 @@ class LabeledDigraph
 
                 // Populate diagonal entries as negative sums of the off-diagonal
                 // entries in each row
-                T row_sum = 0; 
+                U row_sum = 0; 
                 switch (method)
                 {
                     case NaiveSummation: 
@@ -1535,20 +1566,20 @@ class LabeledDigraph
 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // forest matrix 
-                forest_two_roots = this->getSpanningForestMatrix(
+                forest_two_roots = this->getSpanningForestMatrix<U>(
                     this->numnodes - 2, laplacian, method
                 );
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root forest (tree) matrix  
-                forest_one_root = chebotarevAgaevRecurrence<T>(
+                forest_one_root = chebotarevAgaevRecurrence<U>(
                     laplacian, forest_two_roots, this->numnodes - 2, method
                 );
             }
 
             // Now compute the desired mean first-passage times ...
             int t;
-            Matrix<T, Dynamic, 1> mean_times = Matrix<T, Dynamic, 1>::Zero(this->numnodes);  
+            Matrix<U, Dynamic, 1> mean_times = Matrix<U, Dynamic, 1>::Zero(this->numnodes);  
             for (auto it = this->order.begin(); it != this->order.end(); ++it)
             {
                 if (*it == target)
@@ -1641,7 +1672,8 @@ class LabeledDigraph
          *          node from every node in the graph.
          * @throws std::invalid_argument if solver method is not recognized.  
          */
-        Matrix<T, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromSolver(Node* target, 
+        template <typename U = T>
+        Matrix<U, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromSolver(Node* target, 
                                                                             const SolverMethod method = QRDecomposition)
         {
             // Get the index of the target node 
@@ -1657,8 +1689,8 @@ class LabeledDigraph
 
             // Get the Laplacian matrix of the graph and drop the row and column
             // corresponding to the target node 
-            Matrix<T, Dynamic, Dynamic> laplacian = this->getLaplacian();
-            Matrix<T, Dynamic, Dynamic> sublaplacian(this->numnodes - 1, this->numnodes - 1);
+            Matrix<U, Dynamic, Dynamic> laplacian = this->getLaplacian<U>();
+            Matrix<U, Dynamic, Dynamic> sublaplacian(this->numnodes - 1, this->numnodes - 1);
             int z = this->numnodes - 1 - t;
             if (t == 0)
             {
@@ -1677,30 +1709,32 @@ class LabeledDigraph
             } 
 
             // Get the left-hand matrix in the first-passage time linear system
-            Matrix<T, Dynamic, Dynamic> A = -(sublaplacian.transpose() * sublaplacian.transpose() * sublaplacian.transpose());
+            Matrix<U, Dynamic, Dynamic> A = -(
+                sublaplacian.transpose() * sublaplacian.transpose() * sublaplacian.transpose()
+            );
 
             // Get the right-hand vector in the first-passage time linear system 
-            Matrix<T, Dynamic, 1> b = Matrix<T, Dynamic, 1>::Zero(this->numnodes - 1); 
+            Matrix<U, Dynamic, 1> b = Matrix<U, Dynamic, 1>::Zero(this->numnodes - 1); 
             for (unsigned i = 0; i < t; ++i)
             {
                 if (this->hasEdge(this->order[i], target))
-                    b(i) = this->edges[this->order[i]][target];
+                    b(i) = static_cast<U>(this->edges[this->order[i]][target]);
             }
             for (unsigned i = t + 1; i < this->numnodes; ++i)
             {
                 if (this->hasEdge(this->order[i], target))
-                    b(i - 1) = this->edges[this->order[i]][target]; 
+                    b(i - 1) = static_cast<U>(this->edges[this->order[i]][target]); 
             }
 
             // Solve the linear system with the specified method 
-            Matrix<T, Dynamic, 1> solution; 
+            Matrix<U, Dynamic, 1> solution; 
             if (method == QRDecomposition)
             { 
-                solution = solveByQRD<T>(A, b);
+                solution = solveByQRD<U>(A, b);
             }
             else if (method == LUDecomposition)
             { 
-                solution = solveByLUD<T>(A, b);
+                solution = solveByLUD<U>(A, b);
             }
             else
             {
@@ -1711,7 +1745,7 @@ class LabeledDigraph
 
             // Return an augmented vector with the zero mean FPT from the 
             // target node to itself
-            Matrix<T, Dynamic, 1> fpt_vec = Matrix<T, Dynamic, 1>::Zero(this->numnodes);
+            Matrix<U, Dynamic, 1> fpt_vec = Matrix<U, Dynamic, 1>::Zero(this->numnodes);
             for (unsigned i = 0; i < t; ++i)
                 fpt_vec(i) = solution(i); 
             for (unsigned i = t + 1; i < this->numnodes; ++i)
@@ -1738,27 +1772,28 @@ class LabeledDigraph
          *          node from every node in the graph.
          * @throws std::invalid_argument if summation method is not recognized. 
          */
-        Matrix<T, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromRecurrence(Node* target,
+        template <typename U = T>
+        Matrix<U, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromRecurrence(Node* target,
                                                                                 const bool sparse,
                                                                                 const SummationMethod method = NaiveSummation)
         {
             // Compute the required spanning forest matrices ...
-            Matrix<T, Dynamic, Dynamic> forest_one_root, forest_two_roots;
+            Matrix<U, Dynamic, Dynamic> forest_one_root, forest_two_roots;
             if (sparse)
             {
                 // Instantiate a *sparse row-major* Laplacian matrix ...
                 //
                 // Initialize a zero matrix with #rows = #cols = #nodes
-                SparseMatrix<T, RowMajor> laplacian(this->numnodes, this->numnodes); 
+                SparseMatrix<U, RowMajor> laplacian(this->numnodes, this->numnodes); 
 
                 // Populate the entries of the matrix: the off-diagonal (i,j)-th  
                 // entry is the *negative* of the label of the edge i -> j, and 
                 // the diagonal entries are set so that each *row* sum is zero 
-                std::vector<Triplet<T> > laplacian_triplets; 
+                std::vector<Triplet<U> > laplacian_triplets; 
                 unsigned i = 0;
                 for (auto&& v : this->order)
                 {
-                    std::vector<T> row_entries;    // All nonzero off-diagonal entries in i-th row
+                    std::vector<U> row_entries;    // All nonzero off-diagonal entries in i-th row
                     unsigned j = 0;
                     for (auto&& w : this->order)
                     {
@@ -1768,19 +1803,19 @@ class LabeledDigraph
                             // for which i is the target node 
                             if (v != target && this->edges[v].find(w) != this->edges[v].end())
                             {
-                                T label(this->edges[v][w]);
-                                laplacian_triplets.push_back(Triplet<T>(i, j, -label));
+                                U label = static_cast<U>(this->edges[v][w]);
+                                laplacian_triplets.push_back(Triplet<U>(i, j, -label));
                                 row_entries.push_back(label);  
                             }
                         }
                         j++;
                     }
                     // Compute the negative of the i-th row sum
-                    T row_sum = 0; 
+                    U row_sum = 0; 
                     switch (method)
                     {
                         case NaiveSummation: {
-                            for (const T entry : row_entries)
+                            for (const U entry : row_entries)
                                 row_sum += entry;
                             break; 
                         }
@@ -1800,20 +1835,20 @@ class LabeledDigraph
                             break;
                         }  
                     }
-                    laplacian_triplets.push_back(Triplet<T>(i, i, row_sum)); 
+                    laplacian_triplets.push_back(Triplet<U>(i, i, row_sum)); 
                     i++;
                 }
                 laplacian.setFromTriplets(laplacian_triplets.begin(), laplacian_triplets.end());
 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // forest matrix 
-                forest_two_roots = this->getSpanningForestMatrixSparse(
+                forest_two_roots = this->getSpanningForestMatrixSparse<U>(
                     this->numnodes - 2, laplacian, method 
                 );
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root forest (tree) matrix  
-                forest_one_root = chebotarevAgaevRecurrence<T>(
+                forest_one_root = chebotarevAgaevRecurrence<U>(
                     laplacian, forest_two_roots, this->numnodes - 2, method 
                 );
             }
@@ -1822,7 +1857,7 @@ class LabeledDigraph
                 // Instantiate a *dense* Laplacian matrix ...
                 //
                 // Initialize a zero matrix with #rows = #cols = #nodes
-                Matrix<T, Dynamic, Dynamic> laplacian = Matrix<T, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
+                Matrix<U, Dynamic, Dynamic> laplacian = Matrix<U, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
 
                 // Populate the off-diagonal entries of the matrix first: 
                 // (i,j)-th entry is the *negative* of the label of the edge i -> j
@@ -1838,7 +1873,7 @@ class LabeledDigraph
                             // for which i is the target node 
                             if (v != target && this->edges[v].find(w) != this->edges[v].end())
                             {
-                                T label(this->edges[v][w]);
+                                U label = static_cast<U>(this->edges[v][w]);
                                 laplacian(i, j) = -label;
                             }
                         }
@@ -1849,7 +1884,7 @@ class LabeledDigraph
 
                 // Populate diagonal entries as negative sums of the off-diagonal
                 // entries in each row
-                T row_sum = 0; 
+                U row_sum = 0; 
                 switch (method)
                 {
                     case NaiveSummation: 
@@ -1876,13 +1911,13 @@ class LabeledDigraph
 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // forest matrix 
-                forest_two_roots = this->getSpanningForestMatrix(
+                forest_two_roots = this->getSpanningForestMatrix<U>(
                     this->numnodes - 2, laplacian, method
                 );
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root forest (tree) matrix  
-                forest_one_root = chebotarevAgaevRecurrence<T>(
+                forest_one_root = chebotarevAgaevRecurrence<U>(
                     laplacian, forest_two_roots, this->numnodes - 2, method
                 );
             }
@@ -1900,12 +1935,12 @@ class LabeledDigraph
             int z = this->numnodes - 1 - t; 
 
             // Finally compute the desired second moments ...
-            Matrix<T, Dynamic, 1> second_moments = Matrix<T, Dynamic, 1>::Zero(this->numnodes);
+            Matrix<U, Dynamic, 1> second_moments = Matrix<U, Dynamic, 1>::Zero(this->numnodes);
 
             // 1) Get the sub-matrix of the two-root forest matrix obtained by deleting 
             // the row and column corresponding to the target node 
-            Matrix<T, Dynamic, Dynamic> forest_two_roots_sub =
-                Matrix<T, Dynamic, Dynamic>::Zero(this->numnodes - 1, this->numnodes - 1);
+            Matrix<U, Dynamic, Dynamic> forest_two_roots_sub =
+                Matrix<U, Dynamic, Dynamic>::Zero(this->numnodes - 1, this->numnodes - 1);
             if (t == 0)
             {
                 forest_two_roots_sub = forest_two_roots.block(1, 1, z, z); 
@@ -1923,7 +1958,7 @@ class LabeledDigraph
             }
 
             // 2) Get the square of this sub-matrix 
-            Matrix<T, Dynamic, Dynamic> forest_two_roots_sub_squared;
+            Matrix<U, Dynamic, Dynamic> forest_two_roots_sub_squared;
             switch (method) 
             {
                 case NaiveSummation:
