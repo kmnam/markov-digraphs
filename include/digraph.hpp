@@ -5,7 +5,7 @@
  *  Author:
  *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *  Last updated: 
- *      12/1/2021 
+ *      12/4/2021 
  *
  *  \mainpage MarkovDigraphs 
  *
@@ -378,8 +378,167 @@ class LabeledDigraph
         std::unordered_map<Node*, std::unordered_map<Node*, T> > edges;
 
         // ----------------------------------------------------- //
-        //                     PRIVATE METHODS                   //
+        //                   PROTECTED METHODS                   //
         // ----------------------------------------------------- //
+
+        /**
+         * Return a pointer to the node with the given ID; return `nullptr` if 
+         * a node with the given ID does not exist. 
+         *
+         * @param id ID of desired node. 
+         * @returns  A pointer to node with the given ID (`nullptr` if such a node
+         *           does not exist). 
+         */
+        Node* getNode(std::string id) const
+        {
+            auto it = this->nodes.find(id);
+            if (it == this->nodes.end()) return nullptr;
+            else                         return it->second; 
+        }
+
+        /**
+         * Return the canonical ordering of nodes in the graph (`this->order`). 
+         *
+         * @returns A copy of `this->order`. 
+         */
+        std::vector<Node*> getAllNodes() const 
+        {
+            return this->order; 
+        }
+
+        /**
+         * Return the edge between the specified nodes, along with the
+         * edge label.
+         *
+         * This method returns a `nullptr` pair and zero for the edge label
+         * if the edge does not exist but the nodes do, but throws an 
+         * exception if either node does not exist.
+         *
+         * @param source_id ID of source node. 
+         * @param target_id ID of target node. 
+         * @returns         A pair containing the edge (as a `<Node*, Node*>`
+         *                  pair) and the edge label.
+         * @throws std::runtime_error if either node does not exist. 
+         */
+        std::pair<Edge, T> getEdge(std::string source_id, std::string target_id)
+        {
+            Node* source = this->getNode(source_id);
+            Node* target = this->getNode(target_id);
+
+            // Check that both nodes exist 
+            if (source == nullptr)
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
+            if (target == nullptr)
+                throw std::runtime_error("Specified target node does not exist; use LabeledDigraph<T>::addNode() to add node");
+
+            // Check that the edge exists 
+            auto it = this->edges[source].find(target);
+            if (it != this->edges[source].end())
+                return std::make_pair(std::make_pair(source, it->first), it->second);
+            else    // Return pair of nullptrs and zero label if no edge exists
+                return std::make_pair(std::make_pair(nullptr, nullptr), 0);
+        }
+
+        /**
+         * Return a vector of outgoing edges from the given source node, given
+         * the index of the source node in the canonical ordering (`this->order`). 
+         *
+         * @param source_idx Index of source node in the canonical ordering. 
+         * @returns          `std::vector` of pairs containing the target node 
+         *                   index and label of each edge
+         * @throws std::runtime_error if the given node does not exist. 
+         */
+        std::vector<std::pair<int, T> > getAllEdgesFromNode(int source_idx) 
+        {
+            // Check that the given node exists
+            if (source_idx < 0 || source_idx > this->order.size() - 1)
+                throw std::runtime_error("Specified source node does not exist");
+            
+            std::vector<std::pair<int, T> > edges_from_node;
+            Node* source = this->order[source_idx];
+
+            // Run through all nodes in this->order ...
+            for (int i = 0; i < this->numnodes; ++i)
+            {
+                // Is there an edge to this node?
+                Node* target = this->order[i]; 
+                if (this->edges[source].find(target) != this->edges[source].end())
+                {
+                    // If so, instantiate the edge and get the label 
+                    T label = this->edges[source][target];
+                    edges_from_node.push_back(std::make_pair(i, label)); 
+                }
+            }
+
+            return edges_from_node; 
+        }
+
+        /**
+         * Return a vector of outgoing edges from the given source node, given
+         * the ID of the source node. 
+         *
+         * @param source_id ID of source node. 
+         * @returns         `std::vector` of pairs containing each edge (as a 
+         *                  `<Node*, Node*>` pair) and edge label
+         * @throws std::runtime_error if a node with the given ID does not exist. 
+         */
+        std::vector<std::pair<Edge, T> > getAllEdgesFromNode(std::string source_id) 
+        {
+            std::vector<std::pair<Edge, T> > edges_from_node;
+            Node* source = this->getNode(source_id);
+
+            // Check that the given node exists
+            if (source == nullptr)
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
+
+            // Run through all nodes in this->order ...
+            for (auto&& node : this->order)
+            {
+                // Is there an edge to this node?
+                if (this->edges[source].find(node) != this->edges[source].end())
+                {
+                    // If so, instantiate the edge and get the label 
+                    Edge edge = std::make_pair(source, node);
+                    T label = this->edges[source][node];
+                    edges_from_node.push_back(std::make_pair(edge, label)); 
+                }
+            }
+
+            return edges_from_node; 
+        }
+
+        /**
+         * Return a vector of outgoing edges from the given source node, given
+         * a pointer to the source node. 
+         *
+         * @param source Pointer to source node. 
+         * @returns      `std::vector` of pairs containing each edge (as a 
+         *               `<Node*, Node*>` pair) and edge label
+         * @throws std::runtime_error if the given node does not exist. 
+         */
+        std::vector<std::pair<Edge, T> > getAllEdgesFromNode(Node* source) 
+        {
+            std::vector<std::pair<Edge, T> > edges_from_node;
+
+            // Check that the given node exists
+            if (source == nullptr)
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
+
+            // Run through all nodes in this->order ...
+            for (auto&& node : this->order)
+            {
+                // Is there an edge to this node?
+                if (this->edges[source].find(node) != this->edges[source].end())
+                {
+                    // If so, instantiate the edge and get the label 
+                    Edge edge = std::make_pair(source, node);
+                    T label = this->edges[source][node];
+                    edges_from_node.push_back(std::make_pair(edge, label)); 
+                }
+            }
+
+            return edges_from_node; 
+        }
 
         /**
          * Compute the k-th spanning forest matrix, using the recurrence
@@ -462,7 +621,7 @@ class LabeledDigraph
         }
 
         // ----------------------------------------------------- //
-        //              NODE-ADDING/GETTING METHODS              //
+        //         NODE/EDGE/LABEL-ADDING/SETTING METHODS        //
         // ----------------------------------------------------- //
         
         /**
@@ -544,21 +703,6 @@ class LabeledDigraph
         }
 
         /**
-         * Return a pointer to the node with the given ID; return `nullptr` if 
-         * a node with the given ID does not exist. 
-         *
-         * @param id ID of desired node. 
-         * @returns  A pointer to node with the given ID (`nullptr` if such a node
-         *           does not exist). 
-         */
-        Node* getNode(std::string id) const
-        {
-            auto it = this->nodes.find(id);
-            if (it == this->nodes.end()) return nullptr;
-            else                         return it->second; 
-        }
-
-        /**
          * Return true if node with given ID exists in the graph.
          *
          * @param id ID of desired node. 
@@ -568,20 +712,6 @@ class LabeledDigraph
         {
             return this->nodes.count(id);
         }
-
-        /**
-         * Return the canonical ordering of nodes in the graph (`this->order`). 
-         *
-         * @returns A copy of `this->order`. 
-         */
-        std::vector<Node*> getAllNodes() const 
-        {
-            return this->order; 
-        }
-
-        // ----------------------------------------------------- //
-        //              EDGE-ADDING/GETTING METHODS              //
-        // ----------------------------------------------------- //
 
         /**
          * Add an edge between two nodes.
@@ -646,140 +776,6 @@ class LabeledDigraph
                 this->edges[source].erase(this->edges[source].find(target));
             }
             // If not, then do nothing!
-        }
-
-        /**
-         * Return the edge between the specified nodes, along with the
-         * edge label.
-         *
-         * This method returns a `nullptr` pair and zero for the edge label
-         * if the edge does not exist but the nodes do, but throws an 
-         * exception if either node does not exist.
-         *
-         * @param source_id ID of source node. 
-         * @param target_id ID of target node. 
-         * @returns         A pair containing the edge (as a `<Node*, Node*>`
-         *                  pair) and the edge label.
-         * @throws std::runtime_error if either node does not exist. 
-         */
-        std::pair<Edge, T> getEdge(std::string source_id, std::string target_id)
-        {
-            Node* source = this->getNode(source_id);
-            Node* target = this->getNode(target_id);
-
-            // Check that both nodes exist 
-            if (source == nullptr)
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
-            if (target == nullptr)
-                throw std::runtime_error("Specified target node does not exist; use LabeledDigraph<T>::addNode() to add node");
-
-            // Check that the edge exists 
-            auto it = this->edges[source].find(target);
-            if (it != this->edges[source].end())
-                return std::make_pair(std::make_pair(source, it->first), it->second);
-            else    // Return pair of nullptrs and zero label if no edge exists
-                return std::make_pair(std::make_pair(nullptr, nullptr), 0);
-        }
-
-        /**
-         * Return a vector of outgoing edges from the given source node, given
-         * the ID of the source node. 
-         *
-         * @param source_id ID of source node. 
-         * @returns         `std::vector` of pairs containing each edge (as a 
-         *                  `<Node*, Node*>` pair) and edge label
-         * @throws std::runtime_error if a node with the given ID does not exist. 
-         */
-        std::vector<std::pair<Edge, T> > getAllEdgesFromNode(std::string source_id) 
-        {
-            std::vector<std::pair<Edge, T> > edges_from_node;
-            Node* source = this->getNode(source_id);
-
-            // Check that the given node exists
-            if (source == nullptr)
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
-
-            // Run through all nodes in this->order ...
-            for (auto&& node : this->order)
-            {
-                // Is there an edge to this node?
-                if (this->edges[source].find(node) != this->edges[source].end())
-                {
-                    // If so, instantiate the edge and get the label 
-                    Edge edge = std::make_pair(source, node);
-                    T label = this->edges[source][node];
-                    edges_from_node.push_back(std::make_pair(edge, label)); 
-                }
-            }
-
-            return edges_from_node; 
-        }
-
-        /**
-         * Return a vector of outgoing edges from the given source node, given
-         * a pointer to the source node. 
-         *
-         * @param source Pointer to source node. 
-         * @returns      `std::vector` of pairs containing each edge (as a 
-         *               `<Node*, Node*>` pair) and edge label
-         * @throws std::runtime_error if the given node does not exist. 
-         */
-        std::vector<std::pair<Edge, T> > getAllEdgesFromNode(Node* source) 
-        {
-            std::vector<std::pair<Edge, T> > edges_from_node;
-
-            // Check that the given node exists
-            if (source == nullptr)
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
-
-            // Run through all nodes in this->order ...
-            for (auto&& node : this->order)
-            {
-                // Is there an edge to this node?
-                if (this->edges[source].find(node) != this->edges[source].end())
-                {
-                    // If so, instantiate the edge and get the label 
-                    Edge edge = std::make_pair(source, node);
-                    T label = this->edges[source][node];
-                    edges_from_node.push_back(std::make_pair(edge, label)); 
-                }
-            }
-
-            return edges_from_node; 
-        }
-
-        /**
-         * Return a vector of outgoing edges from the given source node, given
-         * the index of the source node in the canonical ordering (`this->order`). 
-         *
-         * @param source_idx Index of source node in the canonical ordering. 
-         * @returns          `std::vector` of pairs containing the target node 
-         *                   index and label of each edge
-         * @throws std::runtime_error if the given node does not exist. 
-         */
-        std::vector<std::pair<int, T> > getAllEdgesFromNode(int source_idx) 
-        {
-            // Check that the given node exists
-            if (source_idx < 0 || source_idx > this->order.size() - 1)
-                throw std::runtime_error("Specified source node does not exist");
-            
-            std::vector<std::pair<int, T> > edges_from_node;
-            Node* source = this->order[source_idx];
-
-            // Run through all nodes in this->order ...
-            for (int i = 0; i < this->numnodes; ++i)
-            {
-                // Is there an edge to this node?
-                Node* target = this->order[i]; 
-                if (this->edges[source].find(target) != this->edges[source].end())
-                {
-                    // If so, instantiate the edge and get the label 
-                    T label = this->edges[source][target];
-                    edges_from_node.push_back(std::make_pair(i, label)); 
-                }
-            }
-
-            return edges_from_node; 
         }
 
         /**
@@ -1999,7 +1995,7 @@ class LabeledDigraph
  * digits available to the scalar. 
  */
 template <int P>
-class PreciseDigraph<P> : public LabeledDigraph<boost::multiprecision::number<boost::multiprecision::mpfr_float_backend<P> > >
+class PreciseDigraph : public LabeledDigraph<boost::multiprecision::number<boost::multiprecision::mpfr_float_backend<P> > >
 {
     // No additional methods to be defined 
 }; 
