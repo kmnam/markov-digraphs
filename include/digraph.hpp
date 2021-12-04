@@ -2014,21 +2014,4 @@ class LabeledDigraph
         } 
 };
 
-// ----------------------------------------------------- //
-//               THE PRECISEDIGRAPH CLASS                //
-// ----------------------------------------------------- //
-
-#include <boost/multiprecision/mpfr.hpp>
-
-/**
- * An implementation of a labeled digraph with boost::multiprecision::number 
- * scalar types, for which the template parameter is the number of mantissa
- * digits available to the scalar. 
- */
-template <int P>
-class PreciseDigraph : public LabeledDigraph<boost::multiprecision::number<boost::multiprecision::mpfr_float_backend<P> > >
-{
-    // No additional methods to be defined 
-}; 
-
 #endif
