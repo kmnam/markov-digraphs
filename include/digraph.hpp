@@ -731,6 +731,21 @@ class LabeledDigraph
         }
 
         /**
+         * Return a vector of the IDs of the nodes, ordered according to the 
+         * canonical ordering (`this->order`). 
+         *
+         * @returns A vector of all node IDs, ordered according to `this->order`.
+         */
+        std::vector<std::string> getAllNodeIds() const 
+        {
+            std::vector<std::string> node_ids; 
+            for (auto&& node : this->order)
+                node_ids.push_back(node->id);
+
+            return node_ids; 
+        }
+
+        /**
          * Add an edge between two nodes.
          *
          * If either ID does not correspond to a node in the graph, this function
@@ -1234,7 +1249,7 @@ class LabeledDigraph
             Matrix<T, Dynamic, 1> steady_state;
             try
             {
-                steady_state = getOneDimNullspaceFromSVD(laplacian);
+                steady_state = getOneDimNullspaceFromSVD<U>(laplacian);
             }
             catch (const std::runtime_error& e)
             {
