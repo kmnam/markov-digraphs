@@ -541,6 +541,21 @@ class LabeledDigraph
         }
 
         /**
+         * Return true if the specified edge exists, given pointers to the 
+         * two nodes, and false otherwise.
+         *
+         * This method also returns false if either node does not exist.  
+         *
+         * @param source Pointer to source node. 
+         * @param target Pointer to target node. 
+         * @returns      true if the edge exists, false otherwise.  
+         */
+        bool hasEdge(Node* source, Node* target) const 
+        {
+            return (this->edges.count(source) && (this->edges.find(source))->second.count(target)); 
+        }
+
+        /**
          * Compute the k-th spanning forest matrix, using the recurrence
          * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18), with 
          * a *dense* Laplacian matrix. 
@@ -802,18 +817,34 @@ class LabeledDigraph
         }
 
         /**
-         * Return true if the specified edge exists, given pointers to the 
-         * two nodes, and false otherwise.
+         * Get the label on the specified edge.
          *
-         * This method also returns false if either node does not exist.  
+         * This method throws an exception if either node does not exist, and 
+         * also if the specified edge does not exist. 
          *
-         * @param source Pointer to source node. 
-         * @param target Pointer to target node. 
-         * @returns      true if the edge exists, false otherwise.  
+         * @param source_id ID of source node. 
+         * @param target_id ID of target node. 
+         * @returns         Edge label. 
+         * @throws std::runtime_error if either node or the edge does not exist.  
          */
-        bool hasEdge(Node* source, Node* target) const 
+        T getEdgeLabel(std::string source_id, std::string target_id)
         {
-            return (this->edges.count(source) && (this->edges.find(source))->second.count(target)); 
+            Node* source = this->getNode(source_id); 
+            Node* target = this->getNode(target_id);
+
+            // Check that both nodes exist 
+            if (source == nullptr)
+                throw std::runtime_error("Specified source node does not exist");
+            if (target == nullptr)
+                throw std::runtime_error("Specified target node does not exist");
+
+            // If the edge exists, return the edge label; otherwise, throw 
+            // std::runtime_error
+            auto it = this->edges[source].find(target);
+            if (it != this->edges[source].end())
+                return this->edges[source][target];
+            else 
+                throw std::runtime_error("Specified edge does not exist");
         }
 
         /**
