@@ -257,9 +257,10 @@ class LineGraph : public LabeledDigraph<T>
          * @param id ID of node to be added (to match signature with parent method). 
          * @throws std::runtime_error if invoked at all. 
          */
-        void addNode(std::string id)
+        Node* addNode(std::string id)
         {
-            throw std::runtime_error("LabeledDigraph<T>::addNode() cannot be called; use LineGraph<T>::addNodeFromEnd()"); 
+            throw std::runtime_error("LabeledDigraph<T>::addNode() cannot be called; use LineGraph<T>::addNodeFromEnd()");
+            return nullptr; 
         }
 
         /**
