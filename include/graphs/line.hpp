@@ -27,16 +27,16 @@
  * we have `this->numnodes == this->N + 1`.
  *
  * Additional methods implemented for this graph include: 
- * - `getUpperExitProb(T, T)`: compute the *splitting probability* of exiting
+ * - `getUpperExitProb<U>(U, U)`: compute the *splitting probability* of exiting
  *   the graph through `this->N` (reaching an auxiliary upper exit node),
  *   and not through `0` (reaching an auxiliary lower exit node). 
- * - `getUpperExitRate(T)`: compute the reciprocal of the *unconditional mean
+ * - `getUpperExitRate<U>(U)`: compute the reciprocal of the *unconditional mean
  *   first-passage time* to exiting the graph through `this->N`, given that
  *   the exit rate from `0` is zero. 
- * - `getLowerExitRate(T)`: compute the reciprocal of the *unconditional mean
+ * - `getLowerExitRate<U>(U)`: compute the reciprocal of the *unconditional mean
  *   first-passage time* to exiting the graph through `0`, given that the 
  *   exit rate from `this->N` is zero. 
- * - `getUpperExitRate(T, T)`: compute the reciprocal of the *conditional mean 
+ * - `getUpperExitRate<U>(U, U)`: compute the reciprocal of the *conditional mean 
  *   first-passage time* to exiting the graph through `this->N`, given that
  *   (1) both exit rates are nonzero and (2) exit through `this->N` does occur. 
  */
@@ -331,21 +331,22 @@ class LineGraph : public LabeledDigraph<T>
          * @param lower_exit_rate Rate of exit through the lower node (`0`). 
          * @param upper_exit_rate Rate of exit through the upper node (`this->N`).
          * @returns               Probability of exit from `0` through `this->N`.
-         */ 
-        T getUpperExitProb(T lower_exit_rate, T upper_exit_rate) 
+         */
+        template <typename U = T> 
+        U getUpperExitProb(U lower_exit_rate, U upper_exit_rate) 
         {   
             // Start with label(N -> N-1) / label(N -> exit), then add one 
-            T invprob = this->line_labels[this->N-1][1] / upper_exit_rate; 
+            U invprob = static_cast<U>(this->line_labels[this->N-1][1]) / upper_exit_rate; 
             invprob += 1;  
             for (int i = this->N - 1; i > 0; --i)
             {
                 // Multiply by label(i -> i-1) / label(i -> i+1) then add one
                 // for i = N-1, ..., 1
-                invprob *= (this->line_labels[i-1][1] / this->line_labels[i][0]); 
+                invprob *= (static_cast<U>(this->line_labels[i-1][1]) / static_cast<U>(this->line_labels[i][0])); 
                 invprob += 1; 
             }
             // Finally multiply by label(0 -> exit) / label(0 -> 1), then add one
-            invprob *= lower_exit_rate / this->line_labels[0][0];
+            invprob *= lower_exit_rate / static_cast<U>(this->line_labels[0][0]);
             invprob += 1; 
 
             return 1 / invprob;  
@@ -361,16 +362,17 @@ class LineGraph : public LabeledDigraph<T>
          * @returns               Reciprocal of mean first-passage time from
          *                        `0` to exit through `this->N`. 
          */
-        T getUpperExitRate(T upper_exit_rate)
+        template <typename U = T>
+        U getUpperExitRate(U upper_exit_rate)
         {
             // Start with label(1 -> 0) / label(0 -> 1), then add one 
-            T invrate = this->line_labels[0][1] / this->line_labels[0][0]; 
+            U invrate = static_cast<U>(this->line_labels[0][1]) / static_cast<U>(this->line_labels[0][0]); 
             invrate += 1; 
             for (int i = 1; i < this->N; ++i)
             {
                 // Multiply by label(i+1 -> i) / label(i -> i+1) then add one
                 // for i = 1, ..., N-1
-                invrate *= (this->line_labels[i][1] / this->line_labels[i][0]);
+                invrate *= (static_cast<U>(this->line_labels[i][1]) / static_cast<U>(this->line_labels[i][0]));
                 invrate += 1; 
             }
 
@@ -388,16 +390,17 @@ class LineGraph : public LabeledDigraph<T>
          * @returns               Reciprocal of mean first-passage time from
          *                        `0` to exit through `0`.   
          */
-        T getLowerExitRate(T lower_exit_rate)
+        template <typename U = T>
+        U getLowerExitRate(U lower_exit_rate)
         {
             // Start with label(N-1 -> N) / label(N -> N-1), then add one 
-            T invrate = this->line_labels[this->N-1][0] / this->line_labels[this->N-1][1];
+            U invrate = static_cast<U>(this->line_labels[this->N-1][0]) / static_cast<U>(this->line_labels[this->N-1][1]);
             invrate += 1; 
             for (int i = this->N - 2; i >= 0; --i)
             {
                 // Multiply by label(i -> i+1) / label(i+1 -> i) then add one
                 // for i = N-2, ..., 0
-                invrate *= (this->line_labels[i][0] / this->line_labels[i][1]);
+                invrate *= (static_cast<U>(this->line_labels[i][0]) / static_cast<U>(this->line_labels[i][1]));
                 invrate += 1; 
             }
 
@@ -416,10 +419,11 @@ class LineGraph : public LabeledDigraph<T>
          * @returns               Reciprocal of conditional mean first-passage
          *                        time from `0` to exit through `this->N`.
          */
-        T getUpperExitRate(T lower_exit_rate, T upper_exit_rate) 
+        template <typename U = T>
+        U getUpperExitRate(U lower_exit_rate, U upper_exit_rate) 
         {
             // Initialize the two recurrences for the numerator
-            std::vector<T> recur1, recur2;
+            std::vector<U> recur1, recur2;
             for (unsigned i = 0; i <= this->N; ++i)
             {
                 recur1.push_back(1); 
@@ -427,27 +431,27 @@ class LineGraph : public LabeledDigraph<T>
             }
 
             // Running product of label(N -> exit), label(N-1 -> N), label(N-2 -> N-1), ...
-            T prod1 = upper_exit_rate;
+            U prod1 = upper_exit_rate;
 
             // Running product of label(0 -> exit), label(1 -> 0), label(2 -> 1), ...
-            T prod2 = lower_exit_rate;
+            U prod2 = lower_exit_rate;
 
             // Apply first recurrence for i = N-1: multiply by label(N -> N-1), then add label(N -> exit)
-            recur1[this->N-1] = this->line_labels[this->N-1][1] + prod1;
+            recur1[this->N-1] = static_cast<U>(this->line_labels[this->N-1][1]) + prod1;
 
             // Apply second recurrence for i = 1: multiply by label(0 -> 1), then add label(0 -> exit)
-            recur2[1] = this->line_labels[0][0] + prod2;  
+            recur2[1] = static_cast<U>(this->line_labels[0][0]) + prod2;  
 
             // Apply the first recurrence for i = N-2, ..., 0, keeping track of 
             // each term in the recurrence
             for (int i = this->N - 2; i >= 0; ++i)
             {
                 // Multiply by label(i+1 -> i)
-                recur1[i] = recur1[i+1] * this->line_labels[i][1]; 
+                recur1[i] = recur1[i+1] * static_cast<U>(this->line_labels[i][1]); 
 
                 // Then add the product of label(i+1 -> i+2), ..., label(N-1 -> N),
                 // label(N -> exit)
-                prod1 *= this->line_labels[i+1][0];     // rhs == label(i+1 -> i+2)
+                prod1 *= static_cast<U>(this->line_labels[i+1][0]);     // rhs == label(i+1 -> i+2)
                 recur1[i] += prod1; 
             }
 
@@ -456,25 +460,25 @@ class LineGraph : public LabeledDigraph<T>
             for (int i = 2; i <= this->N; ++i)
             {
                 // Multiply by label(i-1 -> i)
-                recur2[i] = recur2[i-1] * this->line_labels[i-1][0];
+                recur2[i] = recur2[i-1] * static_cast<U>(this->line_labels[i-1][0]);
 
                 // Then add the product of label(0 -> exit), label(1 -> 0),
                 // ..., label(i-1 -> i-2)
-                prod2 *= this->line_labels[i-2][1];     // rhs == label(i-1 -> i-2) 
+                prod2 *= static_cast<U>(this->line_labels[i-2][1]);     // rhs == label(i-1 -> i-2) 
                 recur2[i] += prod2; 
             }
 
             // Apply the second recurrence once more to obtain the denominator: 
             // multiply by label(N -> exit) ... 
-            T denom = recur2[this->N] * upper_exit_rate;
+            U denom = recur2[this->N] * upper_exit_rate;
 
             // ... then add the product of label(0 -> exit), label(1 -> 0), ...,
             // label(N -> N-1)
-            prod2 *= this->line_labels[this->N-1][1];   // rhs == label(N -> N-1)
+            prod2 *= static_cast<U>(this->line_labels[this->N-1][1]);   // rhs == label(N -> N-1)
             denom += prod2;  
 
             // Compute the numerator
-            T numer = recur1[0] + recur2[0]; 
+            U numer = recur1[0] + recur2[0]; 
             for (int i = 1; i <= this->N; ++i)
                 numer += (recur1[i] * recur2[i]); 
 
