@@ -5,7 +5,7 @@
  *  Author:
  *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *  Last updated: 
- *      12/4/2021 
+ *      12/5/2021 
  *
  *  \mainpage MarkovDigraphs 
  *
@@ -1334,18 +1334,24 @@ class LabeledDigraph
          * The scalar type of the returned vector is by default the scalar 
          * type of the graph (T), unless another type is specified.
          *
-         * @param target Pointer to target node. 
-         * @param method Linear solver method for computing the mean first-passage
-         *               time vector. 
+         * @param target_id ID of target node. 
+         * @param method    Linear solver method for computing the mean first-passage
+         *                  time vector. 
          * @returns Vector of mean first-passage times to the target node from
          *          every node in the graph.
-         * @throws std::invalid_argument if solver method is not recognized.  
+         * @throws std::invalid_argument if solver method is not recognized. 
+         * @throws std::runtime_error    if target node does not exist.
          */
         template <typename U = T>
-        Matrix<U, Dynamic, 1> getMeanFirstPassageTimesFromSolver(Node* target,
+        Matrix<U, Dynamic, 1> getMeanFirstPassageTimesFromSolver(std::string target_id,
                                                                  const SolverMethod method = QRDecomposition) 
         {
-            // Get the index of the target node 
+            // Get the index of the target node
+            Node* target = this->getNode(target_id);
+            if (target == nullptr)
+            {
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
+            }
             int t; 
             for (auto it = this->order.begin(); it != this->order.end(); ++it)
             {
@@ -1435,18 +1441,24 @@ class LabeledDigraph
          * The scalar type of the returned vector is by default the scalar 
          * type of the graph (T), unless another type is specified.
          *
-         * @param target Pointer to target node.
-         * @param sparse If true, use a sparse Laplacian matrix in the calculations. 
-         * @param method Summation method. 
+         * @param target_id ID of target node.
+         * @param sparse    If true, use a sparse Laplacian matrix in the calculations. 
+         * @param method    Summation method. 
          * @returns Vector of mean first-passage times to the target node from
          *          every node in the graph.
          * @throws std::invalid_argument if summation method is not recognized.  
          */
         template <typename U = T>
-        Matrix<U, Dynamic, 1> getMeanFirstPassageTimesFromRecurrence(Node* target,
+        Matrix<U, Dynamic, 1> getMeanFirstPassageTimesFromRecurrence(std::string target_id,
                                                                      const bool sparse,
                                                                      const SummationMethod method = NaiveSummation)
         {
+            Node* target = this->getNode(target_id);
+            if (target == nullptr)
+            {
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
+            }
+
             // Compute the required spanning forest matrices ...
             Matrix<U, Dynamic, Dynamic> forest_one_root, forest_two_roots;
             if (sparse)
@@ -1592,18 +1604,20 @@ class LabeledDigraph
                 );
             }
 
-            // Now compute the desired mean first-passage times ...
-            int t;
-            Matrix<U, Dynamic, 1> mean_times = Matrix<U, Dynamic, 1>::Zero(this->numnodes);  
+            // Get the index of the target node
+            int t; 
             for (auto it = this->order.begin(); it != this->order.end(); ++it)
             {
                 if (*it == target)
                 {
-                    t = std::distance(this->order.begin(), it); 
+                    t = std::distance(this->order.begin(), it);
                     break;
                 }
-            }
+            } 
+
+            // Now compute the desired mean first-passage times ...
             int z = this->numnodes - 1 - t;
+            Matrix<U, Dynamic, 1> mean_times = Matrix<U, Dynamic, 1>::Zero(this->numnodes); 
             if (method == NaiveSummation)
             {
                 if (t == 0)
@@ -1680,18 +1694,23 @@ class LabeledDigraph
          * meaning that there are no alternative terminal nodes (or rather
          * SCCs) to which the process can travel and get "stuck".   
          *
-         * @param target Pointer to target node. 
-         * @param method Linear solver method for computing the second-moment
-         *               time vector. 
+         * @param target_id ID of target node. 
+         * @param method    Linear solver method for computing the second-moment
+         *                  time vector. 
          * @returns Vector of first-passage time second moments to the target
          *          node from every node in the graph.
          * @throws std::invalid_argument if solver method is not recognized.  
          */
         template <typename U = T>
-        Matrix<U, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromSolver(Node* target, 
+        Matrix<U, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromSolver(std::string target_id, 
                                                                             const SolverMethod method = QRDecomposition)
         {
-            // Get the index of the target node 
+            // Get the index of the target node
+            Node* target = this->getNode(target_id);
+            if (target == nullptr)
+            {
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
+            }
             int t; 
             for (auto it = this->order.begin(); it != this->order.end(); ++it)
             {
@@ -1780,18 +1799,24 @@ class LabeledDigraph
          * meaning that there are no alternative terminal nodes (or rather
          * SCCs) to which the process can travel and get "stuck". 
          *
-         * @param target Pointer to target node.
-         * @param sparse If true, use a sparse Laplacian matrix in the calculations. 
-         * @param method Summation method. 
+         * @param target_id ID of target node.
+         * @param sparse    If true, use a sparse Laplacian matrix in the calculations. 
+         * @param method    Summation method. 
          * @returns Vector of first-passage time second moments to the target
          *          node from every node in the graph.
          * @throws std::invalid_argument if summation method is not recognized. 
          */
         template <typename U = T>
-        Matrix<U, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromRecurrence(Node* target,
+        Matrix<U, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromRecurrence(std::string target_id,
                                                                                 const bool sparse,
                                                                                 const SummationMethod method = NaiveSummation)
         {
+            Node* target = this->getNode(target_id);
+            if (target == nullptr)
+            {
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
+            }
+
             // Compute the required spanning forest matrices ...
             Matrix<U, Dynamic, Dynamic> forest_one_root, forest_two_roots;
             if (sparse)
@@ -1937,16 +1962,16 @@ class LabeledDigraph
                 );
             }
 
-            // Identify the index of the target node 
-            int t;
+            // Get the index of the target node
+            int t; 
             for (auto it = this->order.begin(); it != this->order.end(); ++it)
             {
                 if (*it == target)
                 {
-                    t = std::distance(this->order.begin(), it); 
+                    t = std::distance(this->order.begin(), it);
                     break;
                 }
-            }
+            } 
             int z = this->numnodes - 1 - t; 
 
             // Finally compute the desired second moments ...
