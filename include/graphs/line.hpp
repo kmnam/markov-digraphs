@@ -18,12 +18,7 @@
 #include <vector>
 #include <utility>
 #include <stdexcept>
-#include <Eigen/Dense>
-#include <boost/math/tools/promotion.hpp>
-#include <boost/multiprecision/mpfr.hpp>
 #include "../digraph.hpp"
-
-using namespace Eigen;
 
 /**
  * An implementation of the line graph.
