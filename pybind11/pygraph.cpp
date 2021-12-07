@@ -68,7 +68,9 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("method") = SummationMethod::NaiveSummation
         )
         .def("get_spanning_forest_matrix",
-            &LabeledDigraph<PreciseType, double>::getSpanningForestMatrix,
+            static_cast<MatrixXd (LabeledDigraph<PreciseType, double>::*)(const int, const SummationMethod)>(
+                &LabeledDigraph<PreciseType, double>::getSpanningForestMatrix
+            ),
             py::arg("k"),
             py::arg("method") = SummationMethod::NaiveSummation
         )
