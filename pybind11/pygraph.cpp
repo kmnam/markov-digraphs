@@ -13,7 +13,6 @@
  *     12/7/2021
  */
 
-using namespace Eigen; 
 namespace py = pybind11;
 
 // MANTISSA_PRECISION is a parameter to be defined at compile-time 
@@ -68,7 +67,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("method") = SummationMethod::NaiveSummation
         )
         .def("get_spanning_forest_matrix",
-            static_cast<MatrixXd (LabeledDigraph<PreciseType, double>::*)(const int, const SummationMethod)>(
+            static_cast<Eigen::MatrixXd (LabeledDigraph<PreciseType, double>::*)(const int, const SummationMethod)>(
                 &LabeledDigraph<PreciseType, double>::getSpanningForestMatrix
             ),
             py::arg("k"),
