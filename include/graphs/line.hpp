@@ -6,7 +6,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     12/5/2021
+ *     12/7/2021
  */
 
 #ifndef LINE_LABELED_DIGRAPH_HPP
@@ -14,7 +14,6 @@
 
 #include <sstream>
 #include <cstdarg>
-#include <array>
 #include <vector>
 #include <utility>
 #include <stdexcept>
@@ -27,21 +26,21 @@
  * we have `this->numnodes == this->N + 1`.
  *
  * Additional methods implemented for this graph include: 
- * - `getUpperExitProb<U>(U, U)`: compute the *splitting probability* of exiting
+ * - `getUpperExitProb()`: compute the *splitting probability* of exiting
  *   the graph through `this->N` (reaching an auxiliary upper exit node),
  *   and not through `0` (reaching an auxiliary lower exit node). 
- * - `getUpperExitRate<U>(U)`: compute the reciprocal of the *unconditional mean
- *   first-passage time* to exiting the graph through `this->N`, given that
- *   the exit rate from `0` is zero. 
- * - `getLowerExitRate<U>(U)`: compute the reciprocal of the *unconditional mean
+ * - `getUpperExitRate(IOType)`: compute the reciprocal of the *unconditional
+ *   mean first-passage time* to exiting the graph through `this->N`, given
+ *   that the exit rate from `0` is zero. 
+ * - `getLowerExitRate()`: compute the reciprocal of the *unconditional mean
  *   first-passage time* to exiting the graph through `0`, given that the 
  *   exit rate from `this->N` is zero. 
- * - `getUpperExitRate<U>(U, U)`: compute the reciprocal of the *conditional mean 
- *   first-passage time* to exiting the graph through `this->N`, given that
+ * - `getUpperExitRate(IOType, IOType)`: compute the reciprocal of the *conditional
+ *   mean first-passage time* to exiting the graph through `this->N`, given that
  *   (1) both exit rates are nonzero and (2) exit through `this->N` does occur. 
  */
-template <typename T>
-class LineGraph : public LabeledDigraph<T>
+template <typename InternalType, typename IOType = InternalType>
+class LineGraph : public LabeledDigraph<InternalType, IOType>
 {
     private:
         /**
@@ -51,16 +50,17 @@ class LineGraph : public LabeledDigraph<T>
 
         /**
          * Vector of edge labels that grows with the length of the graph. 
-         * The i-th array stores the labels for the edges i -> i+1 and i+1 -> i.
+         * The i-th pair stores the labels for the edges i -> i+1 and i+1 -> i.
          */
-        std::vector<std::array<T, 2> > line_labels;
+        std::vector<std::pair<InternalType, InternalType> > line_labels;
 
         /**
          * Add a node to the graph with the given ID, and return a pointer
          * to the new node.
          *
-         * A convenient private version of the parent method `LabeledDigraph<T>::addNode()`, 
-         * so that any call to `LineGraph<T>::addNode()` throws an exception.  
+         * A convenient private version of the parent method
+         * `LabeledDigraph<...>::addNode()`, so that any call to
+         * `LineGraph<...>::addNode()` throws an exception.  
          *
          * @param id ID for new node. 
          * @returns  A pointer to new node. 
@@ -75,7 +75,7 @@ class LineGraph : public LabeledDigraph<T>
             Node* node = new Node(id);
             this->order.push_back(node); 
             this->nodes[id] = node;
-            this->edges.emplace(node, std::unordered_map<Node*, T>());
+            this->edges.emplace(node, std::unordered_map<Node*, InternalType>());
             this->numnodes++;
             return node;
         }
@@ -86,15 +86,16 @@ class LineGraph : public LabeledDigraph<T>
          * If either ID does not correspond to a node in the graph, this function
          * instantiates these nodes.
          *
-         * A convenient private version of the parent method `LabeledDigraph<T>::addEdge()`,
-         * so that any call to `LineGraph<T>::addEdge()` throws an exception.  
+         * A convenient private version of the parent method
+         * `LabeledDigraph<...>::addEdge()`, so that any call to
+         * `LineGraph<...>::addEdge()` throws an exception.  
          *
          * @param source_id ID of source node of new edge. 
          * @param target_id ID of target node of new edge. 
          * @param label     Label on new edge.
          * @throws std::runtime_error if the edge already exists. 
          */
-        void __addEdge(std::string source_id, std::string target_id, T label = 1)
+        void __addEdge(std::string source_id, std::string target_id, IOType label = 1)
         {
             // Look for the two nodes
             Node* source = this->getNode(source_id);
@@ -105,7 +106,7 @@ class LineGraph : public LabeledDigraph<T>
             if (source != nullptr && target != nullptr &&
                 this->edges[source].find(target) != this->edges[source].end())
             {
-                throw std::runtime_error("Edge already exists; use LabeledDigraph<T>::setEdgeLabel() to change label");
+                throw std::runtime_error("Edge already exists; use LabeledDigraph<...>::setEdgeLabel() to change label");
             }
 
             // If the nodes do not exist, then add the nodes  
@@ -115,16 +116,15 @@ class LineGraph : public LabeledDigraph<T>
                 target = this->addNode(target_id);
 
             // Then define the edge
-            this->edges[source][target] = label;
+            this->edges[source][target] = static_cast<InternalType>(label);
         }
-
 
     public:
         /**
          * Constructor for a line graph of length 1, i.e., a single vertex
          * named "0".
          */
-        LineGraph() : LabeledDigraph<T>()
+        LineGraph() : LabeledDigraph<InternalType, IOType>()
         {
             this->__addNode("0");
             this->N = 0; 
@@ -137,10 +137,10 @@ class LineGraph : public LabeledDigraph<T>
          * @param N Length of desired line graph; `this->N` is set to `N`, and 
          *          `this->numnodes` to `N + 1`. 
          */
-        LineGraph(unsigned N) : LabeledDigraph<T>()
+        LineGraph(unsigned N) : LabeledDigraph<InternalType, IOType>()
         {
             // Add the zeroth node
-            Node* node = this->__addNode("0");
+            this->__addNode("0");
 
             for (unsigned i = 0; i < N; ++i)
             {
@@ -148,14 +148,14 @@ class LineGraph : public LabeledDigraph<T>
                 std::stringstream ssi, ssj;
                 ssi << i;
                 ssj << i + 1;
-                node = this->__addNode(ssj.str());
+                this->__addNode(ssj.str());
 
                 // Add edges i -> i+1 and i+1 -> i with labels set to unity 
                 this->__addEdge(ssi.str(), ssj.str());
                 this->__addEdge(ssj.str(), ssi.str());
 
                 // Separately keep track of edge labels
-                std::array<T, 2> labels = {1, 1};
+                std::pair<InternalType, InternalType> labels = {1, 1};
                 this->line_labels.push_back(labels);
             }
             this->N = N; 
@@ -174,20 +174,25 @@ class LineGraph : public LabeledDigraph<T>
          *
          * @param labels A pair of edge labels, forward edge then reverse edge.  
          */
-        void addNodeToEnd(std::array<T, 2> labels)
+        void addNodeToEnd(std::pair<IOType, IOType> labels)
         {
             // Add new node (N+1, with N not yet incremented) to end of graph 
             std::stringstream ssi, ssj;
             ssi << this->N;
             ssj << this->N + 1;
-            Node* node = this->__addNode(ssj.str());
+            this->__addNode(ssj.str());
 
             // Add edges N -> N+1 and N+1 -> N (with N not yet incremented)
-            this->__addEdge(ssi.str(), ssj.str(), labels[0]);
-            this->__addEdge(ssj.str(), ssi.str(), labels[1]);
+            this->__addEdge(ssi.str(), ssj.str(), labels.first);
+            this->__addEdge(ssj.str(), ssi.str(), labels.second);
 
             // Separately keep track of the new edge labels  
-            this->line_labels.push_back(labels);
+            this->line_labels.emplace_back(
+                std::make_pair(
+                    static_cast<InternalType>(labels.first),
+                    static_cast<InternalType>(labels.second)
+                )
+            );
 
             // Increment N 
             this->N++; 
@@ -217,7 +222,7 @@ class LineGraph : public LabeledDigraph<T>
             // Run through and delete all edges with N as target 
             for (auto&& v : this->edges)
             {
-                // v.first of type Node*, v.second of type std::unordered_map<Node*, T>
+                // v.first of type Node*, v.second of type std::unordered_map<Node*, InternalType>
                 for (auto it = v.second.begin(); it != v.second.end(); ++it)
                 {
                     if (it->first == node)
@@ -240,7 +245,7 @@ class LineGraph : public LabeledDigraph<T>
            
             // Delete the heap-allocated Node itself 
             delete node;
-            this->nodes.erase(id);
+            this->nodes.erase(ss.str());
             this->numnodes--;
 
             // Remove the last pair of edge labels
@@ -259,7 +264,7 @@ class LineGraph : public LabeledDigraph<T>
          */
         Node* addNode(std::string id)
         {
-            throw std::runtime_error("LabeledDigraph<T>::addNode() cannot be called; use LineGraph<T>::addNodeFromEnd()");
+            throw std::runtime_error("LabeledDigraph<...>::addNode() cannot be called; use LineGraph<...>::addNodeFromEnd()");
             return nullptr; 
         }
 
@@ -272,7 +277,7 @@ class LineGraph : public LabeledDigraph<T>
          */
         void removeNode(std::string id)
         {
-            throw std::runtime_error("LabeledDigraph<T>::removeNode() cannot be called; use LineGraph<T>::removeNodeFromEnd()"); 
+            throw std::runtime_error("LabeledDigraph<...>::removeNode() cannot be called; use LineGraph<...>::removeNodeFromEnd()"); 
         }
 
         /**
@@ -286,9 +291,9 @@ class LineGraph : public LabeledDigraph<T>
          * @param label     Label on new edge (to match signature with parent method).
          * @throws std::runtime_error if invoked at all. 
          */
-        void addEdge(std::string source_id, std::string target_id, T label = 1)
+        void addEdge(std::string source_id, std::string target_id, IOType label = 1)
         {
-            throw std::runtime_error("LabeledDigraph<T>::addEdge() cannot be called; use LineGraph<T>::addNodeToEnd()"); 
+            throw std::runtime_error("LabeledDigraph<...>::addEdge() cannot be called; use LineGraph<...>::addNodeToEnd()"); 
         }
 
         /**
@@ -303,7 +308,7 @@ class LineGraph : public LabeledDigraph<T>
          */
         void removeEdge(std::string source_id, std::string target_id)
         {
-            throw std::runtime_error("LabeledDigraph<T>::removeEdge() cannot be called; use LineGraph<T>::removeNodeFromEnd()"); 
+            throw std::runtime_error("LabeledDigraph<...>::removeEdge() cannot be called; use LineGraph<...>::removeNodeFromEnd()"); 
         }
 
         /**
@@ -313,14 +318,15 @@ class LineGraph : public LabeledDigraph<T>
          * @param i      Index of edge labels to update. 
          * @param labels A pair of edge labels, i -> i+1 then i+1 -> i. 
          */
-        void setEdgeLabels(const unsigned i, std::array<T, 2> labels)
+        void setEdgeLabels(const unsigned i, std::pair<IOType, IOType> labels)
         {
             std::stringstream ssi, ssj;
             ssi << i;
             ssj << i + 1;
-            this->setEdgeLabel(ssi.str(), ssj.str(), labels[0]);
-            this->setEdgeLabel(ssj.str(), ssi.str(), labels[1]);
-            this->line_labels[i] = labels;
+            this->setEdgeLabel(ssi.str(), ssj.str(), labels.first);
+            this->setEdgeLabel(ssj.str(), ssi.str(), labels.second);
+            this->line_labels[i].first = static_cast<InternalType>(labels.first);
+            this->line_labels[i].second = static_cast<InternalType>(labels.second); 
         }
 
         /**
@@ -333,24 +339,25 @@ class LineGraph : public LabeledDigraph<T>
          * @param upper_exit_rate Rate of exit through the upper node (`this->N`).
          * @returns               Probability of exit from `0` through `this->N`.
          */
-        template <typename U = T> 
-        U getUpperExitProb(U lower_exit_rate, U upper_exit_rate) 
+        IOType getUpperExitProb(IOType lower_exit_rate, IOType upper_exit_rate) 
         {   
-            // Start with label(N -> N-1) / label(N -> exit), then add one 
-            U invprob = static_cast<U>(this->line_labels[this->N-1][1]) / upper_exit_rate; 
+            // Start with label(N -> N-1) / label(N -> exit), then add one
+            InternalType _lower_exit_rate = static_cast<InternalType>(lower_exit_rate);
+            InternalType _upper_exit_rate = static_cast<InternalType>(upper_exit_rate); 
+            InternalType invprob = this->line_labels[this->N-1].second / _upper_exit_rate; 
             invprob += 1;  
             for (int i = this->N - 1; i > 0; --i)
             {
                 // Multiply by label(i -> i-1) / label(i -> i+1) then add one
                 // for i = N-1, ..., 1
-                invprob *= (static_cast<U>(this->line_labels[i-1][1]) / static_cast<U>(this->line_labels[i][0])); 
+                invprob *= (this->line_labels[i-1].second / this->line_labels[i].first); 
                 invprob += 1; 
             }
             // Finally multiply by label(0 -> exit) / label(0 -> 1), then add one
-            invprob *= lower_exit_rate / static_cast<U>(this->line_labels[0][0]);
+            invprob *= (_lower_exit_rate / this->line_labels[0].first);
             invprob += 1; 
 
-            return 1 / invprob;  
+            return static_cast<IOType>(1 / invprob);  
         }
 
         /**
@@ -363,22 +370,22 @@ class LineGraph : public LabeledDigraph<T>
          * @returns               Reciprocal of mean first-passage time from
          *                        `0` to exit through `this->N`. 
          */
-        template <typename U = T>
-        U getUpperExitRate(U upper_exit_rate)
+        IOType getUpperExitRate(IOType upper_exit_rate)
         {
             // Start with label(1 -> 0) / label(0 -> 1), then add one 
-            U invrate = static_cast<U>(this->line_labels[0][1]) / static_cast<U>(this->line_labels[0][0]); 
+            InternalType _upper_exit_rate = static_cast<InternalType>(upper_exit_rate); 
+            invrate = this->line_labels[0].second / this->line_labels[0].first;  
             invrate += 1; 
             for (int i = 1; i < this->N; ++i)
             {
                 // Multiply by label(i+1 -> i) / label(i -> i+1) then add one
                 // for i = 1, ..., N-1
-                invrate *= (static_cast<U>(this->line_labels[i][1]) / static_cast<U>(this->line_labels[i][0]));
+                invrate *= (this->line_labels[i].second / this->line_labels[i].first);
                 invrate += 1; 
             }
 
             // Finally divide by label(N -> exit) and take the reciprocal
-            return upper_exit_rate / invrate; 
+            return static_cast<IOType>(_upper_exit_rate / invrate);  
         }
 
         /**
@@ -391,22 +398,22 @@ class LineGraph : public LabeledDigraph<T>
          * @returns               Reciprocal of mean first-passage time from
          *                        `0` to exit through `0`.   
          */
-        template <typename U = T>
-        U getLowerExitRate(U lower_exit_rate)
+        IOType getLowerExitRate(IOType lower_exit_rate)
         {
-            // Start with label(N-1 -> N) / label(N -> N-1), then add one 
-            U invrate = static_cast<U>(this->line_labels[this->N-1][0]) / static_cast<U>(this->line_labels[this->N-1][1]);
+            // Start with label(N-1 -> N) / label(N -> N-1), then add one
+            InternalType _lower_exit_rate = static_cast<InternalType>(lower_exit_rate); 
+            InternalType invrate = this->line_labels[this->N-1].first / this->line_labels[this->N-1].second;
             invrate += 1; 
             for (int i = this->N - 2; i >= 0; --i)
             {
                 // Multiply by label(i -> i+1) / label(i+1 -> i) then add one
                 // for i = N-2, ..., 0
-                invrate *= (static_cast<U>(this->line_labels[i][0]) / static_cast<U>(this->line_labels[i][1]));
+                invrate *= (this->line_labels[i].first / this->line_labels[i].second);
                 invrate += 1; 
             }
 
             // Finally divide by label(0 -> exit) and take the reciprocal
-            return lower_exit_rate / invrate;  
+            return static_cast<IOType>(_lower_exit_rate / invrate);  
         }
 
         /**
@@ -420,11 +427,10 @@ class LineGraph : public LabeledDigraph<T>
          * @returns               Reciprocal of conditional mean first-passage
          *                        time from `0` to exit through `this->N`.
          */
-        template <typename U = T>
-        U getUpperExitRate(U lower_exit_rate, U upper_exit_rate) 
+        IOType getUpperExitRate(IOType lower_exit_rate, IOType upper_exit_rate) 
         {
             // Initialize the two recurrences for the numerator
-            std::vector<U> recur1, recur2;
+            std::vector<InternalType> recur1, recur2;
             for (unsigned i = 0; i <= this->N; ++i)
             {
                 recur1.push_back(1); 
@@ -432,27 +438,29 @@ class LineGraph : public LabeledDigraph<T>
             }
 
             // Running product of label(N -> exit), label(N-1 -> N), label(N-2 -> N-1), ...
-            U prod1 = upper_exit_rate;
+            InternalType _upper_exit_rate = static_cast<InternalType>(upper_exit_rate); 
+            InternalType prod1 = _upper_exit_rate;
 
             // Running product of label(0 -> exit), label(1 -> 0), label(2 -> 1), ...
-            U prod2 = lower_exit_rate;
+            InternalType _lower_exit_rate = static_cast<InternalType>(lower_exit_rate); 
+            InternalType prod2 = _lower_exit_rate;
 
             // Apply first recurrence for i = N-1: multiply by label(N -> N-1), then add label(N -> exit)
-            recur1[this->N-1] = static_cast<U>(this->line_labels[this->N-1][1]) + prod1;
+            recur1[this->N-1] = this->line_labels[this->N-1].second + prod1;
 
             // Apply second recurrence for i = 1: multiply by label(0 -> 1), then add label(0 -> exit)
-            recur2[1] = static_cast<U>(this->line_labels[0][0]) + prod2;  
+            recur2[1] = this->line_labels[0].first + prod2;  
 
             // Apply the first recurrence for i = N-2, ..., 0, keeping track of 
             // each term in the recurrence
             for (int i = this->N - 2; i >= 0; ++i)
             {
                 // Multiply by label(i+1 -> i)
-                recur1[i] = recur1[i+1] * static_cast<U>(this->line_labels[i][1]); 
+                recur1[i] = recur1[i+1] * this->line_labels[i].second;  
 
                 // Then add the product of label(i+1 -> i+2), ..., label(N-1 -> N),
                 // label(N -> exit)
-                prod1 *= static_cast<U>(this->line_labels[i+1][0]);     // rhs == label(i+1 -> i+2)
+                prod1 *= this->line_labels[i+1].first;     // rhs == label(i+1 -> i+2)
                 recur1[i] += prod1; 
             }
 
@@ -461,31 +469,31 @@ class LineGraph : public LabeledDigraph<T>
             for (int i = 2; i <= this->N; ++i)
             {
                 // Multiply by label(i-1 -> i)
-                recur2[i] = recur2[i-1] * static_cast<U>(this->line_labels[i-1][0]);
+                recur2[i] = recur2[i-1] * this->line_labels[i-1].first;
 
                 // Then add the product of label(0 -> exit), label(1 -> 0),
                 // ..., label(i-1 -> i-2)
-                prod2 *= static_cast<U>(this->line_labels[i-2][1]);     // rhs == label(i-1 -> i-2) 
+                prod2 *= this->line_labels[i-2].second;    // rhs == label(i-1 -> i-2) 
                 recur2[i] += prod2; 
             }
 
             // Apply the second recurrence once more to obtain the denominator: 
             // multiply by label(N -> exit) ... 
-            U denom = recur2[this->N] * upper_exit_rate;
+            InternalType denom = recur2[this->N] * _upper_exit_rate;
 
             // ... then add the product of label(0 -> exit), label(1 -> 0), ...,
             // label(N -> N-1)
-            prod2 *= static_cast<U>(this->line_labels[this->N-1][1]);   // rhs == label(N -> N-1)
+            prod2 *= this->line_labels[this->N-1].second;   // rhs == label(N -> N-1)
             denom += prod2;  
 
             // Compute the numerator
-            U numer = recur1[0] + recur2[0]; 
+            InternalType numer = recur1[0] + recur2[0]; 
             for (int i = 1; i <= this->N; ++i)
                 numer += (recur1[i] * recur2[i]); 
 
             // Now give the reciprocal of the mean first-passage time (i.e., 
             // denominator / numerator) 
-            return denom / numer; 
+            return static_cast<IOType>(denom / numer);  
         }
 };
 
