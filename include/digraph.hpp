@@ -5,7 +5,7 @@
  *  Author:
  *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *  Last updated: 
- *      12/7/2021 
+ *      12/8/2021 
  *
  *  \mainpage MarkovDigraphs 
  *
@@ -374,16 +374,15 @@ using Edge = std::pair<Node*, Node*>;
 /**
  * An implementation of a labeled digraph.
  *
- * This class has two template parameters, `InternalType` and `IOType`
+ * This class has two template parameters, `InternalType` and `IOType`:
  * - `InternalType` is the scalar type used to store all edge labels and
  *   perform mathematical calculations involving the row and column Laplacian
  *   matrices.
  * - `IOType` is the scalar type used for input values to public methods
  *   (`addEdge()` and `setEdgeLabel()`) and output values from public methods
- *   (`getEdgeLabel()` and all mathematical methods). `IOType` is set to be
- *   the same as `InternalType` if not directly specified.  
+ *   (`getEdgeLabel()` and all mathematical methods).  
  */
-template <typename InternalType, typename IOType = InternalType>
+template <typename InternalType, typename IOType>
 class LabeledDigraph
 {
     protected:
@@ -452,9 +451,9 @@ class LabeledDigraph
 
             // Check that both nodes exist 
             if (source == nullptr)
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
             if (target == nullptr)
-                throw std::runtime_error("Specified target node does not exist; use LabeledDigraph<T>::addNode() to add node");
+                throw std::runtime_error("Specified target node does not exist; use LabeledDigraph<...>::addNode() to add node");
 
             // Check that the edge exists 
             auto it = this->edges[source].find(target);
@@ -514,7 +513,7 @@ class LabeledDigraph
 
             // Check that the given node exists
             if (source == nullptr)
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
 
             // Run through all nodes in this->order ...
             for (auto&& node : this->order)
@@ -547,7 +546,7 @@ class LabeledDigraph
 
             // Check that the given node exists
             if (source == nullptr)
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
 
             // Run through all nodes in this->order ...
             for (auto&& node : this->order)
@@ -972,7 +971,7 @@ class LabeledDigraph
             // Check that a node with the given id exists
             Node* node = this->getNode(id);
             if (node == nullptr)
-                throw std::runtime_error("Specified node does not exist; use LabeledDigraph<T>::addNode() to add node");
+                throw std::runtime_error("Specified node does not exist; use LabeledDigraph<...>::addNode() to add node");
 
             // Find and delete node in this->order
             for (auto it = this->order.begin(); it != this->order.end(); ++it)
@@ -990,7 +989,7 @@ class LabeledDigraph
             // Run through and delete all edges with given node as target 
             for (auto&& v : this->edges)
             {
-                // v.first of type Node*, v.second of type std::unordered_map<Node*, T>
+                // v.first of type Node*, v.second of type std::unordered_map<Node*, InternalType>
                 for (auto it = v.second.begin(); it != v.second.end(); ++it)
                 {
                     if (it->first == node)
@@ -1065,19 +1064,19 @@ class LabeledDigraph
             if (source != nullptr && target != nullptr &&
                 this->edges[source].find(target) != this->edges[source].end())
             {
-                throw std::runtime_error("Edge already exists; use LabeledDigraph<T>::setEdgeLabel() to change label");
+                throw std::runtime_error("Edge already exists; use LabeledDigraph<...>::setEdgeLabel() to change label");
             }
 
             // If the nodes do not exist, then add the nodes  
             if (source == nullptr)
             {
                 this->addNode(source_id);
-                source = this->getNode(source_id); 
+                source = this->nodes[source_id]; 
             }
             if (target == nullptr)
             {
                 this->addNode(target_id); 
-                target = this->getNode(target_id); 
+                target = this->nodes[target_id]; 
             }
 
             // Then define the edge
@@ -1101,9 +1100,9 @@ class LabeledDigraph
 
             // Check that both nodes exist 
             if (source == nullptr)
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
             if (target == nullptr)
-                throw std::runtime_error("Specified target node does not exist; use LabeledDigraph<T>::addNode() to add node");
+                throw std::runtime_error("Specified target node does not exist; use LabeledDigraph<...>::addNode() to add node");
 
             // Does the given edge exist? 
             if (this->edges[source].find(target) != this->edges[source].end())
@@ -1675,7 +1674,7 @@ class LabeledDigraph
             Node* target = this->getNode(target_id);
             if (target == nullptr)
             {
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
             }
             int t = 0;  
             for (auto it = this->order.begin(); it != this->order.end(); ++it)
@@ -1768,7 +1767,8 @@ class LabeledDigraph
          * @param method    Summation method. 
          * @returns Vector of mean first-passage times to the target node from
          *          every node in the graph.
-         * @throws std::invalid_argument if summation method is not recognized.  
+         * @throws std::invalid_argument if summation method is not recognized.
+         * @throws std::runtime_error    if target node does not exist. 
          */
         Matrix<IOType, Dynamic, 1> getMeanFirstPassageTimesFromRecurrence(std::string target_id,
                                                                           const bool sparse,
@@ -1777,7 +1777,7 @@ class LabeledDigraph
             Node* target = this->getNode(target_id);
             if (target == nullptr)
             {
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
             }
 
             // Compute the required spanning forest matrices ...
@@ -1912,7 +1912,8 @@ class LabeledDigraph
          *                  time vector. 
          * @returns Vector of first-passage time second moments to the target
          *          node from every node in the graph.
-         * @throws std::invalid_argument if solver method is not recognized.  
+         * @throws std::invalid_argument if solver method is not recognized.
+         * @throws std::runtime_error    if target node does not exist. 
          */
         Matrix<IOType, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromSolver(std::string target_id, 
                                                                                  const SolverMethod method = QRDecomposition)
@@ -1921,7 +1922,7 @@ class LabeledDigraph
             Node* target = this->getNode(target_id);
             if (target == nullptr)
             {
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
             }
             int t = 0;  
             for (auto it = this->order.begin(); it != this->order.end(); ++it)
@@ -2014,7 +2015,8 @@ class LabeledDigraph
          * @param method    Summation method. 
          * @returns Vector of first-passage time second moments to the target
          *          node from every node in the graph.
-         * @throws std::invalid_argument if summation method is not recognized. 
+         * @throws std::invalid_argument if summation method is not recognized.
+         * @throws std::runtime_error    if target node does not exist. 
          */
         Matrix<IOType, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromRecurrence(std::string target_id,
                                                                                      const bool sparse,
@@ -2023,7 +2025,7 @@ class LabeledDigraph
             Node* target = this->getNode(target_id);
             if (target == nullptr)
             {
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<T>::addNode() to add node");
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
             }
 
             // Compute the required spanning forest matrices ...
