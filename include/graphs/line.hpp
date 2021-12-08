@@ -6,7 +6,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     12/7/2021
+ *     12/8/2021
  */
 
 #ifndef LINE_LABELED_DIGRAPH_HPP
@@ -39,13 +39,11 @@
  *   mean first-passage time* to exiting the graph through `this->N`, given that
  *   (1) both exit rates are nonzero and (2) exit through `this->N` does occur. 
  */
-template <typename InternalType, typename IOType = InternalType>
+template <typename InternalType, typename IOType>
 class LineGraph : public LabeledDigraph<InternalType, IOType>
 {
     private:
-        /**
-         * Index of the last node, N; one less than the number of nodes. 
-         */
+        /** Index of the last node, N; one less than the number of nodes. */ 
         int N;
 
         /**
@@ -60,7 +58,7 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
          *
          * A convenient private version of the parent method
          * `LabeledDigraph<...>::addNode()`, so that any call to
-         * `LineGraph<...>::addNode()` throws an exception.  
+         * `LineGraph<...>::addNode()` throws an exception (see below).  
          *
          * @param id ID for new node. 
          * @returns  A pointer to new node. 
@@ -88,7 +86,7 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
          *
          * A convenient private version of the parent method
          * `LabeledDigraph<...>::addEdge()`, so that any call to
-         * `LineGraph<...>::addEdge()` throws an exception.  
+         * `LineGraph<...>::addEdge()` throws an exception (see below).  
          *
          * @param source_id ID of source node of new edge. 
          * @param target_id ID of target node of new edge. 
@@ -111,9 +109,9 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
 
             // If the nodes do not exist, then add the nodes  
             if (source == nullptr)
-                source = this->addNode(source_id);
+                source = this->__addNode(source_id);
             if (target == nullptr)
-                target = this->addNode(target_id);
+                target = this->__addNode(target_id);
 
             // Then define the edge
             this->edges[source][target] = static_cast<InternalType>(label);
@@ -140,19 +138,20 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
         LineGraph(unsigned N) : LabeledDigraph<InternalType, IOType>()
         {
             // Add the zeroth node
-            this->__addNode("0");
+            Node* node = this->__addNode("0");
+            Node* next; 
 
             for (unsigned i = 0; i < N; ++i)
             {
                 // Add the (i+1)-th node
-                std::stringstream ssi, ssj;
-                ssi << i;
-                ssj << i + 1;
-                this->__addNode(ssj.str());
+                std::stringstream ss;
+                ss << i + 1;
+                next = this->__addNode(ss.str());
 
                 // Add edges i -> i+1 and i+1 -> i with labels set to unity 
-                this->__addEdge(ssi.str(), ssj.str());
-                this->__addEdge(ssj.str(), ssi.str());
+                this->edges[node][next] = 1; 
+                this->edges[next][node] = 1;
+                node = next; 
 
                 // Separately keep track of edge labels
                 std::pair<InternalType, InternalType> labels = {1, 1};
@@ -180,19 +179,17 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
             std::stringstream ssi, ssj;
             ssi << this->N;
             ssj << this->N + 1;
-            this->__addNode(ssj.str());
+            Node* node = this->nodes[ssi.str()]; 
+            Node* next = this->__addNode(ssj.str());
 
             // Add edges N -> N+1 and N+1 -> N (with N not yet incremented)
-            this->__addEdge(ssi.str(), ssj.str(), labels.first);
-            this->__addEdge(ssj.str(), ssi.str(), labels.second);
+            InternalType _label1 = static_cast<InternalType>(labels.first);
+            InternalType _label2 = static_cast<InternalType>(labels.second);
+            this->edges[node][next] = _label1;
+            this->edges[next][node] = _label2;
 
             // Separately keep track of the new edge labels  
-            this->line_labels.emplace_back(
-                std::make_pair(
-                    static_cast<InternalType>(labels.first),
-                    static_cast<InternalType>(labels.second)
-                )
-            );
+            this->line_labels.emplace_back(std::make_pair(_label1, _label2));
 
             // Increment N 
             this->N++; 
@@ -206,45 +203,29 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
          */
         void removeNodeFromEnd()
         {
-            // Throw an exception if N == 0, in which case removal is impossible
+            // Throw an exception if N == 0, in which case removal is disallowed
             if (this->N == 0)
                 throw std::runtime_error("Line graph cannot be empty");
 
             // Delete N from this->order
             this->order.pop_back(); 
 
-            // Run through and delete all edges with N as source
+            // Delete all edges with N as source (namely N -> N-1)
             std::stringstream ss; 
             ss << this->N; 
-            Node* node = this->getNode(ss.str()); 
+            Node* node = this->nodes[ss.str()];
             this->edges[node].clear();
 
-            // Run through and delete all edges with N as target 
-            for (auto&& v : this->edges)
-            {
-                // v.first of type Node*, v.second of type std::unordered_map<Node*, InternalType>
-                for (auto it = v.second.begin(); it != v.second.end(); ++it)
-                {
-                    if (it->first == node)
-                    {
-                        (v.second).erase(it);
-                        break;
-                    }
-                } 
-            }
+            // Remove the edge N-1 -> N
+            ss.str(std::string()); 
+            ss << this->N - 1; 
+            Node* prev = this->nodes[ss.str()];
+            this->edges[prev].erase(node); 
 
-            // Erase N from this->edges 
-            for (auto it = this->edges.begin(); it != this->edges.end(); ++it)
-            {
-                if (it->first == node)
-                {
-                    this->edges.erase(it);
-                    break;
-                }
-            }
-           
-            // Delete the heap-allocated Node itself 
+            // Delete the heap-allocated Node itself
             delete node;
+            ss.str(std::string()); 
+            ss << this->N; 
             this->nodes.erase(ss.str());
             this->numnodes--;
 
@@ -262,10 +243,13 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
          * @param id ID of node to be added (to match signature with parent method). 
          * @throws std::runtime_error if invoked at all. 
          */
-        Node* addNode(std::string id)
+        void addNode(std::string id)
         {
-            throw std::runtime_error("LabeledDigraph<...>::addNode() cannot be called; use LineGraph<...>::addNodeFromEnd()");
-            return nullptr; 
+            throw std::runtime_error(
+                "LabeledDigraph<...>::addNode() cannot be called; "
+                "use LineGraph<...>::addNodeToEnd() to successively add "
+                "adjacent nodes and the edges between them"
+            );
         }
 
         /**
@@ -277,7 +261,11 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
          */
         void removeNode(std::string id)
         {
-            throw std::runtime_error("LabeledDigraph<...>::removeNode() cannot be called; use LineGraph<...>::removeNodeFromEnd()"); 
+            throw std::runtime_error(
+                "LabeledDigraph<...>::removeNode() cannot be called; "
+                "use LineGraph<...>::removeNodeFromEnd() to successively "
+                "remove adjacent nodes and the edges between them"
+            ); 
         }
 
         /**
@@ -293,7 +281,11 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
          */
         void addEdge(std::string source_id, std::string target_id, IOType label = 1)
         {
-            throw std::runtime_error("LabeledDigraph<...>::addEdge() cannot be called; use LineGraph<...>::addNodeToEnd()"); 
+            throw std::runtime_error(
+                "LabeledDigraph<...>::addEdge() cannot be called; "
+                "use LineGraph<...>::addNodeToEnd() to successively add "
+                "adjacent nodes and the edges between them"
+            ); 
         }
 
         /**
@@ -308,7 +300,36 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
          */
         void removeEdge(std::string source_id, std::string target_id)
         {
-            throw std::runtime_error("LabeledDigraph<...>::removeEdge() cannot be called; use LineGraph<...>::removeNodeFromEnd()"); 
+            throw std::runtime_error(
+                "LabeledDigraph<...>::removeEdge() cannot be called; "
+                "use LineGraph<...>::removeNodeFromEnd() to successively "
+                "remove adjacent nodes and the edges between them"
+            ); 
+        }
+
+        /**
+         * Ban clearing via `clear()`: the graph must be non-empty. 
+         *
+         * @throws std::runtime_error if invoked at all. 
+         */
+        void clear()
+        {
+            throw std::runtime_error(
+                "LabeledDigraph<...>::clear() cannot be called; use "
+                "LineGraph<...>::reset() to remove all nodes but 0"
+            ); 
+        }
+
+        /**
+         * Remove all nodes and edges but 0. 
+         */
+        void reset()
+        {
+            // Clear the graph first, then add 0 back in 
+            this->LabeledDigraph<InternalType, IOType>::clear();
+            this->__addNode("0");
+            this->N = 0;
+            this->line_labels.clear();  
         }
 
         /**
@@ -320,13 +341,22 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
          */
         void setEdgeLabels(const unsigned i, std::pair<IOType, IOType> labels)
         {
+            // Find the i-th and (i+1)-th nodes
             std::stringstream ssi, ssj;
             ssi << i;
             ssj << i + 1;
-            this->setEdgeLabel(ssi.str(), ssj.str(), labels.first);
-            this->setEdgeLabel(ssj.str(), ssi.str(), labels.second);
-            this->line_labels[i].first = static_cast<InternalType>(labels.first);
-            this->line_labels[i].second = static_cast<InternalType>(labels.second); 
+            Node* node = this->nodes[ssi.str()];
+            Node* next = this->nodes[ssj.str()];
+
+            // Cast the given edge label values to InternalType
+            InternalType _label1 = static_cast<InternalType>(labels.first); 
+            InternalType _label2 = static_cast<InternalType>(labels.second);
+
+            // Update the stored edge labels 
+            this->edges[node][next] = _label1;
+            this->edges[next][node] = _label2;
+            this->line_labels[i].first = _label1;
+            this->line_labels[i].second = _label2;
         }
 
         /**
@@ -374,7 +404,7 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
         {
             // Start with label(1 -> 0) / label(0 -> 1), then add one 
             InternalType _upper_exit_rate = static_cast<InternalType>(upper_exit_rate); 
-            invrate = this->line_labels[0].second / this->line_labels[0].first;  
+            InternalType invrate = this->line_labels[0].second / this->line_labels[0].first;  
             invrate += 1; 
             for (int i = 1; i < this->N; ++i)
             {
