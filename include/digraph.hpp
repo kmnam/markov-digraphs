@@ -1908,8 +1908,8 @@ class LabeledDigraph
          * SCCs) to which the process can travel and get "stuck".
          *
          * @param target_id ID of target node. 
-         * @param method    Linear solver method for computing the second-moment
-         *                  time vector. 
+         * @param method    Linear solver method for computing the vector of 
+         *                  first-passage time second moments.
          * @returns Vector of first-passage time second moments to the target
          *          node from every node in the graph.
          * @throws std::invalid_argument if solver method is not recognized.
