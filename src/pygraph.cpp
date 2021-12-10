@@ -4,6 +4,7 @@
 #include <pybind11/eigen.h>
 #include "../include/digraph.hpp"
 #include "../include/graphs/line.hpp"
+#include "../include/graphs/grid.hpp"
 
 /**
  * Python bindings for the `LabeledDigraph<...>` class through pybind11. 
@@ -11,7 +12,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     12/8/2021
+ *     12/9/2021
  */
 
 namespace py = pybind11;
@@ -38,25 +39,8 @@ PYBIND11_MODULE(pygraph, m)
        :toctree: _generate
 
        PreciseDigraph
-       PreciseDigraph.get_num_nodes
-       PreciseDigraph.add_node
-       PreciseDigraph.remove_node
-       PreciseDigraph.has_node
-       PreciseDigraph.get_all_node_ids
-       PreciseDigraph.add_edge
-       PreciseDigraph.remove_edge
-       PreciseDigraph.has_edge
-       PreciseDigraph.get_edge_label
-       PreciseDigraph.set_edge_label
-       PreciseDigraph.clear 
-       PreciseDigraph.get_laplacian
-       PreciseDigraph.get_spanning_forest_matrix
-       PreciseDigraph.get_steady_state_from_svd
-       PreciseDigraph.get_steady_state_from_recurrence
-       PreciseDigraph.get_mean_first_passage_times_from_solver
-       PreciseDigraph.get_mean_first_passage_times_from_recurrence
-       PreciseDigraph.get_second_moments_of_first_passage_times_from_solver
-       PreciseDigraph.get_second_moments_of_first_passage_times_from_recurrence
+       PreciseLineGraph
+       PreciseGridGraph
 )delim"; 
 
     py::enum_<SummationMethod>(m, "SummationMethod")
@@ -256,7 +240,7 @@ PYBIND11_MODULE(pygraph, m)
             ),
             R"delim(
     Compute the k-th spanning forest matrix, using the recurrence 
-    of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs. 17-18), with
+    of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18), with
     a *dense* Laplacian matrix.
 
     :param k: Index of the desired spanning forest matrix.
@@ -293,7 +277,7 @@ PYBIND11_MODULE(pygraph, m)
             R"delim(
     Compute a vector in the kernel of the Laplacian matrix of the
     graph, normalized by its 1-norm, by the recurrence of Chebotarev
-    and Agaev (Lin Alg Appl, 2002, Eqs. 17-18).
+    and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18).
 
     This vector coincides with the vector of steady-state probabilities
     of the nodes in the Markov process associated with the graph. 
@@ -347,7 +331,7 @@ PYBIND11_MODULE(pygraph, m)
     Compute the vector of *unconditional* mean first-passage times in 
     the Markov process associated with the graph from each node to the
     target node, using the recurrence of Chebotarev and Agaev (Lin Alg
-    Appl, 2002, Eqs. 17-18).
+    Appl, 2002, Eqs.\ 17-18).
 
     This method assumes that the associated Markov process certainly 
     eventually reaches the target node from each node in the graph, 
@@ -403,7 +387,7 @@ PYBIND11_MODULE(pygraph, m)
     Compute the vector of second moments of the *unconditional* first-
     passage times in the Markov process associated with the graph from
     each node to the target node, using the recurrence of Chebotarev
-    and Agaev (Lin Alg Appl, 2002, Eqs. 17-18).
+    and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18).
 
     This method assumes that the associated Markov process certainly
     eventually reaches the target node from each node in the graph,
@@ -432,33 +416,363 @@ PYBIND11_MODULE(pygraph, m)
      * Expose `LineGraph<PreciseType, double>` as `pygraph.PreciseLineGraph`. 
      */
     py::class_<LineGraph<PreciseType, double>, LabeledDigraph<PreciseType, double> >(m, "PreciseLineGraph")
-        .def(py::init<>())
-        .def(py::init<int>())
-        .def("add_node",             &LineGraph<PreciseType, double>::addNode)
-        .def("remove_node",          &LineGraph<PreciseType, double>::removeNode)
-        .def("add_edge",             &LineGraph<PreciseType, double>::addEdge,
+        .def(py::init<>(),
+            R"delim(
+    Constructor for a line graph of length 0, i.e., a single vertex
+    named "0". 
+)delim"
+        )
+        .def(py::init<int>(),
+            R"delim(
+    Constructor for a line graph of given length, with edge labels 
+    set to unity.
+
+    :param N: Length of desired line graph; `self.N` is set to `N`, 
+        and `self.numnodes` to `N + 1`.
+    :type N: int 
+)delim",
+            py::arg("N")
+        )
+        .def("add_node",
+            &LineGraph<PreciseType, double>::addNode,
+            R"delim(
+    Ban node addition via `addNode()`: nodes can be added or removed 
+    only at the upper end of the graph. 
+
+    :param id: ID of node to be added (to match signature with parent
+        method). 
+    :type id: str
+    :raise RuntimeError: If invoked at all.
+)delim",
+            py::arg("id")
+        )
+        .def("remove_node",
+            &LineGraph<PreciseType, double>::removeNode,
+            R"delim(
+    Ban node removal via `removeNode()`: nodes can be added or removed 
+    only at the upper end of the graph.
+
+    :param id: ID of node to be removed (to match signature with parent
+        method).
+    :type id: str
+    :raise RuntimeError: If invoked at all.
+)delim",
+            py::arg("id")
+        )
+        .def("add_edge",
+            &LineGraph<PreciseType, double>::addEdge,
+            R"delim(
+    Ban edge addition via `addEdge()`: edges can be added or removed 
+    only at the upper end of the graph.
+
+    :param source_id: ID of source node of new edge (to match signature
+        with parent method).
+    :type source_id: str
+    :param target_id: ID of target node of new edge (to match signature
+        with parent method).
+    :type target_id: str
+    :param label: Label on new edge (to match signature with parent
+        method).
+    :type label: float
+    :raise RuntimeError: If invoked at all. 
+)delim",
             py::arg("source_id"),
             py::arg("target_id"),
             py::arg("label") = 1
         )
-        .def("remove_edge",          &LineGraph<PreciseType, double>::removeEdge)
-        .def("add_node_to_end",      &LineGraph<PreciseType, double>::addNodeToEnd)
-        .def("remove_node_from_end", &LineGraph<PreciseType, double>::removeNodeFromEnd)
-        .def("get_edge_label",       &LabeledDigraph<PreciseType, double>::getEdgeLabel)
-        .def("set_edge_label",       &LabeledDigraph<PreciseType, double>::setEdgeLabel)
-        .def("set_edge_labels",      &LineGraph<PreciseType, double>::setEdgeLabels)
-        .def("clear",                &LineGraph<PreciseType, double>::clear)
-        .def("reset",                &LineGraph<PreciseType, double>::reset)
-        .def("get_upper_exit_prob",  &LineGraph<PreciseType, double>::getUpperExitProb)
-        .def("get_lower_exit_rate",  &LineGraph<PreciseType, double>::getLowerExitRate)
+        .def("remove_edge",
+            &LineGraph<PreciseType, double>::removeEdge,
+            R"delim(
+    Ban edge removal via `removeEdge()`: edges can be added or removed 
+    only at the upper end of the graph.
+
+    :param source_id: ID of source node of edge to be removed (to match
+        signature with parent method).
+    :type source_id: str
+    :param target_id: ID of target node of edge to be removed (to match
+        signature with parent method).
+    :type target_id: str
+    :raise RuntimeError: If invoked at all.
+)delim",
+            py::arg("source_id"),
+            py::arg("target_id")
+        )
+        .def("add_node_to_end",
+            &LineGraph<PreciseType, double>::addNodeToEnd,
+            R"delim(
+    Add a new node to the end of the graph (along with the two edges), 
+    increasing its length by one.
+
+    :param labels: A pair of edge labels, forward edge then reverse edge.
+    :type labels: tuple of two floats
+)delim",
+            py::arg("labels")
+        )
+        .def("remove_node_from_end",
+            &LineGraph<PreciseType, double>::removeNodeFromEnd,
+            R"delim(
+    Remove the last node (N) from the graph (along with the two edges),
+    decreasing its length by one.
+
+    :raise RuntimeError: If `self.N` is zero.
+)delim"
+        )
+        .def("set_edge_labels",
+            &LineGraph<PreciseType, double>::setEdgeLabels,
+            R"delim(
+    Set the edge labels between the i-th and (i+1)-th nodes (`i -> i+1`
+    then `i+1 -> i`) to the given values.
+
+    :param i: Index of edge labels to update.
+    :type i: int
+    :param labels: A pair of edge labels, `i -> i+1` then `i+1 -> i`.
+    :type labels: tuple of two floats
+)delim",
+            py::arg("i"),
+            py::arg("labels")
+        )
+        .def("clear",
+            &LineGraph<PreciseType, double>::clear,
+            R"delim(
+    Ban clearing via `clear()`: the graph must be non-empty.
+    
+    :raise RuntimeError: If invoked at all.
+)delim"
+        )
+        .def("reset",
+            &LineGraph<PreciseType, double>::reset,
+            R"delim(Remove all nodes and edges but 0.)delim"
+        )
+        .def("get_upper_exit_prob",
+            &LineGraph<PreciseType, double>::getUpperExitProb,
+            R"delim(
+    Compute the probability of exiting the line graph through the upper
+    node, `self.N` (to an auxiliary "upper exit" node), rather than 
+    through the lower node, `0` (to an auxiliary "lower exit" node),
+    starting from `0`.
+
+    :param lower_exit_rate: Rate of exit through the lower node (`0`).
+    :type lower_exit_rate: float
+    :param upper_exit_rate: Rate of exit through the upper node (`self.N`).
+    :type upper_exit_rate: float
+    :return: Probability of exit from `0` through `self.N`.
+    :rtype: float
+)delim",
+            py::arg("lower_exit_rate"),
+            py::arg("upper_exit_rate")
+        )
+        .def("get_lower_exit_rate",
+            &LineGraph<PreciseType, double>::getLowerExitRate,
+            R"delim(
+    Compute the reciprocal of the *unconditional* mean first-passage
+    time to exit from the line graph through the lower node, `0`
+    (to an auxiliary "lower exit" node), starting from `0`, given that
+    exit through the upper node, `self.N`, is impossible. 
+
+    :param lower_exit_rate: Rate of exit through the lower node (`0`).
+    :type lower_exit_rate: float
+    :return: Reciprocal of mean first-passage time from `0` to exit 
+        through `0`. 
+    :rtype: float
+)delim",
+            py::arg("lower_exit_rate")
+        )
         .def("get_upper_exit_rate",
             static_cast<double (LineGraph<PreciseType, double>::*)(double)>(
                 &LineGraph<PreciseType, double>::getUpperExitRate
-            )
+            ),
+            R"delim(
+    Compute the reciprocal of the *unconditional* mean first-passage 
+    time to exit from the line graph through the upper node, `self.N`
+    (to an auxiliary "upper exit" node), starting from `0`, given that
+    exit through the lower node, `0`, is impossible.
+
+    :param upper_exit_rate: Rate of exit through the upper node (`self.N`).
+    :type upper_exit_rate: float
+    :return: Reciprocal of mean first-passage time from `0` to exit 
+        through `self.N`.
+    :rtype: float
+)delim",
+            py::arg("upper_exit_rate")
         )
         .def("get_upper_exit_rate",
             static_cast<double (LineGraph<PreciseType, double>::*)(double, double)>(
                 &LineGraph<PreciseType, double>::getUpperExitRate
-            )
+            ),
+            R"delim(
+    Compute the reciprocal of the *conditional* mean first-passage 
+    time to exit from the line graph through the upper node, `self.N`
+    (to an auxiliary "upper exit" node), starting from `0`, given that
+    exit through the upper node indeed occurs.
+
+    :param lower_exit_rate: Rate of exit through the lower node (`0`).
+    :type lower_exit_rate: float
+    :param upper_exit_rate: Rate of exit through the upper node (`self.N`).
+    :type upper_exit_rate: float
+    :return: Reciprocal of conditional mean first-passage time from `0`
+        to exit through `self.N`.
+    :rtype: float
+)delim",
+            py::arg("lower_exit_rate"),
+            py::arg("upper_exit_rate")
+        );
+
+    /**
+     * Expose `GridGraph<PreciseType, double>` as `pygraph.PreciseGridGraph`. 
+     */
+    py::class_<GridGraph<PreciseType, double>, LabeledDigraph<PreciseType, double> >(m, "PreciseGridGraph")
+        .def(py::init<>(),
+            R"delim(
+    Constructor for a grid graph of length 0, i.e., the two nodes 
+    `A0` and `B0` and the edges between them, with edge labels 
+    set to unity.
+)delim"
+        )
+        .def(py::init<int>(),
+            R"delim(
+    Constructor for a grid graph of given length, with edge labels 
+    set to unity.
+
+    :param N: Length of desired grid graph; `self.N` is set to `N`, 
+        and `self.numnodes` to `2 * N + 2`.
+    :type N: int 
+)delim",
+            py::arg("N")
+        )
+        .def("set_zeroth_labels",
+            &GridGraph<PreciseType, double>::setZerothLabels,
+            R"delim(
+    Set the labels on the edges `A0 -> B0` and `B0 -> A0` to the 
+    given values.
+
+    :param A0_to_B0: Label on `A0 -> B0`.
+    :type A0_to_B0: float
+    :param B0_to_A0: Label on `B0 -> A0`.
+    :type B0_to_A0: float
+)delim",
+            py::arg("A0_to_B0"),
+            py::arg("B0_to_A0")
+        )
+        .def("add_rung_to_end",
+            &GridGraph<PreciseType, double>::addRungToEnd,
+            R"delim(
+    Add a new pair of nodes to the end of the graph (along with the 
+    six new edges), increasing its length by one.
+
+    :param labels: Labels on the six new edges: `A{N} -> A{N+1}`, 
+        `A{N+1} -> A{N}`, `B{N} -> B{N+1}`, `B{N+1} -> B{N}`, 
+        `A{N+1} -> B{N+1}`, and `B{N+1} -> A{N+1}`.
+    :type labels: list
+)delim",
+            py::arg("labels")
+        )
+        .def("remove_rung_from_end",
+            &GridGraph<PreciseType, double>::removeRungFromEnd,
+            R"delim(
+    Remove the last pair of nodes from the graph (along with the six 
+    associated edges), decreasing its length by one.
+
+    :raise RuntimeError: If `self.N` is zero.
+)delim"
+        )
+        .def("add_node",
+            &GridGraph<PreciseType, double>::addNode,
+            R"delim(
+    Ban node addition via `add_node()`: nodes can be added or removed 
+    only at the upper end of the graph.
+
+    :param id: ID of node to be added (to match signature with parent
+        method).
+    :type id: str
+    :raise RuntimeError: If invoked at all.
+)delim",
+            py::arg("id")
+        )
+        .def("remove_node",
+            &GridGraph<PreciseType, double>::removeNode,
+            R"delim(
+    Ban node removal via `remove_node()`: nodes can be added or removed
+    only at the upper end of the graph.
+
+    :param id: ID of node to be removed (to match signature with parent
+        method).
+    :type id: str
+    :raise RuntimeError: If invoked at all.
+)delim",
+            py::arg("id")
+        )
+        .def("add_edge",
+            &GridGraph<PreciseType, double>::addEdge,
+            R"delim(
+    Ban edge addition via `add_edge()`: edges can be added or removed
+    only at the upper end of the graph.
+
+    :param source_id: ID of source node of new edge (to match signature
+        with parent method).
+    :type source_id: str
+    :param target_id: ID of target node of new edge (to match signature
+        with parent method).
+    :type target_id: str
+    :param label: Label on new edge (to match signature with parent
+        method).
+    :type label: float
+    :raise RuntimeError: If invoked at all.
+)delim",
+            py::arg("source_id"),
+            py::arg("target_id"),
+            py::arg("label") = 1
+        )
+        .def("remove_edge",
+            &GridGraph<PreciseType, double>::removeEdge,
+            R"delim(
+    Ban edge removal via `removeEdge()`: edges can be added or removed 
+    only at the upper end of the graph.
+
+    :param source_id: ID of source node of edge to be removed (to match
+        signature with parent method).
+    :type source_id: str
+    :param target_id: ID of target node of edge to be removed (to match
+        signature with parent method).
+    :type target_id: str
+    :raise RuntimeError: If invoked at all.
+)delim",
+            py::arg("source_id"),
+            py::arg("target_id")
+        )
+        .def("clear",
+            &GridGraph<PreciseType, double>::clear,
+            R"delim(
+    Ban clearing via `clear()`: the graph must be non-empty.
+
+    :raise RuntimeError: If invoked at all.
+)delim"
+        )
+        .def("reset",
+            &GridGraph<PreciseType, double>::reset,
+            R"delim(
+    Remove all nodes and edges but `A0` and `B0` and the edges in
+    between.
+)delim"
+        )
+        .def("set_rung_labels",
+            &GridGraph<PreciseType, double>::setRungLabels,
+            R"delim(
+    Set the labels on the i-th sextet of edges (`A{i} -> A{i+1}`, 
+    `A{i+1} -> A{i}`, `B{i} -> B{i+1}`, `B{i+1} -> B{i}`,
+    `A{i+1} -> B{i+1}`, and `B{i+1} -> A{i+1}`) to the given values.
+
+    This method throws an exception if `i` is not a valid index in 
+    the graph (i.e., if `i >= self.N`).
+
+    :param i: Index of edge labels to update (see below).
+    :type i: int 
+    :param labels: Sextet of new edge label values: `A{i} -> A{i+1}`, 
+        `A{i+1} -> A{i}`, `B{i} -> B{i+1}`, `B{i+1} -> B{i}`,
+        `A{i+1} -> B{i+1}`, and `B{i+1} -> A{i+1}`.
+    :type labels: list of six floats
+    :raise ValueError: If `i >= self.N`.
+)delim",
+            py::arg("i"),
+            py::arg("labels")
         );
 }

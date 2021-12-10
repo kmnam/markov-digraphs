@@ -119,7 +119,7 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
 
     public:
         /**
-         * Constructor for a line graph of length 1, i.e., a single vertex
+         * Constructor for a line graph of length 0, i.e., a single vertex
          * named "0".
          */
         LineGraph() : LabeledDigraph<InternalType, IOType>()
@@ -173,7 +173,7 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
          *
          * @param labels A pair of edge labels, forward edge then reverse edge.  
          */
-        void addNodeToEnd(std::pair<IOType, IOType> labels)
+        void addNodeToEnd(const std::pair<IOType, IOType>& labels)
         {
             // Add new node (N+1, with N not yet incremented) to end of graph 
             std::stringstream ssi, ssj;
@@ -339,7 +339,7 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
          * @param i      Index of edge labels to update. 
          * @param labels A pair of edge labels, i -> i+1 then i+1 -> i. 
          */
-        void setEdgeLabels(const unsigned i, std::pair<IOType, IOType> labels)
+        void setEdgeLabels(const unsigned i, const std::pair<IOType, IOType>& labels)
         {
             // Find the i-th and (i+1)-th nodes
             std::stringstream ssi, ssj;

@@ -4,7 +4,7 @@ from pybind11.setup_helpers import Pybind11Extension, build_ext
 ext_modules = [
     Pybind11Extension(
         'pygraph',
-        ['pygraph.cpp'],
+        ['src/pygraph.cpp'],
         include_dirs=[
             '/usr/local/Cellar/boost/1.76.0/include',
             '/usr/local/Cellar/eigen/3.4.0_1/include/eigen3'
