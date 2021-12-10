@@ -12,7 +12,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     12/9/2021
+ *     12/10/2021
  */
 
 namespace py = pybind11;
@@ -774,5 +774,24 @@ PYBIND11_MODULE(pygraph, m)
 )delim",
             py::arg("i"),
             py::arg("labels")
+        )
+        .def("get_exit_stats",
+            &GridGraph<PreciseType, double>::getExitStats, 
+            R"delim(
+    Compute and return two quantities: the *splitting probability* of exiting
+    the graph through `B{this->N}` (reaching an auxiliary upper exit node),
+    and not through `A0` (reaching an auxiliary lower exit node); and the
+    reciprocal of the *unconditional mean first-passage time* to exiting the
+    graph through `A0`, given that the exit rate from `B{this->N}` is zero.
+
+    :param lower_exit_rate: Rate of lower exit from `A0`.
+    :type lower_exit_rate: float
+    :param upper_exit_rate: Rate of upper exit from `B{this->N}`.
+    :type upper_exit_rate: float
+    :return: The above two quantities.
+    :rtype: tuple of two floats
+)delim",
+            py::arg("lower_exit_rate"),
+            py::arg("upper_exit_rate")
         );
 }
