@@ -1214,7 +1214,7 @@ class LabeledDigraph
          * @throws std::runtime_error if the given subset contains a node that
          *                            does not exist in the graph.  
          */
-        LabeledDigraph<InternalType, IOType>* subgraph(std::unordered_set<Node*> nodes)
+        LabeledDigraph<InternalType, IOType>* subgraph(const std::unordered_set<Node*>& nodes)
         {
             LabeledDigraph<InternalType, IOType>* subgraph = new LabeledDigraph<InternalType, IOType>();
 
