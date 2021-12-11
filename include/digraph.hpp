@@ -1271,6 +1271,7 @@ class LabeledDigraph
             this->numnodes = 0; 
             this->nodes.clear();
             this->edges.clear();
+            this->order.clear(); 
         }
 
         /**
