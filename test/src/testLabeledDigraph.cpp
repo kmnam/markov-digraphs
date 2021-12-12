@@ -3,6 +3,7 @@
 #include <string>
 #include <sstream>
 #include <array>
+#include <iomanip>
 #include <Eigen/Dense>
 #include "../../include/digraph.hpp"
 
@@ -353,12 +354,12 @@ void TEST_MODULE_GET_LAPLACIAN()
 /**
  * Test `LabeledDigraph<...>::getSpanningForestMatrix()`. 
  *
- * With a graph with integer scalars, check that `getLaplacian()` returns an 
- * *exactly* correct Laplacian matrix.
+ * With a graph with (long) integer scalars, check that `getLaplacian()`
+ * returns an *exactly* correct Laplacian matrix.
  */
 void TEST_MODULE_GET_SPANNING_FOREST_MATRIX()
 {
-    LabeledDigraph<int, int>* graph = new LabeledDigraph<int, int>(); 
+    LabeledDigraph<long, long>* graph = new LabeledDigraph<long, long>(); 
     graph->addNode("first"); 
     graph->addNode("second"); 
     graph->addNode("third");
@@ -376,7 +377,7 @@ void TEST_MODULE_GET_SPANNING_FOREST_MATRIX()
     graph->addEdge("fifth", "fourth", 285);
 
     // Check that the zeroth spanning forest matrix equals the identity
-    MatrixXi forest_zero = graph->getSpanningForestMatrix(0);
+    Matrix<long, Dynamic, Dynamic> forest_zero = graph->getSpanningForestMatrix(0);
     for (unsigned i = 0; i < 5; ++i)
     {
         for (unsigned j = 0; j < 5; ++j)
@@ -390,9 +391,9 @@ void TEST_MODULE_GET_SPANNING_FOREST_MATRIX()
     // 1) i != j and abs(i - j) == 1 or abs(i - j) == 4: A(i, j) == label(i -> j)
     // 2) i != j and abs(i - j) == 2 or abs(i - j) == 3: A(i, j) == 0
     // 3) i == j: A(i, j) == sum of all edge labels except for all edges leaving j
-    MatrixXi forest_one = graph->getSpanningForestMatrix(1);
+    Matrix<long, Dynamic, Dynamic> forest_one = graph->getSpanningForestMatrix(1);
     std::vector<std::string> node_ids = {"first", "second", "third", "fourth", "fifth"}; 
-    int sum_of_all_edge_labels = 1 + 13 + 20 + 67 + 42 + 1007 + 17 + 512 + 179 + 285;
+    long sum_of_all_edge_labels = 1 + 13 + 20 + 67 + 42 + 1007 + 17 + 512 + 179 + 285;
     for (unsigned i = 0; i < 5; ++i)
     {
         for (unsigned j = 0; j < 5; ++j)
@@ -428,6 +429,236 @@ void TEST_MODULE_GET_SPANNING_FOREST_MATRIX()
             }
         }
     }
+
+    // Check that the second spanning forest matrix has the correct entries ... 
+    Matrix<long, Dynamic, Dynamic> forest_two = graph->getSpanningForestMatrix(2);
+    
+    // To take advantage of the symmetry of the cycle graph, we introduce a 
+    // "node mapping" that allows us to calculate the spanning forest weights
+    // without having to repeatedly rewrite equivalent products of edge labels
+    std::function<long(const std::unordered_map<std::string, std::string>&)> all_two_edge_forests
+        = [graph](const std::unordered_map<std::string, std::string>& node_map)
+        {
+            std::string _first = node_map.find("first")->second;
+            std::string _second = node_map.find("second")->second; 
+            std::string _third = node_map.find("third")->second; 
+            std::string _fourth = node_map.find("fourth")->second; 
+            std::string _fifth = node_map.find("fifth")->second;  
+            return (
+                graph->getEdgeLabel(_second, _first) * (
+                    graph->getEdgeLabel(_third, _second) +
+                    graph->getEdgeLabel(_third, _fourth) +
+                    graph->getEdgeLabel(_fourth, _third) +
+                    graph->getEdgeLabel(_fourth, _fifth) +
+                    graph->getEdgeLabel(_fifth, _fourth) +
+                    graph->getEdgeLabel(_fifth, _first)
+                ) + graph->getEdgeLabel(_second, _third) * (
+                    graph->getEdgeLabel(_third, _fourth) +
+                    graph->getEdgeLabel(_fourth, _third) +
+                    graph->getEdgeLabel(_fourth, _fifth) + 
+                    graph->getEdgeLabel(_fifth, _fourth) +
+                    graph->getEdgeLabel(_fifth, _first)
+                ) + graph->getEdgeLabel(_third, _second) * (
+                    graph->getEdgeLabel(_fourth, _third) +
+                    graph->getEdgeLabel(_fourth, _fifth) +
+                    graph->getEdgeLabel(_fifth, _fourth) +
+                    graph->getEdgeLabel(_fifth, _first)
+                ) + graph->getEdgeLabel(_third, _fourth) * (
+                    graph->getEdgeLabel(_fourth, _fifth) +
+                    graph->getEdgeLabel(_fifth, _fourth) +
+                    graph->getEdgeLabel(_fifth, _first)
+                ) + graph->getEdgeLabel(_fourth, _third) * (
+                    graph->getEdgeLabel(_fifth, _fourth) +
+                    graph->getEdgeLabel(_fifth, _first)
+                ) + graph->getEdgeLabel(_fourth, _fifth) * graph->getEdgeLabel(_fifth, _first)
+            ); 
+        };
+    std::function<long(const std::unordered_map<std::string, std::string>&)> two_edge_forests_with_path_from_1_to_2
+        = [graph](const std::unordered_map<std::string, std::string>& node_map)
+        {
+            std::string _first = node_map.find("first")->second;
+            std::string _second = node_map.find("second")->second; 
+            std::string _third = node_map.find("third")->second; 
+            std::string _fourth = node_map.find("fourth")->second; 
+            std::string _fifth = node_map.find("fifth")->second;  
+            return graph->getEdgeLabel(_first, _second) * (
+                graph->getEdgeLabel(_third, _second) +
+                graph->getEdgeLabel(_third, _fourth) +
+                graph->getEdgeLabel(_fourth, _third) +
+                graph->getEdgeLabel(_fourth, _fifth) +
+                graph->getEdgeLabel(_fifth, _fourth) +
+                graph->getEdgeLabel(_fifth, _first)
+            ); 
+        };
+    std::function<long(const std::unordered_map<std::string, std::string>&)> two_edge_forests_with_path_from_1_to_5
+        = [graph](const std::unordered_map<std::string, std::string>& node_map)
+        {
+            std::string _first = node_map.find("first")->second;
+            std::string _second = node_map.find("second")->second; 
+            std::string _third = node_map.find("third")->second; 
+            std::string _fourth = node_map.find("fourth")->second; 
+            std::string _fifth = node_map.find("fifth")->second;  
+            return graph->getEdgeLabel(_first, _fifth) * (
+                graph->getEdgeLabel(_second, _first) +
+                graph->getEdgeLabel(_second, _third) +
+                graph->getEdgeLabel(_third, _second) +
+                graph->getEdgeLabel(_third, _fourth) +
+                graph->getEdgeLabel(_fourth, _third) +
+                graph->getEdgeLabel(_fourth, _fifth)
+            ); 
+        }; 
+
+    // (0, 0): 2-edge forests with 1 as a root
+    const std::unordered_map<std::string, std::string> map_to_first = {
+        {"first", "first"}, {"second", "second"}, {"third", "third"}, {"fourth", "fourth"}, {"fifth", "fifth"}
+    };  
+    assert(forest_two(0, 0) == all_two_edge_forests(map_to_first));  
+    // (0, 1): 2-edge forests with 2 as a root and path from 1 to 2
+    assert(forest_two(0, 1) == two_edge_forests_with_path_from_1_to_2(map_to_first));
+    // (0, 2): 2-edge forests with 3 as a root and path from 1 to 3
+    assert(forest_two(0, 2) == graph->getEdgeLabel("first", "second") * graph->getEdgeLabel("second", "third"));
+    // (0, 3): 2-edge forests with 4 as a root and path from 1 to 4
+    assert(forest_two(0, 3) == graph->getEdgeLabel("first", "fifth") * graph->getEdgeLabel("fifth", "fourth"));
+    // (0, 4): 2-edge forests with 5 as a root and path from 1 to 5
+    assert(forest_two(0, 4) == two_edge_forests_with_path_from_1_to_5(map_to_first)); 
+    // (1, 0): 2-edge forests with 1 as a root and path from 2 to 1
+    const std::unordered_map<std::string, std::string> map_to_second = {
+        {"first", "second"}, {"second", "third"}, {"third", "fourth"}, {"fourth", "fifth"}, {"fifth", "first"}
+    }; 
+    assert(forest_two(1, 0) == two_edge_forests_with_path_from_1_to_5(map_to_second));
+    // (1, 1): 2-edge forests with 2 as a root
+    assert(forest_two(1, 1) == all_two_edge_forests(map_to_second));
+    // (1, 2): 2-edge forests with 3 as a root and path from 2 to 3
+    assert(forest_two(1, 2) == two_edge_forests_with_path_from_1_to_2(map_to_second));
+    // (1, 3): 2-edge forests with 4 as a root and path from 2 to 4
+    assert(forest_two(1, 3) == graph->getEdgeLabel("second", "third") * graph->getEdgeLabel("third", "fourth"));
+    // (1, 4): 2-edge forests with 5 as a root and path from 2 to 5
+    assert(forest_two(1, 4) == graph->getEdgeLabel("second", "first") * graph->getEdgeLabel("first", "fifth"));
+    // (2, 0): 2-edge forests with 1 as a root and path from 3 to 1
+    const std::unordered_map<std::string, std::string> map_to_third = {
+        {"first", "third"}, {"second", "fourth"}, {"third", "fifth"}, {"fourth", "first"}, {"fifth", "second"}
+    }; 
+    assert(forest_two(2, 0) == graph->getEdgeLabel("third", "second") * graph->getEdgeLabel("second", "first")); 
+    // (2, 1): 2-edge forests with 2 as a root and path from 3 to 2
+    assert(forest_two(2, 1) == two_edge_forests_with_path_from_1_to_5(map_to_third)); 
+    // (2, 2): 2-edge forests with 3 as a root
+    assert(forest_two(2, 2) == all_two_edge_forests(map_to_third)); 
+    // (2, 3): 2-edge forests with 4 as a root and path from 3 to 4
+    assert(forest_two(2, 3) == two_edge_forests_with_path_from_1_to_2(map_to_third)); 
+    // (2, 4): 2-edge forests with 5 as a root and path from 3 to 5
+    assert(forest_two(2, 4) == graph->getEdgeLabel("third", "fourth") * graph->getEdgeLabel("fourth", "fifth")); 
+    // (3, 0): 2-edge forests with 1 as a root and path from 4 to 1
+    const std::unordered_map<std::string, std::string> map_to_fourth = {
+        {"first", "fourth"}, {"second", "fifth"}, {"third", "first"}, {"fourth", "second"}, {"fifth", "third"}
+    }; 
+    assert(forest_two(3, 0) == graph->getEdgeLabel("fourth", "fifth") * graph->getEdgeLabel("fifth", "first"));
+    // (3, 1): 2-edge forests with 2 as a root and path from 4 to 2
+    assert(forest_two(3, 1) == graph->getEdgeLabel("fourth", "third") * graph->getEdgeLabel("third", "second")); 
+    // (3, 2): 2-edge forests with 3 as a root and path from 4 to 3
+    assert(forest_two(3, 2) == two_edge_forests_with_path_from_1_to_5(map_to_fourth)); 
+    // (3, 3): 2-edge forests with 4 as a root
+    assert(forest_two(3, 3) == all_two_edge_forests(map_to_fourth)); 
+    // (3, 4): 2-edge forests with 5 as a root and path from 4 to 5
+    assert(forest_two(3, 4) == two_edge_forests_with_path_from_1_to_2(map_to_fourth));
+    // (4, 0): 2-edge forests with 1 as a root and path from 5 to 1
+    const std::unordered_map<std::string, std::string> map_to_fifth = {
+        {"first", "fifth"}, {"second", "first"}, {"third", "second"}, {"fourth", "third"}, {"fifth", "fourth"}
+    }; 
+    assert(forest_two(4, 0) == two_edge_forests_with_path_from_1_to_2(map_to_fifth)); 
+    // (4, 1): 2-edge forests with 2 as a root and path from 5 to 2
+    assert(forest_two(4, 1) == graph->getEdgeLabel("fifth", "first") * graph->getEdgeLabel("first", "second")); 
+    // (4, 2): 2-edge forests with 3 as a root and path from 5 to 3
+    assert(forest_two(4, 2) == graph->getEdgeLabel("fifth", "fourth") * graph->getEdgeLabel("fourth", "third")); 
+    // (4, 3): 2-edge forests with 4 as a root and path from 5 to 4
+    assert(forest_two(4, 3) == two_edge_forests_with_path_from_1_to_5(map_to_fifth)); 
+    // (4, 4): 2-edge forests with 5 as a root
+    assert(forest_two(4, 4) == all_two_edge_forests(map_to_fifth));
+
+    // Skip the third spanning forest matrix, and examine the fourth ...
+    Matrix<long, Dynamic, Dynamic> forest_four = graph->getSpanningForestMatrix(4);
+    // (0, 0): trees with 1 as a root 
+    assert(
+        forest_four(0, 0) == (
+            graph->getEdgeLabel("second", "first") * graph->getEdgeLabel("third", "second") *
+            graph->getEdgeLabel("fourth", "third") * graph->getEdgeLabel("fifth", "fourth") +
+            graph->getEdgeLabel("second", "first") * graph->getEdgeLabel("third", "second") * 
+            graph->getEdgeLabel("fourth", "third") * graph->getEdgeLabel("fifth", "first") + 
+            graph->getEdgeLabel("second", "first") * graph->getEdgeLabel("third", "second") * 
+            graph->getEdgeLabel("fourth", "fifth") * graph->getEdgeLabel("fifth", "first") + 
+            graph->getEdgeLabel("second", "first") * graph->getEdgeLabel("third", "fourth") * 
+            graph->getEdgeLabel("fourth", "fifth") * graph->getEdgeLabel("fifth", "first") + 
+            graph->getEdgeLabel("second", "third") * graph->getEdgeLabel("third", "fourth") * 
+            graph->getEdgeLabel("fourth", "fifth") * graph->getEdgeLabel("fifth", "first")
+        )
+    );
+    // (0, 1): trees with 2 as a root
+    assert(
+        forest_four(0, 1) == (
+            graph->getEdgeLabel("first", "second") * graph->getEdgeLabel("third", "fourth") *
+            graph->getEdgeLabel("fourth", "fifth") * graph->getEdgeLabel("fifth", "first") +
+            graph->getEdgeLabel("first", "second") * graph->getEdgeLabel("third", "second") *
+            graph->getEdgeLabel("fourth", "fifth") * graph->getEdgeLabel("fifth", "first") +
+            graph->getEdgeLabel("first", "second") * graph->getEdgeLabel("third", "second") *
+            graph->getEdgeLabel("fourth", "third") * graph->getEdgeLabel("fifth", "first") +
+            graph->getEdgeLabel("first", "second") * graph->getEdgeLabel("third", "second") *
+            graph->getEdgeLabel("fourth", "third") * graph->getEdgeLabel("fifth", "fourth") +
+            graph->getEdgeLabel("first", "fifth") * graph->getEdgeLabel("third", "second") *
+            graph->getEdgeLabel("fourth", "third") * graph->getEdgeLabel("fifth", "fourth")
+        )
+    );
+    // (0, 2): trees with 3 as a root
+    assert(
+        forest_four(0, 2) == (
+            graph->getEdgeLabel("first", "second") * graph->getEdgeLabel("second", "third") *
+            graph->getEdgeLabel("fourth", "fifth") * graph->getEdgeLabel("fifth", "first") +
+            graph->getEdgeLabel("first", "second") * graph->getEdgeLabel("second", "third") *
+            graph->getEdgeLabel("fourth", "third") * graph->getEdgeLabel("fifth", "first") +
+            graph->getEdgeLabel("first", "second") * graph->getEdgeLabel("second", "third") *
+            graph->getEdgeLabel("fourth", "third") * graph->getEdgeLabel("fifth", "fourth") +
+            graph->getEdgeLabel("first", "fifth") * graph->getEdgeLabel("second", "third") *
+            graph->getEdgeLabel("fourth", "third") * graph->getEdgeLabel("fifth", "fourth") +
+            graph->getEdgeLabel("first", "fifth") * graph->getEdgeLabel("second", "first") *
+            graph->getEdgeLabel("fourth", "third") * graph->getEdgeLabel("fifth", "fourth")
+        )
+    );
+    // (0, 3): trees with 4 as a root
+    assert(
+        forest_four(0, 3) == (
+            graph->getEdgeLabel("first", "second") * graph->getEdgeLabel("second", "third") *
+            graph->getEdgeLabel("third", "fourth") * graph->getEdgeLabel("fifth", "first") +
+            graph->getEdgeLabel("first", "second") * graph->getEdgeLabel("second", "third") *
+            graph->getEdgeLabel("third", "fourth") * graph->getEdgeLabel("fifth", "fourth") +
+            graph->getEdgeLabel("first", "fifth") * graph->getEdgeLabel("second", "third") *
+            graph->getEdgeLabel("third", "fourth") * graph->getEdgeLabel("fifth", "fourth") +
+            graph->getEdgeLabel("first", "fifth") * graph->getEdgeLabel("second", "first") *
+            graph->getEdgeLabel("third", "fourth") * graph->getEdgeLabel("fifth", "fourth") +
+            graph->getEdgeLabel("first", "fifth") * graph->getEdgeLabel("second", "first") *
+            graph->getEdgeLabel("third", "second") * graph->getEdgeLabel("fifth", "fourth") 
+        )
+    );
+    // (0, 4): trees with 5 as a root
+    assert(
+        forest_four(0, 4) == (
+            graph->getEdgeLabel("first", "second") * graph->getEdgeLabel("second", "third") *
+            graph->getEdgeLabel("third", "fourth") * graph->getEdgeLabel("fourth", "fifth") +
+            graph->getEdgeLabel("first", "fifth") * graph->getEdgeLabel("second", "third") *
+            graph->getEdgeLabel("third", "fourth") * graph->getEdgeLabel("fourth", "fifth") +
+            graph->getEdgeLabel("first", "fifth") * graph->getEdgeLabel("second", "first") *
+            graph->getEdgeLabel("third", "fourth") * graph->getEdgeLabel("fourth", "fifth") +
+            graph->getEdgeLabel("first", "fifth") * graph->getEdgeLabel("second", "first") *
+            graph->getEdgeLabel("third", "second") * graph->getEdgeLabel("fourth", "fifth") +
+            graph->getEdgeLabel("first", "fifth") * graph->getEdgeLabel("second", "first") *
+            graph->getEdgeLabel("third", "second") * graph->getEdgeLabel("fourth", "third")
+        )
+    );
+    // Check that each column has the same entry in each row
+    for (unsigned i = 0; i < 5; ++i)
+    {
+        for (unsigned j = 1; j < 5; ++j)
+        {
+            assert(forest_four(0, i) == forest_four(j, i));
+        }
+    } 
 
     delete graph; 
 }
