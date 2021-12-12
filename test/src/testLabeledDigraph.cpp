@@ -2,7 +2,6 @@
 #include <assert.h>
 #include <string>
 #include <sstream>
-#include <cmath>
 #include <array>
 #include <Eigen/Dense>
 #include "../../include/digraph.hpp"
@@ -298,11 +297,12 @@ void TEST_MODULE_CLEAR()
 
 /**
  * Test `LabeledDigraph<...>::getLaplacian()`.
+ *
+ * With a graph with integer scalars, check that `getLaplacian()` returns an 
+ * *exactly* correct Laplacian matrix.
  */
 void TEST_MODULE_GET_LAPLACIAN()
 {
-    // With an integer-scalar graph, check that getLaplacian() returns the 
-    // exactly correct Laplacian matrix
     LabeledDigraph<int, int>* graph = new LabeledDigraph<int, int>(); 
     graph->addNode("first"); 
     graph->addNode("second"); 
@@ -350,6 +350,88 @@ void TEST_MODULE_GET_LAPLACIAN()
     delete graph;  
 }
 
+/**
+ * Test `LabeledDigraph<...>::getSpanningForestMatrix()`. 
+ *
+ * With a graph with integer scalars, check that `getLaplacian()` returns an 
+ * *exactly* correct Laplacian matrix.
+ */
+void TEST_MODULE_GET_SPANNING_FOREST_MATRIX()
+{
+    LabeledDigraph<int, int>* graph = new LabeledDigraph<int, int>(); 
+    graph->addNode("first"); 
+    graph->addNode("second"); 
+    graph->addNode("third");
+    graph->addNode("fourth"); 
+    graph->addNode("fifth");
+    graph->addEdge("first", "second", 1);
+    graph->addEdge("first", "fifth", 13); 
+    graph->addEdge("second", "first", 20); 
+    graph->addEdge("second", "third", 67); 
+    graph->addEdge("third", "second", 42); 
+    graph->addEdge("third", "fourth", 1007); 
+    graph->addEdge("fourth", "third", 17); 
+    graph->addEdge("fourth", "fifth", 512); 
+    graph->addEdge("fifth", "first", 179); 
+    graph->addEdge("fifth", "fourth", 285);
+
+    // Check that the zeroth spanning forest matrix equals the identity
+    MatrixXi forest_zero = graph->getSpanningForestMatrix(0);
+    for (unsigned i = 0; i < 5; ++i)
+    {
+        for (unsigned j = 0; j < 5; ++j)
+        {
+            if (i == j) assert(forest_zero(i, j) == 1); 
+            else        assert(forest_zero(i, j) == 0); 
+        }
+    }
+
+    // Check that the first spanning forest matrix has the following entries:
+    // 1) i != j and abs(i - j) == 1 or abs(i - j) == 4: A(i, j) == label(i -> j)
+    // 2) i != j and abs(i - j) == 2 or abs(i - j) == 3: A(i, j) == 0
+    // 3) i == j: A(i, j) == sum of all edge labels except for all edges leaving j
+    MatrixXi forest_one = graph->getSpanningForestMatrix(1);
+    std::vector<std::string> node_ids = {"first", "second", "third", "fourth", "fifth"}; 
+    int sum_of_all_edge_labels = 1 + 13 + 20 + 67 + 42 + 1007 + 17 + 512 + 179 + 285;
+    for (unsigned i = 0; i < 5; ++i)
+    {
+        for (unsigned j = 0; j < 5; ++j)
+        {
+            if (i == j)
+            {
+                if (j == 0)
+                    assert(
+                        forest_one(i, j) == sum_of_all_edge_labels
+                        - graph->getEdgeLabel(node_ids[0], node_ids[4])
+                        - graph->getEdgeLabel(node_ids[0], node_ids[1])
+                    );
+                else if (j == 4)
+                    assert(
+                        forest_one(i, j) == sum_of_all_edge_labels
+                        - graph->getEdgeLabel(node_ids[4], node_ids[0])
+                        - graph->getEdgeLabel(node_ids[4], node_ids[3])
+                    );
+                else
+                    assert(
+                        forest_one(i, j) == sum_of_all_edge_labels
+                        - graph->getEdgeLabel(node_ids[j], node_ids[j-1])
+                        - graph->getEdgeLabel(node_ids[j], node_ids[j+1])
+                    ); 
+            }
+            else if (i != j && (std::abs((int)(i - j)) == 1 || std::abs((int)(i - j)) == 4))
+            {
+                assert(forest_one(i, j) == graph->getEdgeLabel(node_ids[i], node_ids[j])); 
+            }
+            else
+            {
+                assert(forest_one(i, j) == 0); 
+            }
+        }
+    }
+
+    delete graph; 
+}
+
 int main()
 {
     TEST_MODULE_NODE_METHODS();
@@ -360,6 +442,8 @@ int main()
     std::cout << "TEST_MODULE_CLEAR: all tests passed" << std::endl;
     TEST_MODULE_GET_LAPLACIAN(); 
     std::cout << "TEST_MODULE_GET_LAPLACIAN: all tests passed" << std::endl;
+    TEST_MODULE_GET_SPANNING_FOREST_MATRIX(); 
+    std::cout << "TEST_MODULE_GET_SPANNING_FOREST_MATRIX: all tests passed" << std::endl; 
 
     return 0; 
 }
