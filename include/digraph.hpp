@@ -1668,7 +1668,7 @@ class LabeledDigraph
                 }  
             }
             
-            return (forest_matrix.row(0) / norm).template cast<FloatIOType>();
+            return forest_matrix.row(0).template cast<FloatIOType>() / norm.template cast<FloatIOType>();
         }
 
         /**
