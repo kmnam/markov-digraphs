@@ -1575,21 +1575,24 @@ class LabeledDigraph
          *
          * Since this method necessarily returns a vector with floating-point
          * quantities, which may not be accommodated by `IOType`, this method 
-         * allows the specification of a third output type, `FloatIOType`. 
+         * allows the specification of a new output type, `FloatIOType`.
+         * Moreover, since Eigen's SVD module requires a floating-point 
+         * scalar type, this method also allows the specification of a new 
+         * internal type, `FloatInternalType`.
          *
          * @returns Vector in the kernel of the graph's Laplacian matrix, 
          *          normalized by its 1-norm.
          */
-        template <typename FloatIOType = IOType>
+        template <typename FloatInternalType = InternalType, typename FloatIOType = IOType>
         Matrix<FloatIOType, Dynamic, 1> getSteadyStateFromSVD()
         {
-            Matrix<InternalType, Dynamic, Dynamic> laplacian = this->getColumnLaplacianDense();
+            Matrix<FloatInternalType, Dynamic, Dynamic> laplacian = this->getColumnLaplacianDense().template cast<FloatInternalType>();
             
             // Obtain the steady-state vector of the Laplacian matrix
-            Matrix<InternalType, Dynamic, 1> steady_state;
+            Matrix<FloatInternalType, Dynamic, 1> steady_state;
             try
             {
-                steady_state = getOneDimNullspaceFromSVD<InternalType>(laplacian);
+                steady_state = getOneDimNullspaceFromSVD<FloatInternalType>(laplacian);
             }
             catch (const std::runtime_error& e)
             {
@@ -1597,7 +1600,7 @@ class LabeledDigraph
             }
 
             // Normalize by the sum of its entries and return 
-            InternalType norm = steady_state.sum();
+            FloatInternalType norm = steady_state.sum();
             return (steady_state / norm).template cast<FloatIOType>();
         }
 
@@ -1615,7 +1618,7 @@ class LabeledDigraph
          *
          * Since this method necessarily returns a vector with floating-point
          * quantities, which may not be accommodated by `IOType`, this method 
-         * allows the specification of a third output type, `FloatIOType`. 
+         * allows the specification of a new output type, `FloatIOType`. 
          *
          * @param sparse If true, use a sparse Laplacian matrix in the calculations. 
          * @param method Summation method. 
@@ -1680,7 +1683,10 @@ class LabeledDigraph
          *
          * Since this method necessarily returns a vector with floating-point
          * quantities, which may not be accommodated by `IOType`, this method 
-         * allows the specification of a third output type, `FloatIOType`. 
+         * allows the specification of a new output type, `FloatIOType`.
+         * Moreover, since Eigen's QR/LU solvers requires a floating-point 
+         * scalar type, this method also allows the specification of a new 
+         * internal type, `FloatInternalType`.
          *
          * @param target_id ID of target node. 
          * @param method    Linear solver method for computing the mean first-passage
@@ -1690,7 +1696,7 @@ class LabeledDigraph
          * @throws std::invalid_argument if solver method is not recognized. 
          * @throws std::runtime_error    if target node does not exist.
          */
-        template <typename FloatIOType = IOType>
+        template <typename FloatInternalType = InternalType, typename FloatIOType = IOType>
         Matrix<FloatIOType, Dynamic, 1> getMeanFirstPassageTimesFromSolver(std::string target_id,
                                                                            const SolverMethod method = QRDecomposition) 
         {
@@ -1712,8 +1718,8 @@ class LabeledDigraph
 
             // Get the Laplacian matrix of the graph and drop the row and column
             // corresponding to the target node 
-            Matrix<InternalType, Dynamic, Dynamic> laplacian = this->getColumnLaplacianDense();
-            Matrix<InternalType, Dynamic, Dynamic> sublaplacian(this->numnodes - 1, this->numnodes - 1);
+            Matrix<FloatInternalType, Dynamic, Dynamic> laplacian = this->getColumnLaplacianDense().template cast<FloatInternalType>();
+            Matrix<FloatInternalType, Dynamic, Dynamic> sublaplacian(this->numnodes - 1, this->numnodes - 1);
             int z = this->numnodes - 1 - t;
             if (t == 0)
             {
@@ -1732,10 +1738,10 @@ class LabeledDigraph
             } 
 
             // Get the left-hand matrix in the first-passage time linear system
-            Matrix<InternalType, Dynamic, Dynamic> A = sublaplacian.transpose() * sublaplacian.transpose();
+            Matrix<FloatInternalType, Dynamic, Dynamic> A = sublaplacian.transpose() * sublaplacian.transpose();
 
             // Get the right-hand vector in the first-passage time linear system 
-            Matrix<InternalType, Dynamic, 1> b = Matrix<InternalType, Dynamic, 1>::Zero(this->numnodes - 1); 
+            Matrix<FloatInternalType, Dynamic, 1> b = Matrix<FloatInternalType, Dynamic, 1>::Zero(this->numnodes - 1); 
             for (unsigned i = 0; i < t; ++i)
             {
                 if (this->hasEdge(this->order[i], target))
@@ -1748,14 +1754,14 @@ class LabeledDigraph
             }
 
             // Solve the linear system with the specified method 
-            Matrix<InternalType, Dynamic, 1> solution;
+            Matrix<FloatInternalType, Dynamic, 1> solution;
             if (method == QRDecomposition)
             {
-                solution = solveByQRD<InternalType>(A, b);
+                solution = solveByQRD<FloatInternalType>(A, b);
             }
             else if (method == LUDecomposition)
             {
-                solution = solveByLUD<InternalType>(A, b);
+                solution = solveByLUD<FloatInternalType>(A, b);
             }
             else 
             {
@@ -1766,7 +1772,7 @@ class LabeledDigraph
 
             // Return an augmented vector with the zero mean FPT from the 
             // target node to itself
-            Matrix<InternalType, Dynamic, 1> fpt_vec = Matrix<InternalType, Dynamic, 1>::Zero(this->numnodes);
+            Matrix<FloatInternalType, Dynamic, 1> fpt_vec = Matrix<FloatInternalType, Dynamic, 1>::Zero(this->numnodes);
             for (unsigned i = 0; i < t; ++i)
                 fpt_vec(i) = solution(i); 
             for (unsigned i = t + 1; i < this->numnodes; ++i)
@@ -1788,7 +1794,7 @@ class LabeledDigraph
          *
          * Since this method necessarily returns a vector with floating-point
          * quantities, which may not be accommodated by `IOType`, this method 
-         * allows the specification of a third output type, `FloatIOType`. 
+         * allows the specification of a new output type, `FloatIOType`. 
          *
          * @param target_id ID of target node.
          * @param sparse    If true, use a sparse Laplacian matrix in the calculations. 
@@ -1938,7 +1944,10 @@ class LabeledDigraph
          *
          * Since this method necessarily returns a vector with floating-point
          * quantities, which may not be accommodated by `IOType`, this method 
-         * allows the specification of a third output type, `FloatIOType`. 
+         * allows the specification of a new output type, `FloatIOType`.
+         * Moreover, since Eigen's QR/LU solvers requires a floating-point 
+         * scalar type, this method also allows the specification of a new 
+         * internal type, `FloatInternalType`.
          *
          * @param target_id ID of target node. 
          * @param method    Linear solver method for computing the vector of 
@@ -1948,7 +1957,7 @@ class LabeledDigraph
          * @throws std::invalid_argument if solver method is not recognized.
          * @throws std::runtime_error    if target node does not exist. 
          */
-        template <typename FloatIOType = IOType>
+        template <typename FloatInternalType = InternalType, typename FloatIOType = IOType>
         Matrix<FloatIOType, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromSolver(std::string target_id, 
                                                                                       const SolverMethod method = QRDecomposition)
         {
@@ -1970,8 +1979,9 @@ class LabeledDigraph
 
             // Get the row Laplacian matrix of the graph and drop the row and
             // column corresponding to the target node 
-            Matrix<InternalType, Dynamic, Dynamic> laplacian = -this->getColumnLaplacianDense().transpose();
-            Matrix<InternalType, Dynamic, Dynamic> sublaplacian(this->numnodes - 1, this->numnodes - 1);
+            Matrix<FloatInternalType, Dynamic, Dynamic> laplacian =
+                -this->getColumnLaplacianDense().transpose().template cast<FloatInternalType>();
+            Matrix<FloatInternalType, Dynamic, Dynamic> sublaplacian(this->numnodes - 1, this->numnodes - 1);
             int z = this->numnodes - 1 - t;
             if (t == 0)
             {
@@ -1990,10 +2000,10 @@ class LabeledDigraph
             } 
 
             // Get the left-hand matrix in the first-passage time linear system
-            Matrix<InternalType, Dynamic, Dynamic> A = sublaplacian * sublaplacian * sublaplacian; 
+            Matrix<FloatInternalType, Dynamic, Dynamic> A = sublaplacian * sublaplacian * sublaplacian; 
 
             // Get the right-hand vector in the first-passage time linear system 
-            Matrix<InternalType, Dynamic, 1> b = Matrix<InternalType, Dynamic, 1>::Zero(this->numnodes - 1); 
+            Matrix<FloatInternalType, Dynamic, 1> b = Matrix<FloatInternalType, Dynamic, 1>::Zero(this->numnodes - 1); 
             for (unsigned i = 0; i < t; ++i)
             {
                 if (this->hasEdge(this->order[i], target))
@@ -2006,14 +2016,14 @@ class LabeledDigraph
             }
 
             // Solve the linear system with the specified method 
-            Matrix<InternalType, Dynamic, 1> solution; 
+            Matrix<FloatInternalType, Dynamic, 1> solution; 
             if (method == QRDecomposition)
             { 
-                solution = solveByQRD<InternalType>(A, b);
+                solution = solveByQRD<FloatInternalType>(A, b);
             }
             else if (method == LUDecomposition)
             { 
-                solution = solveByLUD<InternalType>(A, b);
+                solution = solveByLUD<FloatInternalType>(A, b);
             }
             else
             {
@@ -2024,7 +2034,7 @@ class LabeledDigraph
 
             // Return an augmented vector with the zero mean FPT from the 
             // target node to itself
-            Matrix<InternalType, Dynamic, 1> fpt_vec = Matrix<InternalType, Dynamic, 1>::Zero(this->numnodes);
+            Matrix<FloatInternalType, Dynamic, 1> fpt_vec = Matrix<FloatInternalType, Dynamic, 1>::Zero(this->numnodes);
             for (unsigned i = 0; i < t; ++i)
                 fpt_vec(i) = solution(i); 
             for (unsigned i = t + 1; i < this->numnodes; ++i)
