@@ -5,7 +5,7 @@
  *  Author:
  *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *  Last updated: 
- *      12/8/2021 
+ *      12/12/2021 
  *
  *  \mainpage MarkovDigraphs 
  *
@@ -378,9 +378,17 @@ using Edge = std::pair<Node*, Node*>;
  * - `InternalType` is the scalar type used to store all edge labels and
  *   perform mathematical calculations involving the row and column Laplacian
  *   matrices.
- * - `IOType` is the scalar type used for input values to public methods
- *   (`addEdge()` and `setEdgeLabel()`) and output values from public methods
- *   (`getEdgeLabel()` and all mathematical methods).  
+ * - `IOType` is the scalar type used for input values to some public methods
+ *   (`addEdge()`, `setEdgeLabel()`, `getEdgeLabel()`, `getLaplacian()`, 
+ *   `getSpanningForestMatrix()`, `getSpanningForestMatrixSparse()`.).
+ *
+ * These types can be finite-precision exact (e.g., integer types), finite-
+ * precision floating-point, or arbitrary-precision.
+ *
+ * The public mathematical methods for computing steady-state probabilities 
+ * or first-passage time moments are required to return a floating-point
+ * scalar, and so these methods involve another template parameter that
+ * specifies this type (see below).
  */
 template <typename InternalType, typename IOType>
 class LabeledDigraph
@@ -1563,12 +1571,17 @@ class LabeledDigraph
          *
          * This method *assumes* that this graph is strongly connected, in which 
          * case the Laplacian matrix has a one-dimensional kernel and so the 
-         * returned vector serves as a basis for this kernel. 
+         * returned vector serves as a basis for this kernel.
+         *
+         * Since this method necessarily returns a vector with floating-point
+         * quantities, which may not be accommodated by `IOType`, this method 
+         * allows the specification of a third output type, `FloatIOType`. 
          *
          * @returns Vector in the kernel of the graph's Laplacian matrix, 
          *          normalized by its 1-norm.
          */
-        Matrix<IOType, Dynamic, 1> getSteadyStateFromSVD()
+        template <typename FloatIOType = IOType>
+        Matrix<FloatIOType, Dynamic, 1> getSteadyStateFromSVD()
         {
             Matrix<InternalType, Dynamic, Dynamic> laplacian = this->getColumnLaplacianDense();
             
@@ -1585,7 +1598,7 @@ class LabeledDigraph
 
             // Normalize by the sum of its entries and return 
             InternalType norm = steady_state.sum();
-            return (steady_state / norm).template cast<IOType>();
+            return (steady_state / norm).template cast<FloatIOType>();
         }
 
         /**
@@ -1600,14 +1613,19 @@ class LabeledDigraph
          * case the Laplacian matrix has a one-dimensional kernel and so the 
          * returned vector serves as a basis for this kernel.
          *
+         * Since this method necessarily returns a vector with floating-point
+         * quantities, which may not be accommodated by `IOType`, this method 
+         * allows the specification of a third output type, `FloatIOType`. 
+         *
          * @param sparse If true, use a sparse Laplacian matrix in the calculations. 
          * @param method Summation method. 
          * @returns      Vector in the kernel of the graph's Laplacian matrix, 
          *               normalized by its 1-norm.
          * @throws std::invalid_argument if summation method is not recognized. 
          */
-        Matrix<IOType, Dynamic, 1> getSteadyStateFromRecurrence(const bool sparse,
-                                                                const SummationMethod method = NaiveSummation)
+        template <typename FloatIOType = IOType>
+        Matrix<FloatIOType, Dynamic, 1> getSteadyStateFromRecurrence(const bool sparse,
+                                                                     const SummationMethod method = NaiveSummation)
         {
             // Obtain the spanning tree weight matrix from the row Laplacian matrix
             Matrix<InternalType, Dynamic, Dynamic> forest_matrix;
@@ -1647,7 +1665,7 @@ class LabeledDigraph
                 }  
             }
             
-            return (forest_matrix.row(0) / norm).template cast<IOType>();
+            return (forest_matrix.row(0) / norm).template cast<FloatIOType>();
         }
 
         /**
@@ -1660,6 +1678,10 @@ class LabeledDigraph
          * meaning that there are no alternative terminal nodes (or rather
          * SCCs) to which the process can travel and get "stuck".
          *
+         * Since this method necessarily returns a vector with floating-point
+         * quantities, which may not be accommodated by `IOType`, this method 
+         * allows the specification of a third output type, `FloatIOType`. 
+         *
          * @param target_id ID of target node. 
          * @param method    Linear solver method for computing the mean first-passage
          *                  time vector. 
@@ -1668,8 +1690,9 @@ class LabeledDigraph
          * @throws std::invalid_argument if solver method is not recognized. 
          * @throws std::runtime_error    if target node does not exist.
          */
-        Matrix<IOType, Dynamic, 1> getMeanFirstPassageTimesFromSolver(std::string target_id,
-                                                                      const SolverMethod method = QRDecomposition) 
+        template <typename FloatIOType = IOType>
+        Matrix<FloatIOType, Dynamic, 1> getMeanFirstPassageTimesFromSolver(std::string target_id,
+                                                                           const SolverMethod method = QRDecomposition) 
         {
             // Get the index of the target node
             Node* target = this->getNode(target_id);
@@ -1749,7 +1772,7 @@ class LabeledDigraph
             for (unsigned i = t + 1; i < this->numnodes; ++i)
                 fpt_vec(i) = solution(i - 1);
 
-            return fpt_vec.template cast<IOType>(); 
+            return fpt_vec.template cast<FloatIOType>(); 
         }
 
         /**
@@ -1763,6 +1786,10 @@ class LabeledDigraph
          * meaning that there are no alternative terminal nodes (or rather
          * SCCs) to which the process can travel and get "stuck".   
          *
+         * Since this method necessarily returns a vector with floating-point
+         * quantities, which may not be accommodated by `IOType`, this method 
+         * allows the specification of a third output type, `FloatIOType`. 
+         *
          * @param target_id ID of target node.
          * @param sparse    If true, use a sparse Laplacian matrix in the calculations. 
          * @param method    Summation method. 
@@ -1771,9 +1798,10 @@ class LabeledDigraph
          * @throws std::invalid_argument if summation method is not recognized.
          * @throws std::runtime_error    if target node does not exist. 
          */
-        Matrix<IOType, Dynamic, 1> getMeanFirstPassageTimesFromRecurrence(std::string target_id,
-                                                                          const bool sparse,
-                                                                          const SummationMethod method = NaiveSummation)
+        template <typename FloatIOType = IOType>
+        Matrix<FloatIOType, Dynamic, 1> getMeanFirstPassageTimesFromRecurrence(std::string target_id,
+                                                                               const bool sparse,
+                                                                               const SummationMethod method = NaiveSummation)
         {
             Node* target = this->getNode(target_id);
             if (target == nullptr)
@@ -1894,7 +1922,7 @@ class LabeledDigraph
             }
             mean_times /= forest_one_root(t, t); 
 
-            return mean_times.template cast<IOType>();
+            return mean_times.template cast<FloatIOType>();
         }
 
         /**
@@ -1908,6 +1936,10 @@ class LabeledDigraph
          * meaning that there are no alternative terminal nodes (or rather
          * SCCs) to which the process can travel and get "stuck".
          *
+         * Since this method necessarily returns a vector with floating-point
+         * quantities, which may not be accommodated by `IOType`, this method 
+         * allows the specification of a third output type, `FloatIOType`. 
+         *
          * @param target_id ID of target node. 
          * @param method    Linear solver method for computing the vector of 
          *                  first-passage time second moments.
@@ -1916,8 +1948,9 @@ class LabeledDigraph
          * @throws std::invalid_argument if solver method is not recognized.
          * @throws std::runtime_error    if target node does not exist. 
          */
-        Matrix<IOType, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromSolver(std::string target_id, 
-                                                                                 const SolverMethod method = QRDecomposition)
+        template <typename FloatIOType = IOType>
+        Matrix<FloatIOType, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromSolver(std::string target_id, 
+                                                                                      const SolverMethod method = QRDecomposition)
         {
             // Get the index of the target node
             Node* target = this->getNode(target_id);
@@ -1997,7 +2030,7 @@ class LabeledDigraph
             for (unsigned i = t + 1; i < this->numnodes; ++i)
                 fpt_vec(i) = solution(i - 1);
 
-            return (fpt_vec * 2).template cast<IOType>(); 
+            return (fpt_vec * 2).template cast<FloatIOType>(); 
         }
 
         /**
@@ -2011,6 +2044,10 @@ class LabeledDigraph
          * meaning that there are no alternative terminal nodes (or rather
          * SCCs) to which the process can travel and get "stuck".
          *
+         * Since this method necessarily returns a vector with floating-point
+         * quantities, which may not be accommodated by `IOType`, this method 
+         * allows the specification of a third output type, `FloatIOType`. 
+         *
          * @param target_id ID of target node.
          * @param sparse    If true, use a sparse Laplacian matrix in the calculations. 
          * @param method    Summation method. 
@@ -2019,9 +2056,10 @@ class LabeledDigraph
          * @throws std::invalid_argument if summation method is not recognized.
          * @throws std::runtime_error    if target node does not exist. 
          */
-        Matrix<IOType, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromRecurrence(std::string target_id,
-                                                                                     const bool sparse,
-                                                                                     const SummationMethod method = NaiveSummation)
+        template <typename FloatIOType = IOType>
+        Matrix<FloatIOType, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromRecurrence(std::string target_id,
+                                                                                          const bool sparse,
+                                                                                          const SummationMethod method = NaiveSummation)
         {
             Node* target = this->getNode(target_id);
             if (target == nullptr)
@@ -2189,7 +2227,7 @@ class LabeledDigraph
             }
             second_moments /= (forest_one_root(t, t) * forest_one_root(t, t)); 
 
-            return (second_moments * 2).template cast<IOType>();
+            return (second_moments * 2).template cast<FloatIOType>();
         } 
 };
 
