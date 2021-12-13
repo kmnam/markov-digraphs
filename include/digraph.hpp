@@ -1668,7 +1668,7 @@ class LabeledDigraph
                 }  
             }
             
-            return forest_matrix.row(0).template cast<FloatIOType>() / norm.template cast<FloatIOType>();
+            return forest_matrix.row(0).template cast<FloatIOType>() / static_cast<FloatIOType>(norm); 
         }
 
         /**
@@ -1926,9 +1926,8 @@ class LabeledDigraph
                 ss << "Unrecognized summation method: " << method; 
                 throw std::invalid_argument(ss.str());
             }
-            mean_times /= forest_one_root(t, t); 
-
-            return mean_times.template cast<FloatIOType>();
+            
+            return mean_times.template cast<FloatIOType>() / static_cast<FloatIOType>(forest_one_root(t, t)); 
         }
 
         /**
@@ -2235,9 +2234,10 @@ class LabeledDigraph
                 ss << "Unrecognized summation method: " << method; 
                 throw std::invalid_argument(ss.str());
             }
-            second_moments /= (forest_one_root(t, t) * forest_one_root(t, t)); 
 
-            return (second_moments * 2).template cast<FloatIOType>();
+            return (2 * second_moments).template cast<FloatIOType>() / (
+                static_cast<FloatIOType>(forest_one_root(t, t) * forest_one_root(t, t))
+            );
         } 
 };
 
