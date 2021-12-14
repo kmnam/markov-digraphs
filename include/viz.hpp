@@ -7,7 +7,7 @@
  *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  *  **Last updated:**
- *      12/13/2021 
+ *      12/14/2021 
  */
 
 #ifndef LABELED_DIGRAPH_GRAPHVIZ_HPP 
@@ -25,7 +25,7 @@
  * Produce a new file with a visualization of the given `LabeledDigraph` 
  * instance with the graphviz library. 
  *
- * @param graph    Pointer to a `LabeledDigraph` instance. 
+ * @param graph    `LabeledDigraph` instance. 
  * @param layout   Graphviz layout algorithm (`"dot"`, `"neato"`, `"fdp"`, 
  *                 `"sfdp"`, `"twopi"`, `"circo"`).
  * @param format   Format of output file (`"png"`, `"pdf"`, etc.)
@@ -33,7 +33,7 @@
  * @param context  Pre-defined graphviz context.  
  */
 template <typename InternalType, typename IOType>
-void vizLabeledDigraph(LabeledDigraph<InternalType, IOType>* graph,
+void vizLabeledDigraph(LabeledDigraph<InternalType, IOType>& graph,
                        std::string layout,
                        std::string format,
                        std::string filename,  
@@ -43,7 +43,7 @@ void vizLabeledDigraph(LabeledDigraph<InternalType, IOType>* graph,
     Agraph_t* g = agopen(NULL, Agdirected, 0);
 
     // Add each node first  
-    for (std::string node_id : graph->getAllNodeIds())
+    for (std::string node_id : graph.getAllNodeIds())
     {
         // Parse each node ID into a non-const char array
         char* _node_id = new char[node_id.length() + 1]; 
@@ -53,7 +53,7 @@ void vizLabeledDigraph(LabeledDigraph<InternalType, IOType>* graph,
     }
     
     // Then add the edges 
-    for (std::string node_id : graph->getAllNodeIds())
+    for (std::string node_id : graph.getAllNodeIds())
     {
         // Parse each node ID (again) into a non-const char array
         char* _node_id = new char[node_id.length() + 1]; 
@@ -61,7 +61,7 @@ void vizLabeledDigraph(LabeledDigraph<InternalType, IOType>* graph,
         Agnode_t* source = agnode(g, _node_id, false); 
 
         // Get all outgoing edges from each node 
-        std::vector<std::pair<std::string, IOType> > edges_from_node = graph->getAllEdgesFromNode(node_id);
+        std::vector<std::pair<std::string, IOType> > edges_from_node = graph.getAllEdgesFromNode(node_id);
         for (auto&& entry : edges_from_node)
         {
             // Parse each target node ID into a non-const char array
