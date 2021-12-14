@@ -5,14 +5,16 @@
 #include "../include/digraph.hpp"
 #include "../include/graphs/line.hpp"
 #include "../include/graphs/grid.hpp"
+#include "../include/viz.hpp"
 
 /**
- * Python bindings for the `LabeledDigraph<...>` class through pybind11. 
+ * Python bindings for the `LabeledDigraph<...>` class and other functions in 
+ * `MarkovDigraphs` through pybind11. 
  *
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     12/10/2021
+ *     12/14/2021
  */
 
 namespace py = pybind11;
@@ -30,9 +32,6 @@ typedef boost::multiprecision::number<boost::multiprecision::mpfr_float_backend<
 PYBIND11_MODULE(pygraph, m)
 {
     m.doc() = R"delim(
-    PyGraph: Labeled directed graphs for modeling Markov processes
-    --------------------------------------------------------------
-
     .. currentmodule:: pygraph
 
     .. autosummary::
@@ -41,6 +40,7 @@ PYBIND11_MODULE(pygraph, m)
        PreciseDigraph
        PreciseLineGraph
        PreciseGridGraph
+       viz_digraph
 )delim"; 
 
     py::enum_<SummationMethod>(m, "SummationMethod")
@@ -812,4 +812,39 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("lower_exit_rate"),
             py::arg("upper_exit_rate")
         );
+
+    /**
+     * Expose `vizLabeledDigraph<PreciseType, double>()` as `viz_digraph()`.
+     */
+    m.def("viz_digraph",
+        [](LabeledDigraph<PreciseType, double>& graph,
+           std::string layout,
+           std::string format,
+           std::string filename)
+        {
+            // Establish a graphviz context, visualize the graph, then 
+            // free the context 
+            GVC_t* context = gvContext();
+            vizLabeledDigraph<PreciseType, double>(graph, layout, format, filename, context); 
+            gvFreeContext(context); 
+        },
+        R"delim(
+    Produce a new file with a visualization of the given `PreciseDigraph`
+    instance with the graphviz library.
+
+    :param graph: Input graph. 
+    :type graph: PreciseDigraph
+    :param layout: Graphviz layout algorithm: `"dot"`, `"neato"`, `"fdp"`,
+        `"sfdp"`, `"twopi"`, or `"circo"`. 
+    :type layout: str
+    :param format: Output file format: `"png"`, `"pdf"`, etc.
+    :type layout: str
+    :param filename: Output file name. 
+    :type layout: str
+)delim",
+        py::arg("graph"),
+        py::arg("format"),  
+        py::arg("layout"), 
+        py::arg("filename")
+    );
 }
