@@ -175,6 +175,24 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("source_id"),
             py::arg("target_id")
         )
+        .def("get_all_edges_from_node", 
+            static_cast<std::vector<std::pair<std::string, double> > (LabeledDigraph<PreciseType, double>::*)(std::string)>(
+                &LabeledDigraph<PreciseType, double>::getAllEdgesFromNode
+            ), 
+            R"delim(
+    Return a list of nodes to which there are edges outgoing from
+    the given source node, along with the corresponding edge labels, 
+    given the ID of the source node. 
+
+    :param source_id: ID of source node.
+    :type source_id: str
+    :return: List of pairs containing each target node ID and the 
+        corresponding edge label. 
+    :rtype: list of tuples of length two
+    :raise RuntimeError: If the source node does not exist. 
+)delim",
+            py::arg("source_id")
+        )
         .def("get_edge_label",
             &LabeledDigraph<PreciseType, double>::getEdgeLabel,
             R"delim(
@@ -255,7 +273,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("method") = SummationMethod::NaiveSummation
         )
         .def("get_steady_state_from_svd",
-            &LabeledDigraph<PreciseType, double>::getSteadyStateFromSVD,
+            &LabeledDigraph<PreciseType, double>::getSteadyStateFromSVD<PreciseType, double>,
             R"delim(
     Compute a vector in the kernel of the Laplacian matrix of the
     graph, normalized by its 1-norm, by singular value decomposition.
@@ -273,7 +291,7 @@ PYBIND11_MODULE(pygraph, m)
 )delim"
         )
         .def("get_steady_state_from_recurrence",
-            &LabeledDigraph<PreciseType, double>::getSteadyStateFromRecurrence,
+            &LabeledDigraph<PreciseType, double>::getSteadyStateFromRecurrence<double>,
             R"delim(
     Compute a vector in the kernel of the Laplacian matrix of the
     graph, normalized by its 1-norm, by the recurrence of Chebotarev
@@ -300,7 +318,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("method") = SummationMethod::NaiveSummation
         )
         .def("get_mean_first_passage_times_from_solver",
-            &LabeledDigraph<PreciseType, double>::getMeanFirstPassageTimesFromSolver,
+            &LabeledDigraph<PreciseType, double>::getMeanFirstPassageTimesFromSolver<PreciseType, double>,
             R"delim(
     Compute the vector of *unconditional* mean first-passage times in 
     the Markov process associated with the graph from each node to the
@@ -326,7 +344,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("method") = SolverMethod::QRDecomposition
         )
         .def("get_mean_first_passage_times_from_recurrence",
-            &LabeledDigraph<PreciseType, double>::getMeanFirstPassageTimesFromRecurrence,
+            &LabeledDigraph<PreciseType, double>::getMeanFirstPassageTimesFromRecurrence<double>,
             R"delim(
     Compute the vector of *unconditional* mean first-passage times in 
     the Markov process associated with the graph from each node to the
@@ -356,7 +374,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("method") = SummationMethod::NaiveSummation
         )
         .def("get_second_moments_of_first_passage_times_from_solver",
-            &LabeledDigraph<PreciseType, double>::getSecondMomentsOfFirstPassageTimesFromSolver,
+            &LabeledDigraph<PreciseType, double>::getSecondMomentsOfFirstPassageTimesFromSolver<PreciseType, double>,
             R"delim(
     Compute the vector of second moments of the *unconditional* first-
     passage times in the Markov process associated with the graph from
@@ -382,7 +400,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("method") = SolverMethod::QRDecomposition
         )
         .def("get_second_moments_of_first_passage_times_from_recurrence",
-            &LabeledDigraph<PreciseType, double>::getSecondMomentsOfFirstPassageTimesFromRecurrence,
+            &LabeledDigraph<PreciseType, double>::getSecondMomentsOfFirstPassageTimesFromRecurrence<double>,
             R"delim(
     Compute the vector of second moments of the *unconditional* first-
     passage times in the Markov process associated with the graph from
