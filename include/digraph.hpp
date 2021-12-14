@@ -2,40 +2,12 @@
  *
  *  Main header file for MarkovDigraphs.
  *
- *  Author:
+ *  **Author:**
  *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
- *  Last updated: 
- *      12/12/2021 
  *
- *  \mainpage MarkovDigraphs 
+ *  **Last updated:** 
+ *      12/13/2021
  *
- *  This header-only C++ package implements a class, `LabeledDigraph`, for 
- *  manipulating and performing computations with directed graphs with labeled
- *  edges as representations of both biochemical systems.
- *
- *  \section Introduction
- *
- *  This approach stems from the "linear framework," which originated as a 
- *  framework for [performing timescale separation in biochemical systems]
- *  (https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0036321)
- *  that could be viewed as "macroscopic" aqueous mixtures of chemical
- *  species---the approach usually taken to model, e.g., enzymatic
- *  reactions---but can also be used to [study the steady-state properties of
- *  a single molecule]
- *  (https://link.springer.com/article/10.1007%2Fs11538-013-9884-8),
- *  such as a gene, whose state evolves according to a Markov process. In either 
- *  setting, the system can be represented in terms of a directed graph with
- *  labeled edges, in which the vertices represent combinations of chemical 
- *  species or molecular states, edges represent chemical reactions or state
- *  transitions, and labels represent reaction/transition rates. From here, 
- *  the properties of the underlying dynamical system or Markov process can 
- *  be revealed from the graph's structure. The linear framework has proved 
- *  useful for studying the [capacity for bistability of post-translational
- *  modification systems]
- *  (https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1007573)
- *  and the [sharpness of gene regulation]
- *  (https://www.sciencedirect.com/science/article/pii/S0092867416307413),
- *  among [various other subjects](https://vcp.med.harvard.edu/papers.html).
  */
 
 #ifndef LABELED_DIGRAPHS_HPP
@@ -499,40 +471,6 @@ class LabeledDigraph
                     // If so, instantiate the edge and get the label 
                     InternalType label = this->edges[source][target];
                     edges_from_node.push_back(std::make_pair(i, label)); 
-                }
-            }
-
-            return edges_from_node; 
-        }
-
-        /**
-         * Return a vector of outgoing edges from the given source node, given
-         * the ID of the source node. 
-         *
-         * @param source_id ID of source node. 
-         * @returns         `std::vector` of pairs containing each edge (as a 
-         *                  `<Node*, Node*>` pair) and edge label
-         * @throws std::runtime_error if a node with the given ID does not exist. 
-         */
-        std::vector<std::pair<Edge, InternalType> > getAllEdgesFromNode(std::string source_id) 
-        {
-            std::vector<std::pair<Edge, InternalType> > edges_from_node;
-            Node* source = this->getNode(source_id);
-
-            // Check that the given node exists
-            if (source == nullptr)
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
-
-            // Run through all nodes in this->order ...
-            for (auto&& node : this->order)
-            {
-                // Is there an edge to this node?
-                if (this->edges[source].find(node) != this->edges[source].end())
-                {
-                    // If so, instantiate the edge and get the label 
-                    Edge edge = std::make_pair(source, node);
-                    InternalType label = this->edges[source][node];
-                    edges_from_node.push_back(std::make_pair(edge, label)); 
                 }
             }
 
@@ -1142,6 +1080,42 @@ class LabeledDigraph
                 return (this->edges.count(source) && (this->edges.find(source))->second.count(target));
             }
             return false;
+        }
+
+        /**
+         * Return a vector of nodes to which there are edges outgoing from the 
+         * given source node, along with the corresponding edge label, given 
+         * the ID of the source node. 
+         *
+         * @param source_id ID of source node. 
+         * @returns         `std::vector` of `<std::string, IOType>` pairs
+         *                  containing each target node and corresponding 
+         *                  edge label
+         * @throws std::runtime_error if a node with the given ID does not exist. 
+         */
+        std::vector<std::pair<std::string, IOType> > getAllEdgesFromNode(std::string source_id) 
+        {
+            std::vector<std::pair<std::string, IOType> > edges_from_node;
+            Node* source = this->getNode(source_id);
+
+            // Check that the given node exists
+            if (source == nullptr)
+                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
+
+            // Run through all nodes in this->order ...
+            for (auto&& node : this->order)
+            {
+                // Is there an edge to this node?
+                if (this->edges[source].find(node) != this->edges[source].end())
+                {
+                    // If so, instantiate the edge and get the label 
+                    std::string target_id = node->id; 
+                    IOType label = static_cast<IOType>(this->edges[source][node]);
+                    edges_from_node.push_back(std::make_pair(target_id, label)); 
+                }
+            }
+
+            return edges_from_node; 
         }
 
         /**
