@@ -56,24 +56,17 @@ Requirements for MarkovDigraphs
 
 **MarkovDigraphs** requires 
 [**Eigen**](https://eigen.tuxfamily.org/index.php?title=Main_Page)
-(version >= 3.4) for linear algebra.
+for linear algebra. Using the graph visualization function
+``vizLabeledDigraph()`` additionally requires
+[**Graphviz**](https://graphviz.org/).
 
-Although the fundamental class template in **MarkovDigraphs**
-(`LabeledDigraph`) allows the use of any (Eigen-compatible) scalar type,
-accurately computing the quantities enumerated above for even relatively
-simple graphs requires the use of
-[multiple-precision arithmetic](https://en.wikipedia.org/wiki/Arbitrary-precision_arithmetic).
-Many packages can be used for this purpose, but we recommend
-[**Boost.Multiprecision**](https://www.boost.org/doc/libs/1_78_0/libs/multiprecision/doc/html/index.html),
-which wraps the [**MPFR** library](https://www.mpfr.org/).
-
-Using the graph visualization function ``vizLabeledDigraph()`` additionally
-requires [**Graphviz**](https://graphviz.org/).
+See [here](install.html) for details on how to start using **MarkovDigraphs**. 
 
 Requirements for PyGraph
 ------------------------
 
-To install **PyGraph** as a Python 3 extension that can used within your 
-Python code, you will additionally need **Boost.Multiprecision** (see above)
-and [**pybind11**](https://pybind11.readthedocs.io/).
+To install **PyGraph** as a Python 3 extension module that can be imported into
+your code, you will additionally need **Boost.Multiprecision**, **Graphviz**
+(see above), and [**pybind11**](https://pybind11.readthedocs.io/).
+See [here](install.html) for details. 
 
