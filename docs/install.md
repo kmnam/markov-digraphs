@@ -109,8 +109,8 @@ If you use [Anaconda](https://anaconda.org/), then you should use conda:
 ```
 $ conda install pybind11
 ```
-If you use a newer version of Python with [homebrew](https://brew.sh/),
-then you should use brew:
+If you prefer to keep your version of Python up-to-date with
+[homebrew](https://brew.sh/), then you should use brew:
 ```
 $ brew install pybind11
 ``` 
@@ -131,4 +131,25 @@ then run the command (from the root directory)
 $ python3 setup.py build_ext --inplace
 ```
 
-This should produce a compiled  library file  
+This should produce a compiled object file with the name `pygraph.[SUFFIX]`,
+where `SUFFIX` is determined by your version of Python (e.g., `cpython-39-darwin.so`).
+If you're curious, you can find out what this suffix is (without compiling
+**PyGraph**) by running
+```
+$ python3-config --extension-suffix
+```
+Now, all you have to do to import **PyGraph** into your Python code is to 
+add the location of this object file (i.e., the **MarkovDigraphs** root 
+directory) to Python's path: 
+```
+import os
+import sys 
+sys.path.append(os.path.abspath('/relative/path/to/markovdigraphs/root/'))
+
+# Now you are free to import pygraph
+import pygraph
+graph = pygraph.PreciseDigraph()
+...
+```
+More details on how to use **PyGraph** and its API can be found on the 
+[**PyGraph** docs page](https://kmnam.github.io/pygraph-docs/). 
