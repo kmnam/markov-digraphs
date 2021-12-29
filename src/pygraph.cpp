@@ -11,10 +11,11 @@
  * Python bindings for the `LabeledDigraph<...>` class and other functions in 
  * `MarkovDigraphs` through pybind11. 
  *
- * Authors:
+ * **Author:**
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
- * Last updated:
- *     12/14/2021
+ *
+ * **Last updated:**
+ *     12/29/2021
  */
 
 namespace py = pybind11;
@@ -42,11 +43,6 @@ PYBIND11_MODULE(pygraph, m)
        PreciseGridGraph
        viz_digraph
 )delim"; 
-
-    py::enum_<SummationMethod>(m, "SummationMethod")
-        .value("NaiveSummation", SummationMethod::NaiveSummation)
-        .value("KahanSummation", SummationMethod::KahanSummation)
-        .value("KBNSummation",   SummationMethod::KBNSummation);
 
     py::enum_<SolverMethod>(m, "SolverMethod")
         .value("QRDecomposition", SolverMethod::QRDecomposition)
@@ -244,16 +240,12 @@ PYBIND11_MODULE(pygraph, m)
     Return the Laplacian matrix, with the nodes ordered according 
     to the graph's canonical ordering of nodes.
 
-    :param method: Summation method.
-    :type method: SummationMethod
     :return: Laplacian matrix of the graph (as a dense matrix).
     :rtype: numpy.ndarray
-    :raise ValueError: If summation method is not recognized.
-)delim",
-            py::arg("method") = SummationMethod::NaiveSummation
+)delim"
         )
         .def("get_spanning_forest_matrix",
-            static_cast<Eigen::MatrixXd (LabeledDigraph<PreciseType, double>::*)(const int, const SummationMethod)>(
+            static_cast<Eigen::MatrixXd (LabeledDigraph<PreciseType, double>::*)(const int)>(
                 &LabeledDigraph<PreciseType, double>::getSpanningForestMatrix
             ),
             R"delim(
@@ -263,14 +255,10 @@ PYBIND11_MODULE(pygraph, m)
 
     :param k: Index of the desired spanning forest matrix.
     :type k: int
-    :param method: Summation method.
-    :type method: SummationMethod
     :return: k-th spanning forest matrix.
     :rtype: numpy.ndarray
-    :raise ValueError: If summation method is not recognized.
 )delim",
-            py::arg("k"),
-            py::arg("method") = SummationMethod::NaiveSummation
+            py::arg("k")
         )
         .def("get_steady_state_from_svd",
             &LabeledDigraph<PreciseType, double>::getSteadyStateFromSVD<PreciseType, double>,
@@ -307,15 +295,11 @@ PYBIND11_MODULE(pygraph, m)
     :param sparse: If True, use a sparse Laplacian matrix in the
         calculations.
     :type sparse: bool
-    :param method: Summation method.
-    :type method: SummationMethod
     :return: Vector in the kernel of the graph's Laplacian matrix,
         normalized by its 1-norm.
     :rtype: numpy.ndarray
-    :raise ValueError: If summation method is not recognized. 
 )delim",
-            py::arg("sparse"),
-            py::arg("method") = SummationMethod::NaiveSummation
+            py::arg("sparse")
         )
         .def("get_mean_first_passage_times_from_solver",
             &LabeledDigraph<PreciseType, double>::getMeanFirstPassageTimesFromSolver<PreciseType, double>,
@@ -361,17 +345,13 @@ PYBIND11_MODULE(pygraph, m)
     :param sparse: If True, use a sparse Laplacian matrix in the
         calculations.
     :type sparse: bool
-    :param method: Summation method.
-    :type method: SummationMethod
     :return: Vector of mean first-passage times to the target node from
         every node in the graph.
     :rtype: numpy.ndarray 
-    :raise ValueError: If summation method is not recognized.
     :raise RuntimeError: If target node does not exist.
 )delim",
             py::arg("target_id"),
-            py::arg("sparse"), 
-            py::arg("method") = SummationMethod::NaiveSummation
+            py::arg("sparse") 
         )
         .def("get_second_moments_of_first_passage_times_from_solver",
             &LabeledDigraph<PreciseType, double>::getSecondMomentsOfFirstPassageTimesFromSolver<PreciseType, double>,
@@ -417,17 +397,13 @@ PYBIND11_MODULE(pygraph, m)
     :param sparse: If True, use a sparse Laplacian matrix in the
         calculations.
     :type sparse: bool
-    :param method: Summation method.
-    :type method: SummationMethod
     :return: Vector of first-passage time second moments to the target
         node from every node in the graph.
     :rtype: numpy.ndarray 
-    :raise ValueError: If summation method is not recognized.
     :raise RuntimeError: If target node does not exist.
 )delim", 
             py::arg("target_id"),
-            py::arg("sparse"), 
-            py::arg("method") = SummationMethod::NaiveSummation 
+            py::arg("sparse")
         );
 
     /**
