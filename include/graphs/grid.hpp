@@ -6,7 +6,7 @@
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  * Last updated:
- *     12/10/2021
+ *     12/29/2021
  */
 
 #ifndef GRID_LABELED_DIGRAPH_HPP
@@ -747,8 +747,8 @@ class GridGraph : public LabeledDigraph<InternalType, IOType>
             laplacian(2, 0) = 0; 
             laplacian(2, 2) = 0; 
             laplacian(2, 3) = 0; 
-            curr = chebotarevAgaevRecurrence<InternalType>(laplacian, curr, 0);
-            curr = chebotarevAgaevRecurrence<InternalType>(laplacian, curr, 1);
+            curr = chebotarevAgaevRecurrence<InternalType>(0, laplacian, curr);
+            curr = chebotarevAgaevRecurrence<InternalType>(1, laplacian, curr);
             // All spanning forests rooted at A0, A1
             InternalType weight_A0_A1 = curr(0, 0);
             // All spanning forests rooted at A0, A1 with path from B0 to A0
@@ -771,7 +771,7 @@ class GridGraph : public LabeledDigraph<InternalType, IOType>
             laplacian(3, 2) = 0;
             laplacian(3, 3) = 0;
             curr = Matrix<InternalType, Dynamic, Dynamic>::Identity(4, 4);
-            curr = chebotarevAgaevRecurrence<InternalType>(laplacian, curr, 0);
+            curr = chebotarevAgaevRecurrence<InternalType>(0, laplacian, curr);
             // All spanning forests rooted at A0, A1, B1
             InternalType weight_A0_A1_B1 = curr(0, 0);
             // All spanning forests rooted at A0, A1, B1 with path from B0 to A0
@@ -785,8 +785,8 @@ class GridGraph : public LabeledDigraph<InternalType, IOType>
             laplacian(2, 3) = -this->edges[node_A1][node_B1];    // A1 -> B1
             laplacian(2, 2) = -laplacian(2, 0) - laplacian(2, 3); 
             curr = Matrix<InternalType, Dynamic, Dynamic>::Identity(4, 4); 
-            curr = chebotarevAgaevRecurrence<InternalType>(laplacian, curr, 0);
-            curr = chebotarevAgaevRecurrence<InternalType>(laplacian, curr, 1);
+            curr = chebotarevAgaevRecurrence<InternalType>(0, laplacian, curr);
+            curr = chebotarevAgaevRecurrence<InternalType>(1, laplacian, curr);
             // All spanning forests rooted at A0, B1
             InternalType weight_A0_B1 = curr(0, 0);
             // All spanning forests rooted at A0, B1 with path from B0 to A0
@@ -806,9 +806,9 @@ class GridGraph : public LabeledDigraph<InternalType, IOType>
             laplacian(3, 2) = -this->edges[node_B1][node_A1];    // B1 -> A1
             laplacian(3, 3) = -laplacian(3, 1) - laplacian(3, 2);
             curr = Matrix<InternalType, Dynamic, Dynamic>::Identity(4, 4);
-            curr = chebotarevAgaevRecurrence<InternalType>(laplacian, curr, 0);
-            curr = chebotarevAgaevRecurrence<InternalType>(laplacian, curr, 1);
-            curr = chebotarevAgaevRecurrence<InternalType>(laplacian, curr, 2);
+            curr = chebotarevAgaevRecurrence<InternalType>(0, laplacian, curr);
+            curr = chebotarevAgaevRecurrence<InternalType>(1, laplacian, curr);
+            curr = chebotarevAgaevRecurrence<InternalType>(2, laplacian, curr);
             InternalType weight_A0 = curr(0, 0);    // All spanning trees rooted at A0
             InternalType weight_B0 = curr(1, 1);    // All spanning trees rooted at B0
             InternalType weight_A1 = curr(2, 2);    // All spanning trees rooted at A1
