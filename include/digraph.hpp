@@ -6,7 +6,7 @@
  *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  *  **Last updated:** 
- *      12/16/2021
+ *      12/29/2021
  */
 
 #ifndef LABELED_DIGRAPHS_HPP
@@ -14,7 +14,6 @@
 
 #include <cmath>
 #include <vector>
-#include <stack>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
@@ -22,352 +21,13 @@
 #include <algorithm>
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
-#include "kahan.hpp"
-#include "KBNSum.hpp"
+#include "math.hpp"
 
 using namespace Eigen;
 
-/** All non-homogeneous linear system solver methods. */
-enum SolverMethod {  
-    LUDecomposition,
-    QRDecomposition
-};
-
-/** All supported summation methods. */  
-enum SummationMethod {
-    NaiveSummation, 
-    KahanSummation, 
-    PairwiseSummation,
-    KBNSummation
-};
-
-// ----------------------------------------------------- //
-//       LINEAR ALGEBRA AND OTHER HELPER FUNCTIONS       //
-// ----------------------------------------------------- //
-/** 
- * Return true if abs(a - b) < tol.
- *
- * @param a   first scalar. 
- * @param b   second scalar. 
- * @param tol tolerance.
- * @returns   true if abs(a - b) < tol, false otherwise.  
- */
-template <typename T>
-bool isclose(T a, T b, T tol)
-{
-    T c = a - b;
-    return ((c >= 0 && c < tol) || (c < 0 && -c < tol));
-}
-
-/**
- * Compute the nullspace of A by performing a singular value decomposition.
- * 
- * This function returns the column of V in the SVD of A = USV corresponding
- * to the least singular value (recall that singular values are always
- * non-negative). It therefore effectively assumes that the A has a 
- * nullspace of dimension one.
- * 
- * @param A Input matrix to be decomposed. 
- * @returns The column of V in the singular value decomposition A = USV 
- *          corresponding to the least singular value. 
- */
-template <typename T>
-Matrix<T, Dynamic, 1> getOneDimNullspaceFromSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A)
-{
-    // Perform a singular value decomposition of A, only computing V in full
-    Eigen::BDCSVD<Matrix<T, Dynamic, Dynamic> > svd(A, Eigen::ComputeFullV);
-
-    // Return the column of V corresponding to the least singular value of A
-    // (always given last in the decomposition) 
-    Matrix<T, Dynamic, 1> singular = svd.singularValues(); 
-    Matrix<T, Dynamic, Dynamic> V = svd.matrixV();
-    return V.col(singular.rows() - 1); 
-}
-
-/**
- * Compute the nullspace of A by performing a singular value decomposition.
- * 
- * This function returns the column(s) of V in the SVD of A = USV
- * corresponding to singular values with absolute value < tol.
- *
- * @param A   Input matrix to be decomposed. 
- * @param tol Tolerance for singular value to be treated as sufficiently 
- *            close to zero.
- * @returns   The matrix of columns in V in the singular value decomposition
- *            A = USV corresponding to singular values less than tol.  
- */
-template <typename T>
-Matrix<T, Dynamic, Dynamic> getNullspaceFromSVD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, const T tol)
-{
-    // Perform a singular value decomposition of A, only computing V in full
-    Eigen::BDCSVD<Matrix<T, Dynamic, Dynamic> > svd(A, Eigen::ComputeFullV);
-
-    // Initialize nullspace basis matrix
-    Matrix<T, Dynamic, Dynamic> nullmat;
-    unsigned ncols = 0;
-    unsigned nrows = A.cols();
-
-    // Run through the singular values of A (in ascending, i.e., reverse order) ...
-    Matrix<T, Dynamic, 1> singular = svd.singularValues();
-    Matrix<T, Dynamic, Dynamic> V = svd.matrixV();
-    unsigned ns = singular.rows();
-    unsigned j = ns - 1;
-    while (isclose<T>(singular(j), 0.0, tol) && j >= 0)
-    {
-        // ... and grab the columns of V that correspond to the zero
-        // singular values
-        ncols++;
-        nullmat.resize(nrows, ncols);
-        nullmat.col(ncols - 1) = V.col(j);
-        j--;
-    }
-
-    return nullmat;
-}
-
-/**
- * Solve the non-homogeneous linear system Ax = b by obtaining an LU 
- * decomposition of a matrix A. 
- * 
- * @param A Input matrix. 
- * @param b Input vector.
- * @returns Solution vector to Ax = b.  
- */
-template <typename T>
-Matrix<T, Dynamic, 1> solveByLUD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A,
-                                 const Ref<const Matrix<T, Dynamic, 1> >& b)
-{
-    // Obtain a full-pivot LU decomposition of A 
-    FullPivLU<Matrix<T, Dynamic, Dynamic> > lud(A); 
-
-    // Get and return the solution to Ax = b
-    return lud.solve(b); 
-}
-
-/**
- * Solve the non-homogeneous linear system Ax = b by obtaining a QR 
- * decomposition of A. 
- *
- * @param A Input matrix. 
- * @param b Input vector. 
- * @returns Solution vector to Ax = b. 
- */
-template <typename T>
-Matrix<T, Dynamic, 1> solveByQRD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, 
-                                 const Ref<const Matrix<T, Dynamic, 1> >& b)
-{
-    // Obtain a QR decomposition of A 
-    ColPivHouseholderQR<Matrix<T, Dynamic, Dynamic> > qrd(A);
-
-    // Get and return the solution to Ax = b
-    return qrd.solve(b); 
-}
-
-/**
- * Apply one iteration of the recurrence of Chebotarev & Agaev (Lin Alg
- * Appl, 2002, Eqs.\ 17-18) for the spanning forest matrices of the graph,
- * using a *dense* Laplacian matrix.
- *
- * @param k         Index of current iteration. 
- * @param laplacian Input Laplacian matrix. 
- * @param curr      k-th spanning forest matrix obtained from previous
- *                  applications of the Chebotarev-Agaev recurrence. 
- * @param method    Summation method.
- * @returns         (k+1)-th spanning forest matrix.  
- */
-template <typename T>
-Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const int k, 
-                                                      const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian,
-                                                      const Ref<const Matrix<T, Dynamic, Dynamic> >& curr,
-                                                      const SummationMethod method = NaiveSummation) 
-{
-    // First compute the following:
-    //
-    //                 tr(L(G) * Q_k(G))
-    // \phi_{k+1}(G) = -----------------
-    //                       k + 1
-    //
-    // Then compute: 
-    //
-    // Q_{k+1}(G) = -L(G) * Q_k(G) + \phi_{k+1}(G) * I
-    //
-    T denom = static_cast<T>(k + 1);
-    Matrix<T, Dynamic, Dynamic> product;
-    T phi; 
-    switch (method)
-    {
-        case NaiveSummation:
-            product = laplacian * curr;
-            phi = product.trace() / denom;
-            break;
-
-        case KahanSummation:
-            product = KahanSum::multiply(laplacian, curr);
-            phi = KahanSum::trace(product) / denom;
-            break;
-
-        case KBNSummation:
-            product = KBNSum::multiply(laplacian, curr); 
-            phi = KBNSum::trace(product) / denom;
-            break;
-
-        default:
-            std::stringstream ss; 
-            ss << "Unrecognized summation method: " << method; 
-            throw std::invalid_argument(ss.str());
-            break; 
-    }
-    Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(laplacian.rows(), laplacian.cols());
-
-    return (phi * identity) - product;
-}
-
-/**
- * Apply one iteration of the recurrence of Chebotarev & Agaev (Lin Alg
- * Appl, 2002, Eq.\ 19) for the *normalized* spanning forest matrices
- * of the graph, using a *dense* Laplacian matrix.
- * 
- * @param k         Index of current iteration. 
- * @param laplacian Input Laplacian matrix. 
- * @param currmat   Pre-computed k-th normalized spanning forest matrix.
- * @param currphi   Pre-computed value of \phi_k(G) / \phi_{k+1}(G), where 
- *                  \phi_k(G) is the sum of weights of all spanning forests of 
- *                  G containing k edges.
- * @param method    Summation method.
- * @returns         The (k+1)-th normalized spanning forest matrix and 
- *                  \phi_{k+1}(G) / \phi_{k+2}(G).
- */
-template <typename T>
-std::pair<Matrix<T, Dynamic, Dynamic>, T> normalizedChebotarevAgaevRecurrence(const int k,
-                                                                              const Ref<const Matrix<T, Dynamic, Dynamic> >& laplacian,
-                                                                              const Ref<const Matrix<T, Dynamic, Dynamic> >& currmat,
-                                                                              const T currphi, 
-                                                                              const SummationMethod method = NaiveSummation) 
-{
-    // First compute the following:
-    //
-    //                   \phi_k(G)
-    // J_{k+1}(G) = -( -------------) * L(G) * J_k(G) + I
-    //                 \phi_{k+1}(G)
-    Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(laplacian.rows(), laplacian.cols());
-    Matrix<T, Dynamic, Dynamic> currprod = laplacian * currmat; 
-    Matrix<T, Dynamic, Dynamic> nextmat = -currphi * currprod + identity;
-
-    // Then compute the following:
-    //
-    //  \phi_{k+1}(G)   k + 2     tr(L(G) * J_k(G))         \phi_k(G)
-    //  ------------- = ----- ( --------------------- ) ( ------------- )
-    //  \phi_{k+2}(G)   k + 1   tr(L(G) * J_{k+1}(G))     \phi_{k+1}(G)
-    T coef = static_cast<T>(k + 2) / static_cast<T>(k + 1);
-    T nextphi = coef * currprod.trace() * currphi / (laplacian * nextmat).trace(); 
-
-    return std::make_pair(nextmat, nextphi); 
-}
-
-/**
- * Apply one iteration of the recurrence of Chebotarev & Agaev (Lin Alg
- * Appl, 2002, Eqs.\ 17-18) for the spanning forest matrices of the graph,
- * using a *compressed sparse row-major* Laplacian matrix.
- *
- * @param k         Index of current iteration. 
- * @param laplacian Input Laplacian matrix (compressed sparse row-major).
- * @param curr      k-th spanning forest matrix obtained from previous
- *                  applications of the Chebotarev-Agaev recurrence. 
- * @param method    Summation method.
- * @returns         (k+1)-th spanning forest matrix. 
- */
-template <typename T>
-Matrix<T, Dynamic, Dynamic> chebotarevAgaevRecurrence(const int k,
-                                                      const SparseMatrix<T, RowMajor>& laplacian, 
-                                                      const Ref<const Matrix<T, Dynamic, Dynamic> >& curr,
-                                                      const SummationMethod method = NaiveSummation)
-{
-    // First compute the following:
-    //
-    //                 tr(L(G) * Q_k(G))
-    // \phi_{k+1}(G) = -----------------
-    //                       k + 1
-    //
-    // Then compute: 
-    //
-    // Q_{k+1}(G) = -L(G) * Q_k(G) + \phi_{k+1}(G) * I
-    //
-    T denom = static_cast<T>(k + 1);
-    Matrix<T, Dynamic, Dynamic> product;
-    T phi; 
-    switch (method)
-    {
-        case NaiveSummation:
-            product = laplacian * curr;
-            phi = product.trace() / denom;
-            break;
-
-        case KahanSummation:
-            product = KahanSum::multiply(laplacian, curr);
-            phi = KahanSum::trace(product) / denom;
-            break;
-
-        case KBNSummation:
-            product = KBNSum::multiply(laplacian, curr); 
-            phi = KBNSum::trace(product) / denom;
-            break;
-
-        default:
-            std::stringstream ss; 
-            ss << "Unrecognized summation method: " << method; 
-            throw std::invalid_argument(ss.str());
-            break; 
-    }
-    Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(laplacian.rows(), laplacian.cols());
-
-    return (phi * identity) - product;
-}
-
-/**
- * Apply one iteration of the recurrence of Chebotarev & Agaev (Lin Alg
- * Appl, 2002, Eq.\ 19) for the *normalized* spanning forest matrices
- * of the graph, using a *compressed sparse row-major* Laplacian matrix.
- * 
- * @param k         Index of current iteration. 
- * @param laplacian Input Laplacian matrix (compressed sparse row-major). 
- * @param currmat   Pre-computed k-th normalized spanning forest matrix.
- * @param currphi   Pre-computed value of \phi_k(G) / \phi_{k+1}(G), where 
- *                  \phi_k(G) is the sum of weights of all spanning forests of 
- *                  G containing k edges.
- * @param method    Summation method.
- * @returns         The (k+1)-th normalized spanning forest matrix and 
- *                  \phi_{k+1}(G) / \phi_{k+2}(G).
- */
-template <typename T>
-std::pair<Matrix<T, Dynamic, Dynamic>, T> normalizedChebotarevAgaevRecurrence(const int k,
-                                                                              const SparseMatrix<T, RowMajor>& laplacian, 
-                                                                              const Ref<const Matrix<T, Dynamic, Dynamic> >& currmat,
-                                                                              const T currphi, 
-                                                                              const SummationMethod method = NaiveSummation) 
-{
-    // First compute the following:
-    //
-    //                   \phi_k(G)
-    // J_{k+1}(G) = -( -------------) * L(G) * J_k(G) + I
-    //                 \phi_{k+1}(G)
-    Matrix<T, Dynamic, Dynamic> identity = Matrix<T, Dynamic, Dynamic>::Identity(laplacian.rows(), laplacian.cols());
-    Matrix<T, Dynamic, Dynamic> currprod = laplacian * currmat; 
-    Matrix<T, Dynamic, Dynamic> nextmat = -currphi * currprod + identity;
-
-    // Then compute the following:
-    //
-    //  \phi_{k+1}(G)   k + 2     tr(L(G) * J_k(G))         \phi_k(G)
-    //  ------------- = ----- ( --------------------- ) ( ------------- )
-    //  \phi_{k+2}(G)   k + 1   tr(L(G) * J_{k+1}(G))     \phi_{k+1}(G)
-    T coef = static_cast<T>(k + 2) / static_cast<T>(k + 1);
-    T nextphi = coef * currprod.trace() * currphi / (laplacian * nextmat).trace(); 
-
-    return std::make_pair(nextmat, nextphi); 
-}
-
-// ----------------------------------------------------- //
-//                    NODES AND EDGES                    //
-// ----------------------------------------------------- //
+// ---------------------------------------------------------------------- //
+//                            NODES AND EDGES                             //
+// ---------------------------------------------------------------------- //
 
 /**
  * A minimal struct that represents a vertex or node. 
@@ -429,9 +89,9 @@ struct Node
  */
 using Edge = std::pair<Node*, Node*>;
 
-// ----------------------------------------------------- //
-//               THE LABELEDDIGRAPH CLASS                //
-// ----------------------------------------------------- //
+// ---------------------------------------------------------------------- //
+//                        THE LABELEDDIGRAPH CLASS                        //
+// ---------------------------------------------------------------------- //
 
 /**
  * An implementation of a labeled digraph.
@@ -470,7 +130,7 @@ class LabeledDigraph
 
         /** Dictionary that maps outgoing edges from each `Node`, along with edge labels. */ 
         std::unordered_map<Node*, std::unordered_map<Node*, InternalType> > edges;
-
+        
         // ----------------------------------------------------- //
         //                   PROTECTED METHODS                   //
         // ----------------------------------------------------- //
@@ -625,12 +285,10 @@ class LabeledDigraph
          * 
          * @param k         Index of desired spanning forest matrix.  
          * @param laplacian Input Laplacian matrix.
-         * @param method    Summation method.
          * @returns         k-th spanning forest matrix. 
          */
         Matrix<InternalType, Dynamic, Dynamic> getSpanningForestMatrix(const int k,
-                                                                       const Ref<const Matrix<InternalType, Dynamic, Dynamic> >& laplacian,
-                                                                       const SummationMethod method = NaiveSummation)
+                                                                       const Ref<const Matrix<InternalType, Dynamic, Dynamic> >& laplacian)
         {
             // Begin with the identity matrix 
             Matrix<InternalType, Dynamic, Dynamic> curr
@@ -638,7 +296,7 @@ class LabeledDigraph
 
             // Apply the recurrence ...
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<InternalType>(i, laplacian, curr, method);
+                curr = chebotarevAgaevRecurrence<InternalType>(i, laplacian, curr);
 
             return curr; 
         }
@@ -653,12 +311,10 @@ class LabeledDigraph
          * 
          * @param k         Index of desired spanning forest matrix.  
          * @param laplacian Input Laplacian matrix (compressed sparse row-major).
-         * @param method    Summation method.
          * @returns         k-th spanning forest matrix. 
          */
         Matrix<InternalType, Dynamic, Dynamic> getSpanningForestMatrix(const int k,
-                                                                       const SparseMatrix<InternalType, RowMajor>& laplacian,
-                                                                       const SummationMethod method = NaiveSummation)
+                                                                       const SparseMatrix<InternalType, RowMajor>& laplacian)
         {
             // Begin with the identity matrix
             Matrix<InternalType, Dynamic, Dynamic> curr
@@ -666,106 +322,9 @@ class LabeledDigraph
 
             // Apply the recurrence ...
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<InternalType>(i, laplacian, curr, method); 
+                curr = chebotarevAgaevRecurrence<InternalType>(i, laplacian, curr); 
 
             return curr; 
-        }
-
-        /**
-         * Compute the k-th *normalized* spanning forest matrix, using the
-         * recurrence of Chebotarev and Agaev (Lin Alg Appl, 2002, Eq.\ 19),
-         * along with the ratio \phi_k(G) / \phi_{k+1}(G) of the total weight
-         * of k-edge spanning forests by the total weight of (k+1)-edge 
-         * spanning forests, with a *dense* Laplacian matrix. 
-         *
-         * A private version of the corresponding public method, in which 
-         * a pre-computed Laplacian matrix is provided as an argument.
-         * 
-         * @param k         Index of desired spanning forest matrix.  
-         * @param laplacian Input Laplacian matrix.
-         * @param method    Summation method.
-         * @returns         k-th normalized spanning forest matrix and
-         *                  \phi_k(G) / \phi_{k+1}(G). 
-         */
-        std::pair<Matrix<InternalType, Dynamic, Dynamic>, InternalType>
-            getNormalizedSpanningForestMatrix(const int k,
-                                              const Ref<const Matrix<InternalType, Dynamic, Dynamic> >& laplacian,
-                                              const SummationMethod method = NaiveSummation)
-        {
-            // Begin with the identity matrix 
-            Matrix<InternalType, Dynamic, Dynamic> currmat
-                = Matrix<InternalType, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes);
-
-            // The ratio \phi_0(G) / \phi_1(G) is the reciprocal of the sum 
-            // of all edge labels in the graph 
-            InternalType sum = 0;
-            for (auto&& source : this->order)
-            {
-                for (auto&& entry : this->edges[source])
-                {
-                    sum += entry.second; 
-                }
-            }
-            InternalType currphi = 1 / sum; 
-
-            // Apply the recurrence ...
-            for (unsigned i = 0; i < k; ++i)
-            {
-                auto result = normalizedChebotarevAgaevRecurrence<InternalType>(i, laplacian, currmat, currphi, method);
-                currmat = result.first; 
-                currphi = result.second; 
-            }
-
-            return std::make_pair(currmat, currphi);  
-        }
-
-        /**
-         * Compute the k-th *normalized* spanning forest matrix, using the
-         * recurrence of Chebotarev and Agaev (Lin Alg Appl, 2002, Eq.\ 19),
-         * along with the ratio \phi_k(G) / \phi_{k+1}(G) of the total weight
-         * of k-edge spanning forests by the total weight of (k+1)-edge 
-         * spanning forests, with a *compressed sparse row-major* Laplacian
-         * matrix. 
-         *
-         * A private version of the corresponding public method, in which 
-         * a pre-computed Laplacian matrix is provided as an argument.
-         * 
-         * @param k         Index of desired spanning forest matrix.  
-         * @param laplacian Input Laplacian matrix (compressed sparse row-major).
-         * @param method    Summation method.
-         * @returns         k-th normalized spanning forest matrix and
-         *                  \phi_k(G) / \phi_{k+1}(G). 
-         */
-        std::pair<Matrix<InternalType, Dynamic, Dynamic>, InternalType>
-            getNormalizedSpanningForestMatrix(const int k,
-                                              const SparseMatrix<InternalType, RowMajor>& laplacian,
-                                              const SummationMethod method = NaiveSummation)
-        {
-            // Begin with the identity matrix 
-            Matrix<InternalType, Dynamic, Dynamic> currmat
-                = Matrix<InternalType, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes);
-
-            // The ratio \phi_0(G) / \phi_1(G) is the reciprocal of the sum 
-            // of all edge labels in the graph 
-            InternalType sum = 0;
-            for (auto&& source : this->order)
-            {
-                for (auto&& entry : this->edges[source])
-                {
-                    sum += entry.second; 
-                }
-            }
-            InternalType currphi = 1 / sum; 
-
-            // Apply the recurrence ...
-            for (unsigned i = 0; i < k; ++i)
-            {
-                auto result = normalizedChebotarevAgaevRecurrence<InternalType>(i, laplacian, currmat, currphi, method);
-                currmat = result.first; 
-                currphi = result.second; 
-            }
-
-            return std::make_pair(currmat, currphi);  
         }
 
         /**
@@ -773,10 +332,9 @@ class LabeledDigraph
          * according to the graph's canonical ordering of nodes, as a *dense*
          * matrix.
          *
-         * @param method Summation method. 
          * @returns      Laplacian matrix of the graph (as a dense matrix). 
          */
-        Matrix<InternalType, Dynamic, Dynamic> getColumnLaplacianDense(const SummationMethod method = NaiveSummation)
+        Matrix<InternalType, Dynamic, Dynamic> getColumnLaplacianDense()
         {
             // Initialize a zero matrix with #rows = #cols = #nodes
             Matrix<InternalType, Dynamic, Dynamic> laplacian
@@ -808,29 +366,8 @@ class LabeledDigraph
 
             // Populate diagonal entries as negative sums of the off-diagonal
             // entries in each column
-            switch (method)
-            {
-                case NaiveSummation:
-                    for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -(laplacian.col(i).sum());
-                    break;
-
-                case KahanSummation:
-                    for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -KahanSum::colSum(laplacian, i);
-                    break;
-
-                case KBNSummation:
-                    for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -KBNSum::colSum(laplacian, i);
-                    break;
-
-                default:
-                    std::stringstream ss; 
-                    ss << "Unrecognized summation method: " << method; 
-                    throw std::invalid_argument(ss.str());
-                    break;
-            }
+            for (unsigned i = 0; i < this->numnodes; ++i)
+                laplacian(i, i) = -(laplacian.col(i).sum()); 
 
             return laplacian;
         }
@@ -839,11 +376,10 @@ class LabeledDigraph
          * Return the *row Laplacian* matrix, according to the graph's canonical
          * ordering of nodes, as a *compressed row-major sparse* matrix. 
          *
-         * @param method Summation method. 
          * @returns      Laplacian matrix of the graph (as a sparse row-major
          *               matrix). 
          */
-        SparseMatrix<InternalType, RowMajor> getRowLaplacianSparse(const SummationMethod method = NaiveSummation)
+        SparseMatrix<InternalType, RowMajor> getRowLaplacianSparse()
         {
             // Initialize a zero matrix with #rows = #cols = #nodes
             SparseMatrix<InternalType, RowMajor> laplacian(this->numnodes, this->numnodes); 
@@ -872,30 +408,9 @@ class LabeledDigraph
                     j++;
                 }
                 // Compute the negative of the i-th row sum
-                InternalType row_sum = 0; 
-                switch (method)
-                {
-                    case NaiveSummation: {
-                        for (const InternalType entry : row_entries)
-                            row_sum += entry;
-                        break; 
-                    }
-
-                    case KahanSummation: 
-                        row_sum = KahanSum::vectorSum(row_entries);
-                        break;
-
-                    case KBNSummation:
-                        row_sum = KBNSum::vectorSum(row_entries);
-                        break;
-
-                    default: {
-                        std::stringstream ss; 
-                        ss << "Unrecognized summation method: " << method; 
-                        throw std::invalid_argument(ss.str());
-                        break;
-                    }  
-                }
+                InternalType row_sum = 0;
+                for (const InternalType entry : row_entries)
+                    row_sum += entry; 
                 laplacian_triplets.push_back(Triplet<InternalType>(i, i, row_sum)); 
                 i++;
             }
@@ -910,11 +425,9 @@ class LabeledDigraph
          * canonical ordering of nodes, as a *dense* matrix.
          *
          * @param target Pointer to node whose outgoing edges are to be removed. 
-         * @param method Summation method. 
          * @returns      Laplacian matrix of the graph (as a dense matrix).  
          */
-        Matrix<InternalType, Dynamic, Dynamic> getRowSublaplacianDense(Node* target,
-                                                                       const SummationMethod method = NaiveSummation)
+        Matrix<InternalType, Dynamic, Dynamic> getRowSublaplacianDense(Node* target)
         {
             // Initialize a zero matrix with #rows = #cols = #nodes
             Matrix<InternalType, Dynamic, Dynamic> laplacian
@@ -945,29 +458,9 @@ class LabeledDigraph
 
             // Populate diagonal entries as negative sums of the off-diagonal
             // entries in each row
-            switch (method)
-            {
-                case NaiveSummation: 
-                    for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -(laplacian.row(i).sum());
-                    break;
+            for (unsigned i = 0; i < this->numnodes; ++i)
+                laplacian(i, i) = -(laplacian.row(i).sum()); 
 
-                case KahanSummation:
-                    for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -KahanSum::rowSum(laplacian, i);
-                    break;
-
-                case KBNSummation:
-                    for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -KBNSum::rowSum(laplacian, i);
-                    break;
-
-                default:
-                    std::stringstream ss; 
-                    ss << "Unrecognized summation method: " << method; 
-                    throw std::invalid_argument(ss.str());
-                    break;
-            }
             return laplacian; 
         }
 
@@ -977,12 +470,10 @@ class LabeledDigraph
          * canonical ordering of nodes, as a *compressed row-major sparse* matrix.
          *
          * @param target Pointer to node whose outgoing edges are to be removed. 
-         * @param method Summation method. 
          * @returns      Laplacian matrix of the graph (as a compressed row-major
          *               sparse matrix). 
          */
-        SparseMatrix<InternalType, RowMajor> getRowSublaplacianSparse(Node* target,
-                                                                      const SummationMethod method = NaiveSummation)
+        SparseMatrix<InternalType, RowMajor> getRowSublaplacianSparse(Node* target)
         {
             // Initialize a zero matrix with #rows = #cols = #nodes
             SparseMatrix<InternalType, RowMajor> laplacian(this->numnodes, this->numnodes); 
@@ -1012,30 +503,9 @@ class LabeledDigraph
                     j++;
                 }
                 // Compute the negative of the i-th row sum
-                InternalType row_sum = 0; 
-                switch (method)
-                {
-                    case NaiveSummation: {
-                        for (const InternalType entry : row_entries)
-                            row_sum += entry;
-                        break; 
-                    }
-
-                    case KahanSummation: 
-                        row_sum = KahanSum::vectorSum(row_entries);
-                        break;
-
-                    case KBNSummation:
-                        row_sum = KBNSum::vectorSum(row_entries);
-                        break;
-
-                    default: {
-                        std::stringstream ss; 
-                        ss << "Unrecognized summation method: " << method; 
-                        throw std::invalid_argument(ss.str());
-                        break;
-                    }  
-                }
+                InternalType row_sum = 0;
+                for (const InternalType entry : row_entries)
+                    row_sum += entry;
                 laplacian_triplets.push_back(Triplet<InternalType>(i, i, row_sum)); 
                 i++;
             }
@@ -1087,10 +557,10 @@ class LabeledDigraph
                 throw std::runtime_error("Node already exists"); 
 
             Node* node = new Node(id);
-            this->order.push_back(node); 
             this->nodes[id] = node;
             this->edges.emplace(node, std::unordered_map<Node*, InternalType>());
             this->numnodes++;
+            this->order.push_back(node);
         }
 
         /**
@@ -1504,10 +974,9 @@ class LabeledDigraph
          * Return the Laplacian matrix, with the nodes ordered according to
          * the graph's canonical ordering of nodes.
          *
-         * @param method Summation method. 
          * @returns      Laplacian matrix of the graph (as a dense matrix). 
          */
-        Matrix<IOType, Dynamic, Dynamic> getLaplacian(const SummationMethod method = NaiveSummation)
+        Matrix<IOType, Dynamic, Dynamic> getLaplacian()
         {
             // Initialize a zero matrix with #rows = #cols = #nodes
             Matrix<InternalType, Dynamic, Dynamic> laplacian
@@ -1539,29 +1008,8 @@ class LabeledDigraph
 
             // Populate diagonal entries as negative sums of the off-diagonal
             // entries in each column
-            switch (method)
-            {
-                case NaiveSummation:
-                    for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -(laplacian.col(i).sum());
-                    break;
-
-                case KahanSummation:
-                    for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -KahanSum::colSum(laplacian, i);
-                    break;
-
-                case KBNSummation:
-                    for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -KBNSum::colSum(laplacian, i);
-                    break;
-
-                default:
-                    std::stringstream ss; 
-                    ss << "Unrecognized summation method: " << method; 
-                    throw std::invalid_argument(ss.str());
-                    break;
-            }
+            for (unsigned i = 0; i < this->numnodes; ++i)
+                laplacian(i, i) = -(laplacian.col(i).sum()); 
 
             return laplacian.template cast<IOType>();
         }
@@ -1572,12 +1020,9 @@ class LabeledDigraph
          * a *dense* Laplacian matrix.
          *
          * @param k      Index of the desired spanning forest matrix. 
-         * @param method Summation method. 
          * @returns      k-th spanning forest matrix.
-         * @throws std::invalid_argument if summation method is not recognized. 
          */
-        Matrix<IOType, Dynamic, Dynamic> getSpanningForestMatrix(const int k,
-                                                                 const SummationMethod method = NaiveSummation)
+        Matrix<IOType, Dynamic, Dynamic> getSpanningForestMatrix(const int k)
         {
             // Begin with the identity matrix 
             Matrix<InternalType, Dynamic, Dynamic> curr
@@ -1611,33 +1056,12 @@ class LabeledDigraph
 
             // Populate diagonal entries as negative sums of the off-diagonal
             // entries in each row
-            switch (method)
-            {
-                case NaiveSummation:
-                    for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -(laplacian.row(i).sum());
-                    break;
-
-                case KahanSummation:
-                    for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -KahanSum::rowSum(laplacian, i);
-                    break;
-
-                case KBNSummation:
-                    for (unsigned i = 0; i < this->numnodes; ++i)
-                        laplacian(i, i) = -KBNSum::rowSum(laplacian, i);
-                    break;
-
-                default:
-                    std::stringstream ss; 
-                    ss << "Unrecognized summation method: " << method; 
-                    throw std::invalid_argument(ss.str());
-                    break;
-            }
+            for (unsigned i = 0; i < this->numnodes; ++i)
+                laplacian(i, i) = -(laplacian.row(i).sum()); 
 
             // Apply the recurrence ...
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<InternalType>(i, laplacian, curr, method);
+                curr = chebotarevAgaevRecurrence<InternalType>(i, laplacian, curr);
 
             return curr.template cast<IOType>();
         }
@@ -1648,12 +1072,10 @@ class LabeledDigraph
          * a *compressed row-major sparse* Laplacian matrix.
          *
          * @param k      Index of the desired spanning forest matrix. 
-         * @param method Summation method. 
          * @returns      k-th spanning forest matrix.
          * @throws std::invalid_argument if summation method is not recognized.
          */
-        Matrix<IOType, Dynamic, Dynamic> getSpanningForestMatrixSparse(const int k,
-                                                                       const SummationMethod method = NaiveSummation)
+        Matrix<IOType, Dynamic, Dynamic> getSpanningForestMatrixSparse(const int k)
         {
             // Begin with the identity matrix
             Matrix<InternalType, Dynamic, Dynamic> curr
@@ -1687,29 +1109,9 @@ class LabeledDigraph
                 }
 
                 // Compute the negative of the i-th row sum
-                InternalType row_sum = 0; 
-                switch (method)
-                {
-                    case NaiveSummation:
-                        for (const InternalType entry : row_entries)
-                            row_sum += entry;
-                        break;  
-
-                    case KahanSummation: 
-                        row_sum = KahanSum::vectorSum(row_entries);
-                        break;
-
-                    case KBNSummation:
-                        row_sum = KBNSum::vectorSum(row_entries);
-                        break;
-
-                    default: {
-                        std::stringstream ss; 
-                        ss << "Unrecognized summation method: " << method; 
-                        throw std::invalid_argument(ss.str());
-                        break;
-                    }  
-                }
+                InternalType row_sum = 0;
+                for (const InternalType entry : row_entries)
+                    row_sum += entry; 
                 laplacian_triplets.push_back(Triplet<InternalType>(i, i, row_sum)); 
                 i++;
             }
@@ -1717,7 +1119,7 @@ class LabeledDigraph
 
             // Apply the recurrence ...
             for (unsigned i = 0; i < k; ++i)
-                curr = chebotarevAgaevRecurrence<InternalType>(i, laplacian, curr, method); 
+                curr = chebotarevAgaevRecurrence<InternalType>(i, laplacian, curr); 
 
             return curr.template cast<IOType>(); 
         }
@@ -1760,7 +1162,7 @@ class LabeledDigraph
                 throw;
             }
 
-            // Normalize by the sum of its entries and return 
+            // Normalize by the sum of the entries and return 
             FloatInternalType norm = steady_state.sum();
             return (steady_state / norm).template cast<FloatIOType>();
         }
@@ -1782,33 +1184,27 @@ class LabeledDigraph
          * allows the specification of a new output type, `FloatIOType`. 
          *
          * @param sparse If true, use a sparse Laplacian matrix in the calculations. 
-         * @param method Summation method. 
          * @returns      Vector in the kernel of the graph's Laplacian matrix, 
          *               normalized by its 1-norm.
-         * @throws std::invalid_argument if summation method is not recognized. 
          */
         template <typename FloatIOType = IOType>
-        Matrix<FloatIOType, Dynamic, 1> getSteadyStateFromRecurrence(const bool sparse,
-                                                                     const SummationMethod method = NaiveSummation)
+        Matrix<FloatIOType, Dynamic, 1> getSteadyStateFromRecurrence(const bool sparse)
         {
-            // Obtain the *normalized* spanning tree weight matrix from the
-            // row Laplacian matrix
+            // Obtain the spanning tree weight matrix from the row Laplacian matrix
             Matrix<InternalType, Dynamic, Dynamic> tree_matrix;
             if (sparse)
             {
-                SparseMatrix<InternalType, RowMajor> laplacian = this->getRowLaplacianSparse(method); 
-                auto result = this->getNormalizedSpanningForestMatrix(this->numnodes - 1, laplacian, method);
-                tree_matrix = result.first; 
+                SparseMatrix<InternalType, RowMajor> laplacian = this->getRowLaplacianSparse(); 
+                tree_matrix = this->getSpanningForestMatrix(this->numnodes - 1, laplacian);  
             } 
             else
             {
-                Matrix<InternalType, Dynamic, Dynamic> laplacian = -this->getColumnLaplacianDense(method).transpose(); 
-                auto result = this->getNormalizedSpanningForestMatrix(this->numnodes - 1, laplacian, method);
-                tree_matrix = result.first; 
+                Matrix<InternalType, Dynamic, Dynamic> laplacian = -this->getColumnLaplacianDense().transpose(); 
+                tree_matrix = this->getSpanningForestMatrix(this->numnodes - 1, laplacian);  
             } 
 
-            // Return any row of the matrix (which should already be normalized) 
-            return tree_matrix.row(0).template cast<FloatIOType>();
+            // Return any row of the matrix, normalized by the sum of its entries
+            return tree_matrix.row(0).template cast<FloatIOType>() / static_cast<FloatIOType>(tree_matrix.row(0).sum());
         }
 
         /**
@@ -1938,16 +1334,13 @@ class LabeledDigraph
          *
          * @param target_id ID of target node.
          * @param sparse    If true, use a sparse Laplacian matrix in the calculations. 
-         * @param method    Summation method. 
          * @returns Vector of mean first-passage times to the target node from
          *          every node in the graph.
-         * @throws std::invalid_argument if summation method is not recognized.
          * @throws std::runtime_error    if target node does not exist. 
          */
         template <typename FloatIOType = IOType>
         Matrix<FloatIOType, Dynamic, 1> getMeanFirstPassageTimesFromRecurrence(std::string target_id,
-                                                                               const bool sparse,
-                                                                               const SummationMethod method = NaiveSummation)
+                                                                               const bool sparse)
         {
             Node* target = this->getNode(target_id);
             if (target == nullptr)
@@ -1956,45 +1349,32 @@ class LabeledDigraph
             }
 
             // Compute the required spanning forest matrices ...
-            Matrix<InternalType, Dynamic, Dynamic> norm_forest_one_root, norm_forest_two_roots;
-            InternalType norm_forest_two_roots_phi;
+            Matrix<InternalType, Dynamic, Dynamic> forest_one_root, forest_two_roots; 
             if (sparse)
             {
                 // Instantiate a *sparse row-major* sub-Laplacian matrix
-                SparseMatrix<InternalType, RowMajor> sublaplacian = this->getRowSublaplacianSparse(target, method);  
+                SparseMatrix<InternalType, RowMajor> sublaplacian = this->getRowSublaplacianSparse(target);  
 
-                // Then run the Chebotarev-Agaev recurrence to get the *normalized*
-                // two-root spanning forest matrix 
-                auto result = this->getNormalizedSpanningForestMatrix(this->numnodes - 2, sublaplacian, method);
-                norm_forest_two_roots = result.first;
-                norm_forest_two_roots_phi = result.second;  
+                // Then run the Chebotarev-Agaev recurrence to get the two-root
+                // spanning forest matrix
+                forest_two_roots = this->getSpanningForestMatrix(this->numnodes - 2, sublaplacian);
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
-                // the normalized one-root spanning forest (tree) matrix  
-                result = normalizedChebotarevAgaevRecurrence<InternalType>(
-                    this->numnodes - 2, sublaplacian, norm_forest_two_roots,
-                    norm_forest_two_roots_phi, method
-                );
-                norm_forest_one_root = result.first; 
+                // the one-root spanning forest (tree) matrix  
+                forest_one_root = chebotarevAgaevRecurrence<InternalType>(this->numnodes - 2, sublaplacian, forest_two_roots); 
             }
             else 
             {
                 // Instantiate a *dense* sub-Laplacian matrix
-                Matrix<InternalType, Dynamic, Dynamic> sublaplacian = this->getRowSublaplacianDense(target, method); 
+                Matrix<InternalType, Dynamic, Dynamic> sublaplacian = this->getRowSublaplacianDense(target); 
 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // forest matrix 
-                auto result = this->getNormalizedSpanningForestMatrix(this->numnodes - 2, sublaplacian, method);
-                norm_forest_two_roots = result.first; 
-                norm_forest_two_roots_phi = result.second; 
+                forest_two_roots = this->getSpanningForestMatrix(this->numnodes - 2, sublaplacian);
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root forest (tree) matrix  
-                result = normalizedChebotarevAgaevRecurrence<InternalType>(
-                    this->numnodes - 2, sublaplacian, norm_forest_two_roots,
-                    norm_forest_two_roots_phi, method
-                );
-                norm_forest_one_root = result.first; 
+                forest_one_root = chebotarevAgaevRecurrence<InternalType>(this->numnodes - 2, sublaplacian, forest_two_roots); 
             }
 
             // Get the index of the target node
@@ -2011,72 +1391,23 @@ class LabeledDigraph
             // Now compute the desired mean first-passage times ...
             int z = this->numnodes - 1 - t;
             Matrix<InternalType, Dynamic, 1> mean_times = Matrix<InternalType, Dynamic, 1>::Zero(this->numnodes); 
-            if (method == NaiveSummation)
+            if (t == 0)
             {
-                if (t == 0)
-                {
-                    mean_times.tail(z) = norm_forest_two_roots.block(1, 1, z, z).rowwise().sum(); 
-                }
-                else if (z == 0)
-                {
-                    mean_times.head(t) = norm_forest_two_roots.block(0, 0, t, t).rowwise().sum();
-                }
-                else
-                {
-                    mean_times.head(t) = norm_forest_two_roots.block(0, 0, t, t).rowwise().sum(); 
-                    mean_times.head(t) += norm_forest_two_roots.block(0, t + 1, t, z).rowwise().sum(); 
-                    mean_times.tail(z) = norm_forest_two_roots.block(t + 1, 0, z, t).rowwise().sum(); 
-                    mean_times.tail(z) += norm_forest_two_roots.block(t + 1, t + 1, z, z).rowwise().sum();
-                } 
+                mean_times.tail(z) = forest_two_roots.block(1, 1, z, z).rowwise().sum(); 
+            }
+            else if (z == 0)
+            {
+                mean_times.head(t) = forest_two_roots.block(0, 0, t, t).rowwise().sum();
+            }
+            else
+            {
+                mean_times.head(t) = forest_two_roots.block(0, 0, t, t).rowwise().sum(); 
+                mean_times.head(t) += forest_two_roots.block(0, t + 1, t, z).rowwise().sum(); 
+                mean_times.tail(z) = forest_two_roots.block(t + 1, 0, z, t).rowwise().sum(); 
+                mean_times.tail(z) += forest_two_roots.block(t + 1, t + 1, z, z).rowwise().sum();
             } 
-            else if (method == KahanSummation)
-            {
-                if (t == 0)
-                {
-                    mean_times.tail(z) = KahanSum::rowSum(norm_forest_two_roots.block(1, 1, z, z)); 
-                }
-                else if (z == 0)
-                {
-                    mean_times.head(t) = KahanSum::rowSum(norm_forest_two_roots.block(0, 0, t, t)); 
-                }
-                else
-                { 
-                    mean_times.head(t) = KahanSum::rowSum(norm_forest_two_roots.block(0, 0, t, t)); 
-                    mean_times.head(t) += KahanSum::rowSum(norm_forest_two_roots.block(0, t + 1, t, z)); 
-                    mean_times.tail(z) = KahanSum::rowSum(norm_forest_two_roots.block(t + 1, 0, z, t)); 
-                    mean_times.tail(z) += KahanSum::rowSum(norm_forest_two_roots.block(t + 1, t + 1, z, z));
-                }
-            }
-            else if (method == KBNSummation)
-            {
-                if (t == 0)
-                {
-                    mean_times.tail(z) = KBNSum::rowSum(norm_forest_two_roots.block(1, 1, z, z)); 
-                }
-                else if (z == 0)
-                {
-                    mean_times.head(t) = KBNSum::rowSum(norm_forest_two_roots.block(0, 0, t, t)); 
-                }
-                else
-                { 
-                    mean_times.head(t) = KBNSum::rowSum(norm_forest_two_roots.block(0, 0, t, t)); 
-                    mean_times.head(t) += KBNSum::rowSum(norm_forest_two_roots.block(0, t + 1, t, z)); 
-                    mean_times.tail(z) = KBNSum::rowSum(norm_forest_two_roots.block(t + 1, 0, z, t)); 
-                    mean_times.tail(z) += KBNSum::rowSum(norm_forest_two_roots.block(t + 1, t + 1, z, z));
-                }
-            }
-            else 
-            {
-                std::stringstream ss; 
-                ss << "Unrecognized summation method: " << method; 
-                throw std::invalid_argument(ss.str());
-            }
 
-            FloatIOType _norm_forest_two_roots_phi = static_cast<FloatIOType>(norm_forest_two_roots_phi); 
-            Matrix<FloatIOType, Dynamic, 1> _mean_times = mean_times.template cast<FloatIOType>();
-            FloatIOType _norm_forest_one_root_at_t = static_cast<FloatIOType>(norm_forest_one_root(t, t));  
-            
-            return _norm_forest_two_roots_phi * _mean_times / _norm_forest_one_root_at_t; 
+            return (mean_times / forest_one_root(t, t)).template cast<FloatIOType>(); 
         }
 
         /**
@@ -2208,16 +1539,13 @@ class LabeledDigraph
          *
          * @param target_id ID of target node.
          * @param sparse    If true, use a sparse Laplacian matrix in the calculations. 
-         * @param method    Summation method. 
          * @returns Vector of first-passage time second moments to the target
          *          node from every node in the graph.
-         * @throws std::invalid_argument if summation method is not recognized.
          * @throws std::runtime_error    if target node does not exist. 
          */
         template <typename FloatIOType = IOType>
         Matrix<FloatIOType, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromRecurrence(std::string target_id,
-                                                                                          const bool sparse,
-                                                                                          const SummationMethod method = NaiveSummation)
+                                                                                          const bool sparse)
         {
             Node* target = this->getNode(target_id);
             if (target == nullptr)
@@ -2230,34 +1558,28 @@ class LabeledDigraph
             if (sparse)
             {
                 // Instantiate a *sparse row-major* sub-Laplacian matrix
-                SparseMatrix<InternalType, RowMajor> sublaplacian = this->getRowSublaplacianSparse(target, method);  
+                SparseMatrix<InternalType, RowMajor> sublaplacian = this->getRowSublaplacianSparse(target);  
                 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // forest matrix 
-                forest_two_roots = this->getSpanningForestMatrix(this->numnodes - 2, sublaplacian, method);
+                forest_two_roots = this->getSpanningForestMatrix(this->numnodes - 2, sublaplacian);
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root forest (tree) matrix  
-                forest_one_root = chebotarevAgaevRecurrence<InternalType>(
-                    this->numnodes - 2, sublaplacian, forest_two_roots, method 
-                );
+                forest_one_root = chebotarevAgaevRecurrence<InternalType>(this->numnodes - 2, sublaplacian, forest_two_roots);
             }
             else 
             {
                 // Instantiate a *dense* sub-Laplacian matrix
-                Matrix<InternalType, Dynamic, Dynamic> sublaplacian = this->getRowSublaplacianDense(target, method); 
+                Matrix<InternalType, Dynamic, Dynamic> sublaplacian = this->getRowSublaplacianDense(target); 
 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // forest matrix 
-                forest_two_roots = this->getSpanningForestMatrix(
-                    this->numnodes - 2, sublaplacian, method
-                );
+                forest_two_roots = this->getSpanningForestMatrix(this->numnodes - 2, sublaplacian);
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root forest (tree) matrix  
-                forest_one_root = chebotarevAgaevRecurrence<InternalType>(
-                    this->numnodes - 2, sublaplacian, forest_two_roots, method
-                );
+                forest_one_root = chebotarevAgaevRecurrence<InternalType>(this->numnodes - 2, sublaplacian, forest_two_roots);
             }
 
             // Get the index of the target node
@@ -2296,96 +1618,30 @@ class LabeledDigraph
             }
 
             // 2) Get the square of this sub-matrix 
-            Matrix<InternalType, Dynamic, Dynamic> forest_two_roots_sub_squared;
-            switch (method) 
-            {
-                case NaiveSummation:
-                    forest_two_roots_sub_squared = forest_two_roots_sub * forest_two_roots_sub;
-                    break;
-
-                case KahanSummation: 
-                    forest_two_roots_sub_squared = KahanSum::multiply(forest_two_roots_sub, forest_two_roots_sub);
-                    break;
-
-                case KBNSummation: 
-                    forest_two_roots_sub_squared = KBNSum::multiply(forest_two_roots_sub, forest_two_roots_sub);
-                    break;
-
-                default: {
-                    std::stringstream ss; 
-                    ss << "Unrecognized summation method: " << method; 
-                    throw std::invalid_argument(ss.str());
-                    break;
-                }
-            }
+            Matrix<InternalType, Dynamic, Dynamic> forest_two_roots_sub_squared = forest_two_roots_sub * forest_two_roots_sub;
 
             // 3) The second moments of each FPT to the target node is given by the
             // corresponding row sum in this squared sub-matrix
-            if (method == NaiveSummation)
+            if (t == 0)
             {
-                if (t == 0)
-                {
-                    second_moments.tail(z) = forest_two_roots_sub_squared.block(1, 1, z, z).rowwise().sum(); 
-                }
-                else if (z == 0)
-                {
-                    second_moments.head(t) = forest_two_roots_sub_squared.block(0, 0, t, t).rowwise().sum(); 
-                }
-                else 
-                {
-                    second_moments.head(t) = forest_two_roots_sub_squared.block(0, 0, t, t).rowwise().sum(); 
-                    second_moments.head(t) += forest_two_roots_sub_squared.block(0, t + 1, t, z).rowwise().sum(); 
-                    second_moments.tail(z) = forest_two_roots_sub_squared.block(t + 1, 0, z, t).rowwise().sum(); 
-                    second_moments.tail(z) += forest_two_roots_sub_squared.block(t + 1, t + 1, z, z).rowwise().sum();
-                } 
-            } 
-            else if (method == KahanSummation)
-            {
-                if (t == 0)
-                {
-                    second_moments.tail(z) = KahanSum::rowSum(forest_two_roots_sub_squared.block(1, 1, z, z)); 
-                }
-                else if (z == 0)
-                {
-                    second_moments.head(t) = KahanSum::rowSum(forest_two_roots_sub_squared.block(0, 0, t, t)); 
-                }
-                else 
-                { 
-                    second_moments.head(t) = KahanSum::rowSum(forest_two_roots_sub_squared.block(0, 0, t, t)); 
-                    second_moments.head(t) += KahanSum::rowSum(forest_two_roots_sub_squared.block(0, t + 1, t, z)); 
-                    second_moments.tail(z) = KahanSum::rowSum(forest_two_roots_sub_squared.block(t + 1, 0, z, t)); 
-                    second_moments.tail(z) += KahanSum::rowSum(forest_two_roots_sub_squared.block(t + 1, t + 1, z, z));
-                } 
+                second_moments.tail(z) = forest_two_roots_sub_squared.block(1, 1, z, z).rowwise().sum(); 
             }
-            else if (method == KBNSummation)
+            else if (z == 0)
             {
-                if (t == 0)
-                {
-                    second_moments.tail(z) = KBNSum::rowSum(forest_two_roots_sub_squared.block(1, 1, z, z)); 
-                }
-                else if (z == 0)
-                {
-                    second_moments.head(t) = KBNSum::rowSum(forest_two_roots_sub_squared.block(0, 0, t, t)); 
-                }
-                else 
-                { 
-                    second_moments.head(t) = KBNSum::rowSum(forest_two_roots_sub_squared.block(0, 0, t, t)); 
-                    second_moments.head(t) += KBNSum::rowSum(forest_two_roots_sub_squared.block(0, t + 1, t, z)); 
-                    second_moments.tail(z) = KBNSum::rowSum(forest_two_roots_sub_squared.block(t + 1, 0, z, t)); 
-                    second_moments.tail(z) += KBNSum::rowSum(forest_two_roots_sub_squared.block(t + 1, t + 1, z, z));
-                } 
+                second_moments.head(t) = forest_two_roots_sub_squared.block(0, 0, t, t).rowwise().sum(); 
             }
             else 
             {
-                std::stringstream ss; 
-                ss << "Unrecognized summation method: " << method; 
-                throw std::invalid_argument(ss.str());
-            }
+                second_moments.head(t) = forest_two_roots_sub_squared.block(0, 0, t, t).rowwise().sum(); 
+                second_moments.head(t) += forest_two_roots_sub_squared.block(0, t + 1, t, z).rowwise().sum(); 
+                second_moments.tail(z) = forest_two_roots_sub_squared.block(t + 1, 0, z, t).rowwise().sum(); 
+                second_moments.tail(z) += forest_two_roots_sub_squared.block(t + 1, t + 1, z, z).rowwise().sum();
+            } 
 
             return (2 * second_moments).template cast<FloatIOType>() / (
                 static_cast<FloatIOType>(forest_one_root(t, t) * forest_one_root(t, t))
             );
-        } 
+        }
 };
 
 #endif
