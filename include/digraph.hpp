@@ -6,7 +6,7 @@
  *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  *  **Last updated:** 
- *      12/29/2021
+ *      1/4/2022
  */
 
 #ifndef LABELED_DIGRAPHS_HPP
@@ -1240,6 +1240,7 @@ class LabeledDigraph
             Node* target = this->getNode(target_id);
             if (target == nullptr)
             {
+                std::cout << "here?\n"; 
                 throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
             }
             int t = 0;  

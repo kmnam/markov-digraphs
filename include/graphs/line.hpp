@@ -3,10 +3,11 @@
  *
  * Implementation of the line graph.
  *
- * Authors:
+ * **Authors:**
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
- * Last updated:
- *     12/8/2021
+ *
+ * **Last updated:**
+ *     1/4/2021
  */
 
 #ifndef LINE_LABELED_DIGRAPH_HPP
@@ -29,9 +30,6 @@
  * - `getUpperExitProb()`: compute the *splitting probability* of exiting
  *   the graph through `this->N` (reaching an auxiliary upper exit node),
  *   and not through `0` (reaching an auxiliary lower exit node). 
- * - `getUpperExitRate(IOType)`: compute the reciprocal of the *unconditional
- *   mean first-passage time* to exiting the graph through `this->N`, given
- *   that the exit rate from `0` is zero. 
  * - `getLowerExitRate()`: compute the reciprocal of the *unconditional mean
  *   first-passage time* to exiting the graph through `0`, given that the 
  *   exit rate from `this->N` is zero. 
@@ -392,34 +390,6 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
 
         /**
          * Compute the reciprocal of the *unconditional* mean first-passage
-         * time to exit from the line graph through the upper node, `this->N`
-         * (to an auxiliary "upper exit" node), starting from `0`, given that
-         * exit through the lower node, `0`, is impossible. 
-         *
-         * @param upper_exit_rate Rate of exit through the upper node (`this->N`).
-         * @returns               Reciprocal of mean first-passage time from
-         *                        `0` to exit through `this->N`. 
-         */
-        IOType getUpperExitRate(IOType upper_exit_rate)
-        {
-            // Start with label(1 -> 0) / label(0 -> 1), then add one 
-            InternalType _upper_exit_rate = static_cast<InternalType>(upper_exit_rate); 
-            InternalType invrate = this->line_labels[0].second / this->line_labels[0].first;  
-            invrate += 1; 
-            for (int i = 1; i < this->N; ++i)
-            {
-                // Multiply by label(i+1 -> i) / label(i -> i+1) then add one
-                // for i = 1, ..., N-1
-                invrate *= (this->line_labels[i].second / this->line_labels[i].first);
-                invrate += 1; 
-            }
-
-            // Finally divide by label(N -> exit) and take the reciprocal
-            return static_cast<IOType>(_upper_exit_rate / invrate);  
-        }
-
-        /**
-         * Compute the reciprocal of the *unconditional* mean first-passage
          * time to exit from the line graph through the lower node, `0`
          * (to an auxiliary "lower exit" node), starting from `0`, given that
          * exit through the upper node, `this->N`, is impossible.
@@ -479,19 +449,19 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
             recur1[this->N-1] = this->line_labels[this->N-1].second + prod1;
 
             // Apply second recurrence for i = 1: multiply by label(0 -> 1), then add label(0 -> exit)
-            recur2[1] = this->line_labels[0].first + prod2;  
+            recur2[1] = this->line_labels[0].first + prod2;
 
             // Apply the first recurrence for i = N-2, ..., 0, keeping track of 
             // each term in the recurrence
-            for (int i = this->N - 2; i >= 0; ++i)
+            for (int i = this->N - 2; i >= 0; --i)
             {
                 // Multiply by label(i+1 -> i)
-                recur1[i] = recur1[i+1] * this->line_labels[i].second;  
+                recur1[i] = recur1[i+1] * this->line_labels[i].second;
 
                 // Then add the product of label(i+1 -> i+2), ..., label(N-1 -> N),
                 // label(N -> exit)
                 prod1 *= this->line_labels[i+1].first;     // rhs == label(i+1 -> i+2)
-                recur1[i] += prod1; 
+                recur1[i] += prod1;
             }
 
             // Apply the second recurrence for i = 2, ..., N, keeping track of 
@@ -504,7 +474,7 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
                 // Then add the product of label(0 -> exit), label(1 -> 0),
                 // ..., label(i-1 -> i-2)
                 prod2 *= this->line_labels[i-2].second;    // rhs == label(i-1 -> i-2) 
-                recur2[i] += prod2; 
+                recur2[i] += prod2;
             }
 
             // Apply the second recurrence once more to obtain the denominator: 
@@ -514,12 +484,12 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
             // ... then add the product of label(0 -> exit), label(1 -> 0), ...,
             // label(N -> N-1)
             prod2 *= this->line_labels[this->N-1].second;   // rhs == label(N -> N-1)
-            denom += prod2;  
+            denom += prod2;
 
             // Compute the numerator
             InternalType numer = recur1[0] + recur2[0]; 
             for (int i = 1; i <= this->N; ++i)
-                numer += (recur1[i] * recur2[i]); 
+                numer += (recur1[i] * recur2[i]);
 
             // Now give the reciprocal of the mean first-passage time (i.e., 
             // denominator / numerator) 
