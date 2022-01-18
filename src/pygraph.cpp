@@ -15,7 +15,7 @@
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  * **Last updated:**
- *     1/4/2022
+ *     1/18/2022
  */
 
 namespace py = pybind11;
@@ -572,9 +572,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("lower_exit_rate")
         )
         .def("get_upper_exit_rate",
-            static_cast<double (LineGraph<PreciseType, double>::*)(double, double)>(
-                &LineGraph<PreciseType, double>::getUpperExitRate
-            ),
+            &LineGraph<PreciseType, double>::getUpperExitRate,
             R"delim(
     Compute the reciprocal of the *conditional* mean first-passage 
     time to exit from the line graph through the upper node, `self.N`
@@ -765,7 +763,7 @@ PYBIND11_MODULE(pygraph, m)
     :param upper_exit_rate: Rate of upper exit from `B{this->N}`.
     :type upper_exit_rate: float
     :return: The above two quantities.
-    :rtype: tuple of two floats
+    :rtype: tuple of three floats
 )delim",
             py::arg("lower_exit_rate"),
             py::arg("upper_exit_rate")
