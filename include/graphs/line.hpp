@@ -7,7 +7,7 @@
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  * **Last updated:**
- *     1/4/2021
+ *     1/18/2022
  */
 
 #ifndef LINE_LABELED_DIGRAPH_HPP
@@ -487,8 +487,8 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
             denom += prod2;
 
             // Compute the numerator
-            InternalType numer = recur1[0] + recur2[0]; 
-            for (int i = 1; i <= this->N; ++i)
+            InternalType numer = 0;
+            for (int i = 0; i <= this->N; ++i)
                 numer += (recur1[i] * recur2[i]);
 
             // Now give the reciprocal of the mean first-passage time (i.e., 
