@@ -3,10 +3,11 @@
  *
  * An implementation of the grid graph. 
  *
- * Authors:
+ * **Authors:**
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
- * Last updated:
- *     12/29/2021
+ *
+ * **Last updated:**
+ *     1/18/2022
  */
 
 #ifndef GRID_LABELED_DIGRAPH_HPP
@@ -23,7 +24,7 @@
 using namespace Eigen;
 
 /**
- * Apply operator alpha onto the given vector `v`, with the given sextet
+ * Apply operator Alpha onto the given vector `v`, with the given sextet
  * of edge labels.
  *
  * @param rung_labels Sextet of edge labels taken from a rung in the grid graph.
@@ -42,65 +43,52 @@ Matrix<T, 3, 1> alpha(const std::array<T, 6>& rung_labels, const Ref<const Matri
     T d = rung_labels[5];
     T tmp0 = fA * rB; 
     T tmp1 = fB * rA; 
-    A(0, 0) = rA * (rB + d) + rB * c; 
-    A(0, 1) = tmp0 * c; 
-    A(0, 2) = tmp1 * d; 
+    A(0, 0) = rA * (rB + d) + rB * c;    // d * rA + c * rB + rA * rB
+    A(0, 1) = tmp0 * c;                  // fA * c * rB
+    A(0, 2) = tmp1 * d;                  // fB * d * rA
     A(1, 0) = rB;
-    A(1, 1) = tmp0;
-    A(2, 0) = rA; 
-    A(2, 2) = tmp1; 
+    A(1, 1) = tmp0;                      // fA * rB
+    A(2, 0) = rA;
+    A(2, 2) = tmp1;                      // fB * rA 
+    // A(1, 2) == A(2, 1) == 0
 
     return A * v; 
 }
 
 /**
- * Apply operator beta onto the given vector `v`, with the given sextet 
+ * Apply operator Beta onto the given vector `v`, with the given sextet
  * of edge labels.
  *
  * @param rung_labels Sextet of edge labels taken from a rung in the grid graph.
  * @param v           Input vector (length 3). 
- * @returns           Output vector (length 8). 
+ * @returns           Output vector (length 3). 
  */
 template <typename T>
-Matrix<T, 9, 1> beta(const std::array<T, 6>& rung_labels, const Ref<const Matrix<T, 3, 1> >& v)
+Matrix<T, 3, 1> beta(const std::array<T, 6>& rung_labels, const Ref<const Matrix<T, 3, 1> >& v)
 {
-    Matrix<T, 9, 3> A = Matrix<T, 9, 3>::Zero(); 
-    T fA = rung_labels[0];
-    T rA = rung_labels[1];
-    T fB = rung_labels[2];
-    T rB = rung_labels[3];
-    T c = rung_labels[4];
-    T d = rung_labels[5];
-    T tmp0 = d + rB; 
-    T tmp1 = rA * tmp0; 
-    T tmp2 = rB * c;
-    T tmp3 = fA * fB;
-    T tmp4 = fB * rA;  
-    A(0, 0) = tmp1 + tmp2;
-    A(0, 2) = tmp4 * d; 
-    A(1, 1) = tmp1 + tmp2; 
-    A(1, 2) = fA * tmp2;
-    A(2, 0) = fA * tmp0;
-    A(2, 1) = fB * d; 
-    A(2, 2) = tmp3 * d;
-    A(3, 0) = fA * c; 
-    A(3, 1) = fB * (c + rA);
-    A(3, 2) = tmp3 * c;
-    A(4, 0) = rB; 
-    A(5, 0) = rA; 
-    A(5, 2) = tmp4; 
-    A(6, 1) = rB; 
-    A(6, 2) = fA * rB;
-    A(7, 1) = rA; 
-    A(8, 0) = fA; 
-    A(8, 1) = fB; 
-    A(8, 2) = tmp3;
+    Matrix<T, 3, 3> A = Matrix<T, 3, 3>::Zero(); 
+    T fA = rung_labels[0]; 
+    T rA = rung_labels[1]; 
+    T fB = rung_labels[2]; 
+    T rB = rung_labels[3]; 
+    T c = rung_labels[4]; 
+    T d = rung_labels[5]; 
+    T tmp0 = fA * fB;
+    A(0, 0) = fA * (d + rB); 
+    A(0, 1) = fB * d; 
+    A(0, 2) = tmp0 * d;        // fA * fB * d 
+    A(1, 0) = fA * c; 
+    A(1, 1) = fB * (c + rA); 
+    A(1, 2) = tmp0 * c;        // fA * fB * c
+    A(2, 0) = fA; 
+    A(2, 1) = fB; 
+    A(2, 2) = tmp0;            // fA * fB
 
-    return A * v;
+    return A * v; 
 }
 
 /**
- * Apply operator gamma onto the given vector `v`, with the given sextet 
+ * Apply operator Beta1 onto the given vector `v`, with the given sextet
  * of edge labels.
  *
  * @param rung_labels Sextet of edge labels taken from a rung in the grid graph.
@@ -108,47 +96,161 @@ Matrix<T, 9, 1> beta(const std::array<T, 6>& rung_labels, const Ref<const Matrix
  * @returns           Output vector (length 3). 
  */
 template <typename T>
-Matrix<T, 3, 1> gamma(const std::array<T, 6>& rung_labels, const Ref<const Matrix<T, 4, 1> >& v)
+Matrix<T, 3, 1> beta1(const std::array<T, 6>& rung_labels, const Ref<const Matrix<T, 4, 1> >& v)
 {
     Matrix<T, 3, 4> A = Matrix<T, 3, 4>::Zero(); 
-    T fA = rung_labels[0];
-    T rA = rung_labels[1];
-    T fB = rung_labels[2];
-    T rB = rung_labels[3];
-    T c = rung_labels[4];
-    T d = rung_labels[5];
-    T tmp0 = d + rB; 
-    T tmp1 = fB * d;
-    T tmp2 = c + rA;
-    T tmp3 = fA * c;  
-    A(0, 0) = tmp0; 
-    A(0, 1) = fA * tmp0; 
-    A(0, 2) = tmp1;
-    A(0, 3) = fA * tmp1; 
-    A(1, 0) = tmp2; 
-    A(1, 1) = tmp3; 
-    A(1, 2) = fB * tmp2;
-    A(1, 3) = fB * tmp3; 
+    T fA = rung_labels[0]; 
+    T rA = rung_labels[1]; 
+    T fB = rung_labels[2]; 
+    T rB = rung_labels[3]; 
+    T c = rung_labels[4]; 
+    T d = rung_labels[5]; 
+    T tmp0 = c + rA;
+    T tmp1 = d + rB; 
+    T tmp2 = fA * fB; 
+    A(0, 0) = tmp1;            // d + rB 
+    A(0, 1) = fA * tmp1;       // fA * (d + rB)
+    A(0, 2) = fB * d;
+    A(0, 3) = tmp2 * d;        // fA * fB * d 
+    A(1, 0) = tmp0;            // c + rA 
+    A(1, 1) = fA * c; 
+    A(1, 2) = fB * tmp0;       // fB * (c + rA) 
+    A(1, 3) = tmp2 * c;        // fA * fB * c
     A(2, 0) = 1; 
     A(2, 1) = fA; 
     A(2, 2) = fB; 
-    A(2, 3) = fA * fB; 
+    A(2, 3) = tmp2;            // fA * fB
 
-    return A * v;
+    return A * v; 
 }
 
 /**
- * Apply operator delta onto the given vector `v`, with the given sextet
+ * Apply operator Gamma1 onto the given vector `v`, with the given sextet
  * of edge labels.
  *
  * @param rung_labels Sextet of edge labels taken from a rung in the grid graph.
- * @param v           Input vector (length 4). 
- * @returns           Output vector (length 8). 
+ * @param v           Input vector (length 2). 
+ * @returns           Output vector (length 3). 
  */
 template <typename T>
-Matrix<T, 8, 1> delta(const std::array<T, 6>& rung_labels, const Ref<const Matrix<T, 4, 1> >& v)
+Matrix<T, 3, 1> gamma1(const std::array<T, 6>& rung_labels, const Ref<const Matrix<T, 2, 1> >& v)
 {
-    Matrix<T, 8, 4> A = Matrix<T, 8, 4>::Zero();  
+    Matrix<T, 3, 2> A = Matrix<T, 3, 2>::Zero(); 
+    T fA = rung_labels[0]; 
+    T rA = rung_labels[1]; 
+    T fB = rung_labels[2]; 
+    T rB = rung_labels[3]; 
+    T c = rung_labels[4]; 
+    T d = rung_labels[5]; 
+    T tmp0 = fB * rA; 
+    A(0, 0) = rA * (rB + d) + rB * c;    // d * rA + c * rB + rA * rB
+    A(0, 1) = tmp0 * d;                  // fB * d * rA
+    A(1, 0) = rB;
+    A(2, 0) = rA;
+    A(2, 1) = tmp0;                      // fB * rA 
+    // A(1, 1) == 0
+
+    return A * v; 
+}
+
+/**
+ * Apply operator Gamma2 onto the given vector `v`, with the given sextet
+ * of edge labels.
+ *
+ * @param rung_labels Sextet of edge labels taken from a rung in the grid graph.
+ * @param v           Input vector (length 2). 
+ * @returns           Output vector (length 3). 
+ */
+template <typename T>
+Matrix<T, 3, 1> gamma2(const std::array<T, 6>& rung_labels, const Ref<const Matrix<T, 2, 1> >& v)
+{
+    Matrix<T, 3, 2> A = Matrix<T, 3, 2>::Zero(); 
+    T fA = rung_labels[0];
+    T rA = rung_labels[1];
+    T fB = rung_labels[2];
+    T rB = rung_labels[3];
+    T c = rung_labels[4];
+    T d = rung_labels[5];
+    T tmp0 = fA * rB; 
+    A(0, 0) = rA * (rB + d) + rB * c;    // d * rA + c * rB + rA * rB
+    A(0, 1) = tmp0 * c;                  // fA * c * rB
+    A(1, 0) = rB;
+    A(1, 1) = tmp0;                      // fA * rB
+    A(2, 0) = rA;
+    // A(2, 1) == 0
+
+    return A * v; 
+}
+
+/**
+ * Apply operator Delta1 onto the given vector `v`, with the given sextet 
+ * of edge labels. 
+ *
+ * @param rung_labels Sextet of edge labels taken from a rung in the grid graph.
+ * @param v           Input vector (length 2). 
+ * @returns           Output scalar.
+ */
+template <typename T>
+T delta1(const std::array<T, 6>& rung_labels, const Ref<const Matrix<T, 2, 1> >& v)
+{
+    return rung_labels[0] * v(0) + (rung_labels[0] * rung_labels[2]) * v(1); 
+}
+
+/**
+ * Apply operator Delta2 onto the given vector `v`, with the given sextet 
+ * of edge labels. 
+ *
+ * @param rung_labels Sextet of edge labels taken from a rung in the grid graph.
+ * @param v           Input vector (length 2). 
+ * @returns           Output scalar. 
+ */
+template <typename T>
+T delta2(const std::array<T, 6>& rung_labels, const Ref<const Matrix<T, 2, 1> >& v)
+{
+    return rung_labels[2] * v(0) + (rung_labels[0] * rung_labels[2]) * v(1); 
+}
+
+/**
+ * Apply operator Epsilon1 onto the given vector `v`, with the given sextet 
+ * of edge labels. 
+ *
+ * @param rung_labels Sextet of edge labels taken from a rung in the grid graph.
+ * @param v           Input vector (length 2). 
+ * @returns           Output vector (length 3). 
+ */
+template <typename T>
+Matrix<T, 3, 1> epsilon1(const std::array<T, 6>& rung_labels, const Ref<const Matrix<T, 2, 1> >& v)
+{
+    Matrix<T, 3, 2> A; 
+    T fA = rung_labels[0];
+    T rA = rung_labels[1];
+    T fB = rung_labels[2];
+    T rB = rung_labels[3];
+    T c = rung_labels[4];
+    T d = rung_labels[5];
+    T tmp0 = c + rA; 
+    A(0, 0) = d + rB; 
+    A(0, 1) = fB * d; 
+    A(1, 0) = tmp0; 
+    A(1, 1) = fB * tmp0; 
+    A(2, 0) = 1; 
+    A(2, 1) = fB; 
+
+    return A * v; 
+}
+
+/**
+ * Apply operator Epsilon2 onto the given vector `v`, with the given sextet 
+ * of edge labels. 
+ *
+ * @param rung_labels Sextet of edge labels taken from a rung in the grid graph.
+ * @param v           Input vector (length 2). 
+ * @returns           Output vector (length 3).
+ */
+template <typename T>
+Matrix<T, 3, 1> epsilon2(const std::array<T, 6>& rung_labels, const Ref<const Matrix<T, 2, 1> >& v)
+{
+    Matrix<T, 3, 2> A; 
     T fA = rung_labels[0];
     T rA = rung_labels[1];
     T fB = rung_labels[2];
@@ -156,66 +258,148 @@ Matrix<T, 8, 1> delta(const std::array<T, 6>& rung_labels, const Ref<const Matri
     T c = rung_labels[4];
     T d = rung_labels[5];
     T tmp0 = d + rB; 
-    T tmp1 = c + rA; 
-    T tmp2 = fA * fB;
     A(0, 0) = tmp0; 
-    A(0, 3) = fB * d; 
-    A(1, 1) = tmp0; 
-    A(1, 2) = fA * tmp0; 
-    A(2, 0) = tmp1; 
-    A(2, 3) = fB * tmp1; 
-    A(3, 1) = tmp1; 
-    A(3, 2) = fA * c; 
-    A(4, 0) = fA;
-    A(4, 2) = tmp2; 
-    A(5, 1) = fB; 
-    A(5, 3) = tmp2; 
-    A(6, 0) = 1;
-    A(6, 3) = fB; 
-    A(7, 1) = 1; 
-    A(7, 2) = fA;
+    A(0, 1) = fA * tmp0;
+    A(1, 0) = c + rA; 
+    A(1, 1) = fA * c; 
+    A(2, 0) = 1; 
+    A(2, 1) = fA;  
 
-    return A * v;
+    return A * v; 
 }
 
 /**
- * Apply operator epsilon onto the given vector `v`, with the given sextet
- * of edge labels.
+ * Apply operator Theta1 onto the given vector `v`, with the given sextet 
+ * of edge labels. 
  *
- * @param rung_labels Sextet of edge labels taken from a rung in the grid graph.
- * @param v           Input vector (length 3). 
- * @returns           Output vector (length 8). 
+ * @param rung_labels Sextet of edge labels taken from a rung in the grid graph. 
+ * @param v           Input vector (length 4). 
+ * @returns           Output vector (length 4).
  */
 template <typename T>
-Matrix<T, 8, 1> epsilon(const std::array<T, 6>& rung_labels, const Ref<const Matrix<T, 3, 1> >& v)
+Matrix<T, 4, 1> theta1(const std::array<T, 6>& rung_labels, const Ref<const Matrix<T, 4, 1> >& v)
 {
-    Matrix<T, 8, 3> A = Matrix<T, 8, 3>::Zero();  
+    Matrix<T, 4, 4> A = Matrix<T, 4, 4>::Zero(); 
     T fA = rung_labels[0];
     T rA = rung_labels[1];
     T fB = rung_labels[2];
     T rB = rung_labels[3];
     T c = rung_labels[4];
     T d = rung_labels[5];
-    T tmp0 = d + rB;
-    T tmp1 = c + rA;
-    A(0, 0) = tmp0; 
-    A(0, 2) = fB * d; 
-    A(1, 0) = tmp1; 
-    A(1, 2) = fB * tmp1; 
-    A(2, 0) = tmp0; 
-    A(2, 1) = fA * tmp0;
-    A(3, 0) = tmp1;
-    A(3, 1) = fA * c;
-    A(4, 0) = rB;
-    A(4, 1) = fA * rB;
-    A(5, 0) = rA; 
-    A(5, 2) = fB * rA;
-    A(6, 0) = 1;
-    A(6, 2) = fB; 
-    A(7, 0) = 1;
-    A(7, 1) = fA; 
+    T tmp0 = fA * fB; 
+    A(0, 0) = fA * (d + rB); 
+    A(0, 1) = fB * d;
+    A(0, 2) = tmp0 * d;        // fA * fB * d
+    A(0, 3) = tmp0 * d;        // fA * fB * d
+    A(1, 0) = fA * c;
+    A(1, 1) = fB * (c + rA); 
+    A(1, 2) = tmp0 * c;        // fA * fB * c
+    A(1, 3) = tmp0 * c;        // fA * fB * c
+    A(2, 1) = fB; 
+    A(2, 2) = tmp0;            // fA * fB
+    A(3, 0) = fA; 
+    A(3, 3) = tmp0;            // fA * fB
 
-    return A * v;
+    return A * v;  
+}
+
+/**
+ * Apply operator Theta2 onto the given vector `v`, with the given sextet 
+ * of edge labels. 
+ *
+ * @param rung_labels Sextet of edge labels taken from a rung in the grid graph. 
+ * @param v           Input vector (length 3). 
+ * @returns           Output vector (length 4).
+ */
+template <typename T>
+Matrix<T, 4, 1> theta2(const std::array<T, 6>& rung_labels, const Ref<const Matrix<T, 3, 1> >& v)
+{
+    Matrix<T, 4, 3> A = Matrix<T, 4, 3>::Zero(); 
+    T fA = rung_labels[0];
+    T rA = rung_labels[1];
+    T fB = rung_labels[2];
+    T rB = rung_labels[3];
+    T c = rung_labels[4];
+    T d = rung_labels[5];
+    T tmp0 = fA * fB; 
+    A(0, 0) = fA * (d + rB); 
+    A(0, 1) = fB * d;
+    A(0, 2) = tmp0 * d;        // fA * fB * d
+    A(1, 0) = fA * c;
+    A(1, 1) = fB * (c + rA);
+    A(1, 2) = tmp0 * c;        // fA * fB * c 
+    A(2, 1) = fB; 
+    A(3, 0) = fA; 
+    A(3, 2) = tmp0;            // fA * fB
+
+    return A * v;  
+}
+
+/**
+ * Apply operator Theta3 onto the given vector `v`, with the given sextet 
+ * of edge labels. 
+ *
+ * @param rung_labels Sextet of edge labels taken from a rung in the grid graph. 
+ * @param v           Input vector (length 3). 
+ * @returns           Output vector (length 4).
+ */
+template <typename T>
+Matrix<T, 4, 1> theta3(const std::array<T, 6>& rung_labels, const Ref<const Matrix<T, 3, 1> >& v)
+{
+    Matrix<T, 4, 3> A = Matrix<T, 4, 3>::Zero(); 
+    T fA = rung_labels[0];
+    T rA = rung_labels[1];
+    T fB = rung_labels[2];
+    T rB = rung_labels[3];
+    T c = rung_labels[4];
+    T d = rung_labels[5];
+    T tmp0 = fA * fB; 
+    A(0, 0) = fA * (d + rB); 
+    A(0, 1) = fB * d;
+    A(0, 2) = tmp0 * d;        // fA * fB * d 
+    A(1, 0) = fA * c;
+    A(1, 1) = fB * (c + rA);
+    A(1, 2) = tmp0 * c;        // fA * fB * c 
+    A(2, 1) = fB;
+    A(2, 2) = tmp0;            // fA * fB 
+    A(3, 0) = fA; 
+
+    return A * v;  
+}
+
+/**
+ * Apply operator Theta4 onto the given vector `v`, with the given sextet 
+ * of edge labels. 
+ *
+ * @param rung_labels Sextet of edge labels taken from a rung in the grid graph. 
+ * @param v           Input vector (length 6). 
+ * @returns           Output vector (length 2).
+ */
+template <typename T>
+Matrix<T, 2, 1> theta4(const std::array<T, 6>& rung_labels, const Ref<const Matrix<T, 6, 1> >& v)
+{
+    Matrix<T, 2, 6> A;
+    T fA = rung_labels[0];
+    T rA = rung_labels[1];
+    T fB = rung_labels[2];
+    T rB = rung_labels[3];
+    T c = rung_labels[4];
+    T d = rung_labels[5];
+    T tmp0 = fA * fB; 
+    A(0, 0) = c;
+    A(0, 1) = fA * c; 
+    A(0, 2) = fB * c; 
+    A(0, 3) = tmp0 * c;        // fA * fB * c
+    A(0, 4) = rA * fB; 
+    A(0, 5) = 0; 
+    A(1, 0) = d; 
+    A(1, 1) = fA * d; 
+    A(1, 2) = fB * d; 
+    A(1, 3) = tmp0 * d;        // fA * fB * c
+    A(1, 4) = 0; 
+    A(1, 5) = fA * rB; 
+
+    return A * v; 
 }
 
 /**
@@ -246,7 +430,7 @@ class GridGraph : public LabeledDigraph<InternalType, IOType>
     /**
      * An implementation of the grid graph. 
      */
-    private:
+    protected:
         /** Index of the last pair of nodes. */
         unsigned N;
 
@@ -324,6 +508,696 @@ class GridGraph : public LabeledDigraph<InternalType, IOType>
 
             // Then define the edge
             this->edges[source][target] = static_cast<InternalType>(label);
+        }
+
+        /**
+         * Compute and return six matrices of spanning forest weights related 
+         * to the exit statistics of the grid graph, named as follows: 
+         *
+         * 1) `v_alpha` (size `(3, 2 * this->N + 2)`)
+         * 2) `v_beta1` (size `(3, this->N)`)
+         * 3) `v_beta2` (size `(3, 2 * this->N + 2)`)
+         * 4) `v_beta3` (size `(3, 2 * this->N + 2)`)
+         * 5) `v_delta1` (size `(2, this->N)`)
+         * 6) `v_delta2` (size `(2, this->N)`)
+         *
+         * The `(2*i)`-th column of `v_alpha` contains the weights of 
+         * - spanning forests rooted at `(A,i)`
+         * - spanning forests rooted at `\{(A,i),(A,N)\}` with path `(B,N) -> (A,i)`
+         * - spanning forests rooted at `\{(A,i),(B,N)\}` with path `(A,N) -> (A,i)`
+         * The `(2*i+1)`-th column of `v_alpha` contains the weights of
+         * - spanning forests rooted at `(B,i)`
+         * - spanning forests rooted at `\{(B,i),(A,N)\}` with path `(B,N) -> (B,i)`
+         * - spanning forests rooted at `\{(B,i),(B,N)\}` with path `(A,N) -> (B,i)`
+         *
+         * The `i`-th column of `v_beta1` contains the weights of 
+         * - spanning forests rooted at `(A,i+1)`
+         * - spanning forests rooted at `(B,i+1)`
+         * - spanning forests rooted at `\{(A,i+1),(B,i+1)\}`
+         * on the `(i+1)`-th grid subgraph
+         *
+         * The `(2*i)`-th column of `v_beta2` contains the weights of
+         * - spanning forests rooted at `\{(A,i),(A,N)\}`
+         * - spanning forests rooted at `\{(A,i),(B,N)\}`
+         * - spanning forests rooted at `\{(A,i),(A,N),(B,N)\}`
+         * The `(2*i+1)`-th column of `v_beta2` contains the weights of
+         * - spanning forests rooted at `\{(B,i),(A,N)\}`
+         * - spanning forests rooted at `\{(B,i),(B,N)\}`
+         * - spanning forests rooted at `\{(B,i),(A,N),(B,N)\}`
+         *
+         * The `(2*i)`-th column of `v_beta3` contains the weights of
+         * - spanning forests rooted at `\{(A,i),(A,N)\}` with path `(A,0) -> (A,i)`
+         * - spanning forests rooted at `\{(A,i),(B,N)\}` with path `(A,0) -> (A,i)`
+         * - spanning forests rooted at `\{(A,i),(A,N),(B,N)\}` with path `(A,0) -> (A,i)`
+         * The `(2*i+1)`-th column of `v_beta3` contains the weights of
+         * - spanning forests rooted at `\{(B,i),(A,N)\}` with path `(A,0) -> (B,i)`
+         * - spanning forests rooted at `\{(B,i),(B,N)\}` with path `(A,0) -> (B,i)`
+         * - spanning forests rooted at `\{(B,i),(A,N),(B,N)\}` with path `(A,0) -> (B,i)`
+         *
+         * The `i`-th column of `v_delta1` contains the weights of
+         * - spanning forests rooted at `(A,i+1)`
+         * - spanning forests rooted at `\{(A,i+1),(B,i+1)\}` with path `(A,0) -> (A,i+1)`
+         * on the `(i+1)`-th grid subgraph
+         *
+         * The `i`-th column of `v_delta2` contains the weights of
+         * - spanning forests rooted at `(B,i+1)`
+         * - spanning forests rooted at `\{(A,i+1),(B,i+1)\}` with path `(A,0) -> (B,i+1)`
+         * on the `(i+1)`-th grid subgraph
+         *
+         * The `(2*i)`-th column of `v_theta1` contains the weights of 
+         * - spanning forests rooted at `\{(A,0),(A,N)\}` with path `(A,i) -> (A,N)`
+         * - spanning forests rooted at `\{(A,0),(B,N)\}` with path `(A,i) -> (B,N)`
+         * - spanning forests rooted at `\{(A,0),(A,N),(B,N)\}` with path `(A,i) -> (B,N)`
+         * - spanning forests rooted at `\{(A,0),(A,N),(B,N)\}` with path `(A,i) -> (A,N)`
+         *
+         * The `(2*i+1)`-th column of `v_theta1` contains the weights of 
+         * - spanning forests rooted at `\{(A,0),(A,N)\}` with path `(B,i) -> (A,N)`
+         * - spanning forests rooted at `\{(A,0),(B,N)\}` with path `(B,i) -> (B,N)`
+         * - spanning forests rooted at `\{(A,0),(A,N),(B,N)\}` with path `(B,i) -> (B,N)`
+         * - spanning forests rooted at `\{(A,0),(A,N),(B,N)\}` with path `(B,i) -> (A,N)`
+         *
+         * The `i`-th column of `v_theta2` contains the weights of
+         * - spanning forests rooted at `\{(A,0),(B,i+1)\}` with path `(A,i+1) -> (B,i+1)`
+         * - spanning forests rooted at `\{(A,0),(A,i+1)\}` with path `(B,i+1) -> (A,i+1)`
+         * on the `(i+1)`-th grid subgraph 
+         *
+         * This method assumes that `this->N` is greater than 1.  
+         *
+         * @returns               The above six matrices. 
+         */
+        std::tuple<Matrix<InternalType, 3, Dynamic>,    // v_alpha
+                   Matrix<InternalType, 3, Dynamic>,    // v_beta1
+                   Matrix<InternalType, 3, Dynamic>,    // v_beta2
+                   Matrix<InternalType, 3, Dynamic>,    // v_beta3
+                   Matrix<InternalType, 2, Dynamic>,    // v_delta1
+                   Matrix<InternalType, 2, Dynamic>,    // v_delta2
+                   Matrix<InternalType, 4, Dynamic>,    // v_theta1 and v_theta2
+                   Matrix<InternalType, 2, Dynamic> > getExitRelatedSpanningForestWeights()
+        {
+            Node* node_A0 = this->getNode("A0"); 
+            Node* node_B0 = this->getNode("B0"); 
+
+            // First define the Laplacian matrix of the subgraph on A0, B0, A1, B1
+            Matrix<InternalType, Dynamic, Dynamic> laplacian = Matrix<InternalType, Dynamic, Dynamic>::Zero(4, 4);
+            Node* node_A1 = this->getNode("A1");
+            Node* node_B1 = this->getNode("B1");
+            laplacian(0, 1) = -this->edges[node_A0][node_B0];    // A0 -> B0
+            laplacian(0, 2) = -this->edges[node_A0][node_A1];    // A0 -> A1
+            laplacian(1, 0) = -this->edges[node_B0][node_A0];    // B0 -> A0
+            laplacian(1, 3) = -this->edges[node_B0][node_B1];    // B0 -> B1
+            laplacian(2, 0) = -this->edges[node_A1][node_A0];    // A1 -> A0
+            laplacian(2, 3) = -this->edges[node_A1][node_B1];    // A1 -> B1
+            laplacian(3, 1) = -this->edges[node_B1][node_B0];    // B1 -> B0
+            laplacian(3, 2) = -this->edges[node_B1][node_A1];    // B1 -> A1
+            for (unsigned i = 0; i < 4; ++i)
+                laplacian(i, i) = -laplacian.row(i).sum();
+
+            // Remove the edges outgoing from A1 and apply the Chebotarev-Agaev
+            // recurrence to obtain the required spanning forest weights
+            Matrix<InternalType, Dynamic, Dynamic> curr = Matrix<InternalType, Dynamic, Dynamic>::Identity(4, 4);
+            laplacian(2, 0) = 0; 
+            laplacian(2, 2) = 0; 
+            laplacian(2, 3) = 0; 
+            curr = chebotarevAgaevRecurrence<InternalType>(0, laplacian, curr);
+            curr = chebotarevAgaevRecurrence<InternalType>(1, laplacian, curr);
+            // All spanning forests rooted at A0, A1
+            InternalType weight_A0_A1 = curr(0, 0);
+            // All spanning forests rooted at A0, A1 with path from B0 to A0
+            InternalType weight_A0_A1_with_path_B0_to_A0 = curr(1, 0); 
+            // All spanning forests rooted at A0, A1 with path from B1 to A0
+            InternalType weight_A0_A1_with_path_B1_to_A0 = curr(3, 0);
+            // All spanning forests rooted at B0, A1 with path from A0 to B0
+            InternalType weight_B0_A1_with_path_A0_to_B0 = curr(0, 1); 
+            // All spanning forests rooted at B0, A1 with path from B1 to B0
+            InternalType weight_B0_A1_with_path_B1_to_B0 = curr(3, 1);
+            // All spanning forests rooted at B0, A1
+            InternalType weight_B0_A1 = curr(1, 1); 
+            // All spanning forests rooted at A1, B1
+            InternalType weight_A1_B1 = curr(3, 3);
+            // All spanning forests rooted at A1, B1 with path from A0 to B1
+            InternalType weight_A1_B1_with_path_A0_to_B1 = curr(0, 3);
+
+            // Now remove the edges outgoing from B1 (without adding the edges
+            // outgoing from A1 back into the graph!) and apply the Chebotarev-
+            // Agaev recurrence again
+            laplacian(3, 1) = 0;
+            laplacian(3, 2) = 0;
+            laplacian(3, 3) = 0;
+            curr = Matrix<InternalType, Dynamic, Dynamic>::Identity(4, 4);
+            curr = chebotarevAgaevRecurrence<InternalType>(0, laplacian, curr);
+            // All spanning forests rooted at A0, A1, B1
+            InternalType weight_A0_A1_B1 = curr(0, 0);
+            // All spanning forests rooted at B0, A1, B1
+            InternalType weight_B0_A1_B1 = curr(1, 1); 
+            // All spanning forests rooted at A0, A1, B1 with path from B0 to A0
+            InternalType weight_A0_A1_B1_with_path_B0_to_A0 = curr(1, 0);  
+            // All spanning forests rooted at B0, A1, B1 with path from A0 to B0
+            InternalType weight_B0_A1_B1_with_path_A0_to_B0 = curr(0, 1); 
+
+            // Now add the edges outgoing from A1 back into the graph, and 
+            // apply the Chebotarev-Agaev recurrence again 
+            laplacian(2, 0) = -this->edges[node_A1][node_A0];    // A1 -> A0
+            laplacian(2, 3) = -this->edges[node_A1][node_B1];    // A1 -> B1
+            laplacian(2, 2) = -laplacian(2, 0) - laplacian(2, 3); 
+            curr = Matrix<InternalType, Dynamic, Dynamic>::Identity(4, 4); 
+            curr = chebotarevAgaevRecurrence<InternalType>(0, laplacian, curr);
+            curr = chebotarevAgaevRecurrence<InternalType>(1, laplacian, curr);
+            // All spanning forests rooted at A0, B1
+            InternalType weight_A0_B1 = curr(0, 0);
+            // All spanning forests rooted at B0, B1
+            InternalType weight_B0_B1 = curr(1, 1); 
+            // All spanning forests rooted at A0, B1 with path from B0 to A0
+            InternalType weight_A0_B1_with_path_B0_to_A0 = curr(1, 0); 
+            // All spanning forests rooted at A0, B1 with path from A1 to A0
+            InternalType weight_A0_B1_with_path_A1_to_A0 = curr(2, 0);
+            // All spanning forests rooted at B0, B1 with path from A0 to B0
+            InternalType weight_B0_B1_with_path_A0_to_B0 = curr(0, 1);  
+            // All spanning forests rooted at B0, B1 with path from A1 to B0
+            InternalType weight_B0_B1_with_path_A1_to_B0 = curr(2, 1);
+            // All spanning forests rooted at A1, B1 with path from A0 to A1
+            InternalType weight_A1_B1_with_path_A0_to_A1 = curr(0, 2);
+
+            // Now add the edges outgoing from B1 back into the graph, and
+            // apply the Chebotarev-Agaev recurrence again
+            laplacian(3, 1) = -this->edges[node_B1][node_B0];    // B1 -> B0
+            laplacian(3, 2) = -this->edges[node_B1][node_A1];    // B1 -> A1
+            laplacian(3, 3) = -laplacian(3, 1) - laplacian(3, 2);
+            curr = Matrix<InternalType, Dynamic, Dynamic>::Identity(4, 4);
+            curr = chebotarevAgaevRecurrence<InternalType>(0, laplacian, curr);
+            curr = chebotarevAgaevRecurrence<InternalType>(1, laplacian, curr);
+            curr = chebotarevAgaevRecurrence<InternalType>(2, laplacian, curr);
+            InternalType weight_A0 = curr(0, 0);    // All spanning trees rooted at A0
+            InternalType weight_B0 = curr(1, 1);    // All spanning trees rooted at B0
+            InternalType weight_A1 = curr(2, 2);    // All spanning trees rooted at A1
+            InternalType weight_B1 = curr(3, 3);    // All spanning trees rooted at B1
+
+            // Now remove the edges outgoing from A0 from the graph, and
+            // apply the Chebotarev-Agaev recurrence again
+            laplacian(0, 0) = 0;
+            laplacian(0, 1) = 0; 
+            laplacian(0, 2) = 0; 
+            curr = Matrix<InternalType, Dynamic, Dynamic>::Identity(4, 4);
+            curr = chebotarevAgaevRecurrence<InternalType>(0, laplacian, curr);
+            curr = chebotarevAgaevRecurrence<InternalType>(1, laplacian, curr);
+            // All spanning forests rooted at A0, A1 with path from B0 to A1
+            InternalType weight_A0_A1_with_path_B0_to_A1 = curr(1, 2); 
+            // All spanning forests rooted at A0, B1 with path from B0 to B1
+            InternalType weight_A0_B1_with_path_B0_to_B1 = curr(1, 3); 
+            // All spanning forests rooted at A0, B1 with path from A1 to B1
+            InternalType weight_A0_B1_with_path_A1_to_B1 = curr(2, 3);
+            // All spanning forests rooted at A0, A1 with path from B1 to A1
+            InternalType weight_A0_A1_with_path_B1_to_A1 = curr(3, 2); 
+
+            // Now remove the edges outgoing from A1 from the graph (again), and
+            // apply the Chebotarev-Agaev recurrence again
+            laplacian(2, 0) = 0; 
+            laplacian(2, 2) = 0; 
+            laplacian(2, 3) = 0; 
+            curr = Matrix<InternalType, Dynamic, Dynamic>::Identity(4, 4);
+            curr = chebotarevAgaevRecurrence<InternalType>(0, laplacian, curr);
+            // All spanning forests rooted at A0, A1, B1 with path from B0 to B1
+            InternalType weight_A0_A1_B1_with_path_B0_to_B1 = curr(1, 3);
+
+            // Now add the edges outgoing from A1 back into the graph, then
+            // remove the edges outgoing from B1 from the graph (again), and 
+            // apply the Chebotarev-Agaev recurrence again (one last time!) 
+            laplacian(2, 0) = -this->edges[node_A1][node_A0];    // A1 -> A0
+            laplacian(2, 3) = -this->edges[node_A1][node_B1];    // A1 -> B1
+            laplacian(2, 2) = -laplacian(2, 0) - laplacian(2, 3);
+            laplacian(3, 1) = 0; 
+            laplacian(3, 2) = 0; 
+            laplacian(3, 3) = 0;
+            curr = Matrix<InternalType, Dynamic, Dynamic>::Identity(4, 4);
+            curr = chebotarevAgaevRecurrence<InternalType>(0, laplacian, curr);
+            // All spanning forests rooted at A0, A1, B1 with path from B0 to A1
+            InternalType weight_A0_A1_B1_with_path_B0_to_A1 = curr(1, 2);
+
+            // Assemble vectors to pass to the five operators defined above ...
+            //
+            // The (2*i)-th column of v_alpha contains the weights of 
+            // - spanning forests rooted at (A,i)
+            // - spanning forests rooted at \{(A,i),(A,N)\} with path (B,N) -> (A,i)
+            // - spanning forests rooted at \{(A,i),(B,N)\} with path (A,N) -> (A,i)
+            //
+            // The (2*i+1)-th column of v_alpha contains the weights of  
+            // - spanning forests rooted at (B,i)
+            // - spanning forests rooted at \{(B,i),(A,N)\} with path (B,N) -> (B,i)
+            // - spanning forests rooted at \{(B,i),(B,N)\} with path (A,N) -> (B,i)
+            Matrix<InternalType, 3, Dynamic> v_alpha(3, 2 * this->N + 2);
+            
+            // The i-th column of v_beta1 contains the weights of 
+            // - spanning forests rooted at (A,i+1)
+            // - spanning forests rooted at (B,i+1)
+            // - spanning forests rooted at \{(A,i+1),(B,i+1)\}
+            // on the (i+1)-th grid subgraph
+            Matrix<InternalType, 3, Dynamic> v_beta1(3, this->N);
+
+            // The (2*i)-th column of v_beta2 contains the weights of 
+            // - spanning forests rooted at \{(A,i),(A,N)\}
+            // - spanning forests rooted at \{(A,i),(B,N)\}
+            // - spanning forests rooted at \{(A,i),(A,N),(B,N)\}
+            //
+            // The (2*i+1)-th column of v_beta2 contains the weights of 
+            // - spanning forests rooted at \{(B,i),(A,N)\}
+            // - spanning forests rooted at \{(B,i),(B,N)\}
+            // - spanning forests rooted at \{(B,i),(A,N),(B,N)\}
+            Matrix<InternalType, 3, Dynamic> v_beta2(3, 2 * this->N + 2);
+
+            // The (2*i)-th column of v_beta3 contains the weights of 
+            // - spanning forests rooted at \{(A,i),(A,N)\} with path (A,0) -> (A,i)
+            // - spanning forests rooted at \{(A,i),(B,N)\} with path (A,0) -> (A,i)
+            // - spanning forests rooted at \{(A,i),(A,N),(B,N)\} with path (A,0) -> (A,i)
+            //
+            // The (2*i+1)-th column of v_beta3 contains the weights of 
+            // - spanning forests rooted at \{(B,i),(A,N)\} with path (A,0) -> (B,i)
+            // - spanning forests rooted at \{(B,i),(B,N)\} with path (A,0) -> (B,i)
+            // - spanning forests rooted at \{(B,i),(A,N),(B,N)\} with path (A,0) -> (B,i)
+            Matrix<InternalType, 3, Dynamic> v_beta3(3, 2 * this->N + 2);
+
+            // The i-th column of v_beta4 contains the weights of 
+            // - spanning forests rooted at (A,0)
+            // - spanning forests rooted at \{(A,0),(A,i)\}
+            // - spanning forests rooted at \{(A,0),(B,i)\}
+            // - spanning forests rooted at \{(A,0),(A,i),(B,i)\}
+            // on the (i+1)-th grid subgraph 
+            Matrix<InternalType, 4, Dynamic> v_beta4(4, this->N);  
+            
+            // The i-th column of v_delta1 contains the weights of 
+            // - spanning forests rooted at (A,i+1)
+            // - spanning forests rooted at \{(A,i+1),(B,i+1)\} with path (A,0) -> (A,i+1)
+            // on the (i+1)-th grid subgraph
+            //
+            // The i-th column of v_delta2 contains the weights of 
+            // - spanning forests rooted at (B,i+1)
+            // - spanning forests rooted at \{(A,i+1),(B,i+1)\} with path (A,0) -> (B,i+1)
+            // on the (i+1)-th grid subgraph
+            Matrix<InternalType, 2, Dynamic> v_delta1(2, this->N);
+            Matrix<InternalType, 2, Dynamic> v_delta2(2, this->N);
+
+            // The (2*i)-th column of v_theta1 contains the weights of 
+            // - spanning forests rooted at \{(A,0),(A,N)\} with path (A,i) -> (A,N)
+            // - spanning forests rooted at \{(A,0),(B,N)\} with path (A,i) -> (B,N)
+            // - spanning forests rooted at \{(A,0),(A,N),(B,N)\} with path (A,i) -> (B,N)
+            // - spanning forests rooted at \{(A,0),(A,N),(B,N)\} with path (A,i) -> (A,N)
+            // 
+            // The (2*i+1)-th column of v_theta1 contains the weights of 
+            // - spanning forests rooted at \{(A,0),(A,N)\} with path (B,i) -> (A,N)
+            // - spanning forests rooted at \{(A,0),(B,N)\} with path (B,i) -> (B,N)
+            // - spanning forests rooted at \{(A,0),(A,N),(B,N)\} with path (B,i) -> (B,N)
+            // - spanning forests rooted at \{(A,0),(A,N),(B,N)\} with path (B,i) -> (A,N)
+            Matrix<InternalType, 4, Dynamic> v_theta1(4, 2 * this->N + 2);
+
+            // The i-th column of v_theta2 contains the weights of 
+            // - spanning forests rooted at \{(A,0),(B,i+1)\} with path (A,i+1) -> (B,i+1)
+            // - spanning forests rooted at \{(A,0),(A,i+1)\} with path (B,i+1) -> (A,i+1)
+            // on the (i+1)-th grid subgraph 
+            Matrix<InternalType, 2, Dynamic> v_theta2(2, this->N); 
+
+            v_alpha(0, 0) = weight_A0;
+            v_alpha(1, 0) = weight_A0_A1_with_path_B1_to_A0;
+            v_alpha(2, 0) = weight_A0_B1_with_path_A1_to_A0; 
+            v_alpha(0, 1) = weight_B0;
+            v_alpha(1, 1) = weight_B0_A1_with_path_B1_to_B0;
+            v_alpha(2, 1) = weight_B0_B1_with_path_A1_to_B0;
+            v_beta1(0, 0) = weight_A1;
+            v_beta1(1, 0) = weight_B1;
+            v_beta1(2, 0) = weight_A1_B1;
+            v_beta2(0, 0) = weight_A0_A1; 
+            v_beta2(1, 0) = weight_A0_B1; 
+            v_beta2(2, 0) = weight_A0_A1_B1;
+            v_beta2(0, 1) = weight_B0_A1; 
+            v_beta2(1, 1) = weight_B0_B1; 
+            v_beta2(2, 1) = weight_B0_A1_B1; 
+            v_beta3(0, 0) = weight_A0_A1; 
+            v_beta3(1, 0) = weight_A0_B1; 
+            v_beta3(2, 0) = weight_A0_A1_B1;
+            v_beta3(0, 1) = weight_B0_A1_with_path_A0_to_B0;
+            v_beta3(1, 1) = weight_B0_B1_with_path_A0_to_B0; 
+            v_beta3(2, 1) = weight_B0_A1_B1_with_path_A0_to_B0;
+            v_beta4(0, 0) = weight_A0; 
+            v_beta4(1, 0) = weight_A0_A1; 
+            v_beta4(2, 0) = weight_A0_B1; 
+            v_beta4(3, 0) = weight_A0_A1_B1; 
+            v_delta1(0, 0) = weight_A1; 
+            v_delta1(1, 0) = weight_A1_B1_with_path_A0_to_A1;
+            v_delta2(0, 0) = weight_B1; 
+            v_delta2(1, 0) = weight_A1_B1_with_path_A0_to_B1;
+            v_theta1(0, 0) = 0; 
+            v_theta1(1, 0) = 0; 
+            v_theta1(2, 0) = 0; 
+            v_theta1(3, 0) = 0;
+            v_theta1(0, 1) = weight_A0_A1_with_path_B0_to_A1;
+            v_theta1(1, 1) = weight_A0_B1_with_path_B0_to_B1; 
+            v_theta1(2, 1) = weight_A0_A1_B1_with_path_B0_to_B1;
+            v_theta1(3, 1) = weight_A0_A1_B1_with_path_B0_to_A1;
+            v_theta2(0, 0) = weight_A0_B1_with_path_A1_to_B1; 
+            v_theta2(1, 0) = weight_A0_A1_with_path_B1_to_A1;
+
+            // Apply operator Alpha (Eqn.19 in the SI) onto columns 0 and 1
+            // of v_alpha to yield the weights of: 
+            // - spanning forests rooted at (A,0) 
+            // - spanning forests rooted at \{(A,0),(A,N)\} with path (B,N) -> (A,0)
+            // - spanning forests rooted at \{(A,0),(B,N)\} with path (A,N) -> (A,0)
+            // - spanning forests rooted at (B,0)
+            // - spanning forests rooted at \{(B,0),(A,N)\} with path (B,N) -> (B,0)
+            // - spanning forests rooted at \{(B,0),(B,N)\} with path (A,N) -> (A,0)
+            // on the full grid graph ...
+            //
+            // ... while also applying operator Beta1 (Eqn.24 in the SI) onto
+            // columns 0 and 1 of v_beta2 to yield the weights of: 
+            // - spanning forests rooted at \{(A,0),(A,N)\}
+            // - spanning forests rooted at \{(A,0),(B,N)\} 
+            // - spanning forests rooted at \{(A,0),(A,N),(B,N)\} 
+            // - spanning forests rooted at \{(B,0),(A,N)\}
+            // - spanning forests rooted at \{(B,0),(B,N)\} 
+            // - spanning forests rooted at \{(B,0),(A,N),(B,N)\} 
+            // on the full grid graph
+            //
+            // ... while also applying operator Beta1 (Eqn.27 in the SI) to
+            // obtain the weights of: 
+            // - spanning forests rooted at \{(A,0),(A,N)\} (with path (A,0) -> (A,0))
+            // - spanning forests rooted at \{(A,0),(B,N)\} (with path (A,0) -> (A,0))
+            // - spanning forests rooted at \{(A,0),(A,N),(B,N)\} (with path (A,0) -> (A,0))
+            // - spanning forests rooted at \{(B,0),(A,N)\} with path (A,0) -> (B,0)
+            // - spanning forests rooted at \{(B,0),(B,N)\} with path (A,0) -> (B,0)
+            // - spanning forests rooted at \{(B,0),(A,N),(B,N)\} with path (A,0) -> (B,0)
+            // on the (i+j)-th grid subgraph
+            //
+            // ... while also applying operator Theta1 (Eqn.32 in the SI) to 
+            // obtain the weights of: 
+            // - spanning forests rooted at \{(A,0),(A,N)\} with path (B,0) -> (A,N)
+            // - spanning forests rooted at \{(A,0),(B,N)\} with path (B,0) -> (B,N)
+            // - spanning forests rooted at \{(A,0),(A,N),(B,N)\} with path (B,0) -> (B,N)
+            // - spanning forests rooted at \{(A,0),(A,N),(B,N)\} with path (B,0) -> (A,N)
+            // on the full grid graph 
+            //
+            // The j-th rung includes the labels between (A,j), (B,j), (A,j+1), (B,j+1)
+            InternalType weight_A0_sub = v_alpha(0, 0); 
+            InternalType weight_B0_sub = v_alpha(0, 1);
+            Matrix<InternalType, 4, 1> y; 
+            for (unsigned j = 1; j < this->N; ++j)
+            {
+                v_alpha.col(0) = alpha<InternalType>(this->rung_labels[j], v_alpha.col(0));      // Eqn.19
+                v_alpha.col(1) = alpha<InternalType>(this->rung_labels[j], v_alpha.col(1));      // Eqn.19
+                y << weight_A0_sub, v_beta2(0, 0), v_beta2(1, 0), v_beta2(2, 0); 
+                v_beta2.col(0) = beta1<InternalType>(this->rung_labels[j], y);                   // Eqn.24
+                y << weight_B0_sub, v_beta2(0, 1), v_beta2(1, 1), v_beta2(2, 1); 
+                v_beta2.col(1) = beta1<InternalType>(this->rung_labels[j], y);                   // Eqn.24
+                y << weight_A0_sub, v_beta3(0, 0), v_beta3(1, 0), v_beta3(2, 0); 
+                v_beta3.col(0) = beta1<InternalType>(this->rung_labels[j], y);                   // Eqn.27
+                y << weight_B0_sub, v_beta3(0, 1), v_beta3(1, 1), v_beta3(2, 1);
+                v_beta3.col(1) = beta1<InternalType>(this->rung_labels[j], y);                   // Eqn.27
+                v_theta1.col(1) = theta1<InternalType>(this->rung_labels[j], v_theta1.col(1));   // Eqn.32
+                    
+                // The new values of v_alpha(0, 0) and v_alpha(0, 1) are the 
+                // weights of spanning forests rooted at (A,0) or at (B,0) in
+                // the (j+1)-th grid subgraph
+                weight_A0_sub = v_alpha(0, 0); 
+                weight_B0_sub = v_alpha(0, 1);
+
+                // The new values of v_beta2.col(0) are the weights of: 
+                // - spanning forests rooted at \{(A,0),(A,j+1)\}
+                // - spanning forests rooted at \{(A,0),(B,j+1)\}
+                // - spanning forests rooted at \{(A,0),(A,j+1),(B,j+1)\}
+                // of the (j+1)-th grid graph  
+                v_beta4(0, j) = weight_A0_sub;
+                v_beta4(1, j) = v_beta2(0, 0); 
+                v_beta4(2, j) = v_beta2(1, 0); 
+                v_beta4(3, j) = v_beta2(2, 0);
+            }
+
+            // For i = 1, ..., this->N - 1, do the following:
+            Matrix<InternalType, 3, 1> v_gamma1, v_gamma2, v_epsilon1, v_epsilon2, v_epsilon3, v_epsilon4;
+            Matrix<InternalType, 4, 1> v_omega1, v_omega2;  
+            for (unsigned i = 1; i < this->N; ++i)
+            {
+                // Apply operators Gamma1 (Eqn.22 in the SI) and Gamma2 (Eqn.23
+                // in the SI) onto the current values in v_beta
+                //
+                // Gamma1 yields the weights of:
+                // - spanning forests rooted at (A,i)
+                // - spanning forests rooted at \{(A,i),(A,i+1)\} with path (B,i+1) -> (A,i)
+                // - spanning forests rooted at \{(A,i),(B,i+1)\} with path (A,i+1) -> (A,i) 
+                // on the (i+1)-th grid subgraph
+                //
+                // Gamma2 yields the weights of: 
+                // - spanning forests rooted at (B,i)
+                // - spanning forests rooted at \{(B,i),(A,i+1)\} with path (B,i+1) -> (B,i)
+                // - spanning forests rooted at \{(B,i),(B,i+1)\} with path (A,i+1) -> (B,i)
+                // on the (i+1)-th grid subgraph
+                //
+                // The i-th rung includes the labels between (A,i), (B,i), (A,i+1), (B,i+1)
+                Matrix<InternalType, 2, 1> v_beta_A, v_beta_B; 
+                v_beta_A << v_beta1(0, i-1), v_beta1(2, i-1); 
+                v_beta_B << v_beta1(1, i-1), v_beta1(2, i-1); 
+                v_gamma1 = gamma1<InternalType>(this->rung_labels[i], v_beta_A); 
+                v_gamma2 = gamma2<InternalType>(this->rung_labels[i], v_beta_B);
+
+                // Apply operator Epsilon1 (Eqn.25 in the SI) to obtain the 
+                // weights of
+                // - spanning forests rooted at \{(A,i),(A,i+1)\}
+                // - spanning forests rooted at \{(A,i),(B,i+1)\}
+                // - spanning forests rooted at \{(A,i),(A,i+1),(B,i+1)\}
+                // of the (i+1)-th grid subgraph
+                //
+                // The i-th rung includes the labels between (A,i), (B,i), (A,i+1), (B,i+1)
+                v_epsilon1 = epsilon1<InternalType>(this->rung_labels[i], v_beta_A);
+
+                // Apply operator Epsilon2 (Eqn.26 in the SI) to obtain the 
+                // weights of 
+                // - spanning forests rooted at \{(B,i),(A,i+1)\}
+                // - spanning forests rooted at \{(B,i),(B,i+1)\}
+                // - spanning forests rooted at \{(B,i),(A,i+1),(B,i+1)\}
+                // of the (i+1)-th grid subgraph
+                //
+                // The i-th rung includes the labels between (A,i), (B,i), (A,i+1), (B,i+1)
+                v_epsilon2 = epsilon2<InternalType>(this->rung_labels[i], v_beta_B);  
+
+                // Apply operator Epsilon1 (Eqn.28 in the SI) to obtain the 
+                // weights of 
+                // - spanning forests rooted at \{(A,i),(A,i+1)\} with path (A,0) -> (A,i)
+                // - spanning forests rooted at \{(A,i),(B,i+1)\} with path (A,0) -> (A,i)
+                // - spanning forests rooted at \{(A,i),(A,i+1),(B,i+1)\} with path (A,0) -> (A,i)
+                //
+                // The i-th rung includes the labels between (A,i), (B,i), (A,i+1), (B,i+1)
+                //
+                // The (i-1)-th column of v_delta1 contains the weights of 
+                // - spanning forests rooted at (A,i)
+                // - spanning forests rooted at \{(A,i),(B,i)\} with path (A,0) -> (A,i)
+                // of the i-th grid subgraph
+                Matrix<InternalType, 2, 1> x;
+                x << v_delta1(0, i-1), v_delta1(1, i-1); 
+                v_epsilon3 = epsilon1<InternalType>(this->rung_labels[i], x);
+                
+                // Apply operator Epsilon2 (Eqn.29 in the SI) to obtain the 
+                // weights of 
+                // - spanning forests rooted at \{(B,i),(A,i+1)\} with path (A,0) -> (B,i)
+                // - spanning forests rooted at \{(B,i),(B,i+1)\} with path (A,0) -> (B,i)
+                // - spanning forests rooted at \{(B,i),(A,i+1),(B,i+1)\} with path (A,0) -> (B,i) 
+                //
+                // The i-th rung includes the labels between (A,i), (B,i), (A,i+1), (B,i+1)
+                //
+                // The (i-1)-th column of v_delta2 contains the weights of 
+                // - spanning forests rooted at (B,i)
+                // - spanning forests rooted at \{(A,i),(B,i)\} with path (A,0) -> (B,i)
+                // on the i-th grid subgraph
+                x << v_delta2(0, i-1), v_delta2(1, i-1); 
+                v_epsilon4 = epsilon2<InternalType>(this->rung_labels[i], x);
+
+                // Apply operator Theta2 (Eqn.33 in the SI) to obtain the
+                // weights of 
+                // - spanning forests rooted at \{(A,0),(A,i+1)\} with path (A,i) -> (A,i+1)
+                // - spanning forests rooted at \{(A,0),(B,i+1)\} with path (A,i) -> (B,i+1)
+                // - spanning forests rooted at \{(A,0),(A,i+1),(B,i+1)\} with path (A,i) -> (B,i+1)
+                // - spanning forests rooted at \{(A,0),(A,i+1),(B,i+1)\} with path (A,i) -> (A,i+1)
+                //
+                // The i-th rung includes the labels between (A,i), (B,i), (A,i+1), (B,i+1)
+                //
+                // The (i-1)-th column of v_beta4 contains the weights of 
+                // - spanning forests rooted at (A,0)
+                // - spanning forests rooted at \{(A,0),(A,i)\}
+                // - spanning forests rooted at \{(A,0),(B,i)\}
+                // - spanning forests rooted at \{(A,0),(A,i),(B,i)\}
+                // on the i-th grid subgraph
+                //
+                // The (i-1)-th column of v_theta2 contains the weights of 
+                // - spanning forests rooted at \{(A,0),(B,i)\} with path (A,i) -> (B,i)
+                // - spanning forests rooted at \{(A,0),(A,i)\} with path (B,i) -> (A,i)
+                // on the i-th grid subgraph
+                Matrix<InternalType, 3, 1> z;
+                z << v_beta4(1, i-1), v_theta2(0, i-1), v_beta4(3, i-1); 
+                v_omega1 = theta2<InternalType>(this->rung_labels[i], z);
+
+                // Apply operator Theta3 (Eqn.34 in the SI) to obtain the
+                // weights of 
+                // - spanning forests rooted at \{(A,0),(A,i+1)\} with path (B,i) -> (A,i+1)
+                // - spanning forests rooted at \{(A,0),(B,i+1)\} with path (B,i) -> (B,i+1)
+                // - spanning forests rooted at \{(A,0),(A,i+1),(B,i+1)\} with path (B,i) -> (B,i+1)
+                // - spanning forests rooted at \{(A,0),(A,i+1),(B,i+1)\} with path (B,i) -> (A,i+1)
+                //
+                // The i-th rung includes the labels between (A,i), (B,i), (A,i+1), (B,i+1)
+                //
+                // The (i-1)-th column of v_beta4 contains the weights of 
+                // - spanning forests rooted at (A,0)
+                // - spanning forests rooted at \{(A,0),(A,i)\}
+                // - spanning forests rooted at \{(A,0),(B,i)\}
+                // - spanning forests rooted at \{(A,0),(A,i),(B,i)\}
+                // on the i-th grid subgraph
+                //
+                // The (i-1)-th column of v_theta2 contains the weights of 
+                // - spanning forests rooted at \{(A,0),(B,i)\} with path (A,i) -> (B,i)
+                // - spanning forests rooted at \{(A,0),(A,i)\} with path (B,i) -> (A,i)
+                // on the i-th grid subgraph
+                z << v_theta2(1, i-1), v_beta4(2, i-1), v_beta4(3, i-1); 
+                v_omega2 = theta3<InternalType>(this->rung_labels[i], z);
+
+                // Then, for j = 2, ..., this->N - i, apply operator Alpha
+                // (Eqn.21 in the SI) to obtain the weights of: 
+                // - spanning forests rooted at (A,i)
+                // - spanning forests rooted at \{(A,i),(A,i+j)\} with path (B,i+j) -> (A,i)
+                // - spanning forests rooted at \{(A,i),(B,i+j)\} with path (A,i+j) -> (A,i)
+                // - spanning forests rooted at (B,i)
+                // - spanning forests rooted at \{(B,i),(A,i+j)\} with path (B,i+j) -> (B,i)
+                // - spanning forests rooted at \{(B,i),(B,i+j)\} with path (A,i+j) -> (B,i)
+                // on the (i+j)-th grid subgraph ...
+                //
+                // ... while also applying operator Beta1 (Eqn.24 in the SI) to 
+                // obtain the weights of: 
+                // - spanning forests rooted at \{(A,i),(A,i+j)\}
+                // - spanning forests rooted at \{(A,i),(B,i+j)\}
+                // - spanning forests rooted at \{(A,i),(A,i+j),(B,i+j)\}
+                // - spanning forests rooted at \{(B,i),(A,i+j)\}
+                // - spanning forests rooted at \{(B,i),(B,i+j)\}
+                // - spanning forests rooted at \{(B,i),(A,i+j),(B,i+j)\}
+                // on the (i+j)-th grid subgraph ...
+                //
+                // ... while also applying operator Beta1 (Eqn.27 in the SI) to
+                // obtain the weights of: 
+                // - spanning forests rooted at \{(A,i),(A,i+j)\} with path (A,0) -> (A,i)
+                // - spanning forests rooted at \{(A,i),(B,i+j)\} with path (A,0) -> (A,i) 
+                // - spanning forests rooted at \{(A,i),(A,i+j),(B,i+j)\} with path (A,0) -> (A,i)
+                // - spanning forests rooted at \{(B,i),(A,i+j)\} with path (A,0) -> (B,i)
+                // - spanning forests rooted at \{(B,i),(B,i+j)\} with path (A,0) -> (B,i)
+                // - spanning forests rooted at \{(B,i),(A,i+j),(B,i+j)\} with path (A,0) -> (B,i)
+                // on the (i+j)-th grid subgraph
+                //
+                // ... while also applying operator Theta1 (Eqn.32 in the SI) to 
+                // obtain the weights of: 
+                // - spanning forests rooted at \{(A,0),(A,i+j)\} with path (A,i) -> (A,i+j)
+                // - spanning forests rooted at \{(A,0),(B,i+j)\} with path (A,i) -> (B,i+j)
+                // - spanning forests rooted at \{(A,0),(A,i+j),(B,i+j)\} with path (A,i) -> (B,i+j)
+                // - spanning forests rooted at \{(A,0),(A,i+j),(B,i+j)\} with path (A,i) -> (A,i+j)
+                // - spanning forests rooted at \{(A,0),(A,i+j)\} with path (B,i) -> (A,i+j)
+                // - spanning forests rooted at \{(A,0),(B,i+j)\} with path (B,i) -> (B,i+j)
+                // - spanning forests rooted at \{(A,0),(A,i+j),(B,i+j)\} with path (B,i) -> (B,i+j)
+                // - spanning forests rooted at \{(A,0),(A,i+j),(B,i+j)\} with path (B,i) -> (A,i+j)
+                // on the (i+j)-th grid subgraph 
+                //
+                // The (i+j-1)-th rung includes the labels between (A,i+j-1), (B,i+j-1), (A,i+j), (B,i+j)
+                for (unsigned j = 2; j <= this->N - i; ++j)
+                {
+                    // v_gamma1(0) is, at this point, the weight of spanning
+                    // forests rooted at (A,i) for the (i+j-1)-th grid subgraph
+                    InternalType weight_Ai = v_gamma1(0); 
+
+                    // v_gamma2(0) is, at this point, the weight of spanning 
+                    // forests rooted at (B,i) for the (i+j-1)-th grid subgraph
+                    InternalType weight_Bi = v_gamma2(0);
+
+                    v_gamma1 = alpha<InternalType>(this->rung_labels[i+j-1], v_gamma1);    // Eqn.21 in the SI
+                    v_gamma2 = alpha<InternalType>(this->rung_labels[i+j-1], v_gamma2);    // Eqn.21 in the SI
+                    y << weight_Ai, v_epsilon1(0), v_epsilon1(1), v_epsilon1(2);
+                    v_epsilon1 = beta1<InternalType>(this->rung_labels[i+j-1], y);         // Eqn.24 in the SI
+                    y << weight_Bi, v_epsilon2(0), v_epsilon2(1), v_epsilon2(2);  
+                    v_epsilon2 = beta1<InternalType>(this->rung_labels[i+j-1], y);         // Eqn.24 in the SI
+                    y << weight_Ai, v_epsilon3(0), v_epsilon3(1), v_epsilon3(2); 
+                    v_epsilon3 = beta1<InternalType>(this->rung_labels[i+j-1], y);         // Eqn.27 in the SI
+                    y << weight_Bi, v_epsilon4(0), v_epsilon4(1), v_epsilon4(2);
+                    v_epsilon4 = beta1<InternalType>(this->rung_labels[i+j-1], y);         // Eqn.27 in the SI
+                    v_omega1 = theta1<InternalType>(this->rung_labels[i+j-1], v_omega1);   // Eqn.32 in the SI
+                    v_omega2 = theta1<InternalType>(this->rung_labels[i+j-1], v_omega2);   // Eqn.32 in the SI
+                }
+                int index_Ai = 2 * i; 
+                int index_Bi = 2 * i + 1; 
+                v_alpha.col(index_Ai) = v_gamma1; 
+                v_alpha.col(index_Bi) = v_gamma2;
+                v_beta2.col(index_Ai) = v_epsilon1;
+                v_beta2.col(index_Bi) = v_epsilon2;
+                v_beta3.col(index_Ai) = v_epsilon3; 
+                v_beta3.col(index_Bi) = v_epsilon4;
+                v_theta1.col(index_Ai) = v_omega1; 
+                v_theta1.col(index_Bi) = v_omega2;
+
+                // Apply operator Beta (Eqn.20 in the SI) to obtain the
+                // weights of
+                // - spanning forests rooted at (A,i+1)
+                // - spanning forests rooted at (B,i+1)
+                // - spanning forests rooted at \{(A,i+1),(B,i+1)\}
+                // on the (i+1)-th grid subgraph
+                //
+                // The i-th rung includes the labels between (A,i), (B,i), (A,i+1), (B,i+1)
+                //
+                // The (i-1)-th column of v_beta1 contains the weights of 
+                // - spanning forests rooted at (A,i)
+                // - spanning forests rooted at (B,i)
+                // - spanning forests rooted at \{(A,i),(B,i)\}
+                // on the i-th grid subgraph 
+                v_beta1.col(i) = beta<InternalType>(this->rung_labels[i], v_beta1.col(i-1));
+
+                // Apply operator Delta1 (Eqn.30 in the SI) to obtain the
+                // weights of 
+                // - spanning forests rooted at (A,i+1)
+                // - spanning forests rooted at \{(A,i+1),(B,i+1)\} with path (A,0) -> (A,i+1)
+                // on the (i+1)-th grid subgraph
+                //
+                // The i-th rung includes the labels between (A,i), (B,i), (A,i+1), (B,i+1)
+                //
+                // The (i-1)-th column of v_delta1 contains the corresponding 
+                // spanning forests of the i-th grid subgraph 
+                InternalType result_delta1 = delta1<InternalType>(this->rung_labels[i], v_delta1.col(i-1));
+                v_delta1(0, i) = v_beta1(0, i); 
+                v_delta1(1, i) = result_delta1;
+
+                // Apply operator Delta2 (Eqn.31 in the SI) to obtain the 
+                // weights of 
+                // - spanning forests rooted at (B,i+1)
+                // - spanning forests rooted at \{(A,i+1),(B,i+1)\} with path (A,0) -> (B,i+1)
+                // on the (i+1)-th grid subgraph
+                //
+                // The i-th rung includes the labels between (A,i), (B,i), (A,i+1), (B,i+1)
+                //
+                // The (i-1)-th column of v_delta2 contains the corresponding 
+                // spanning forests of the i-th grid subgraph 
+                InternalType result_delta2 = delta2<InternalType>(this->rung_labels[i], v_delta2.col(i-1));
+                v_delta2(0, i) = v_beta1(1, i); 
+                v_delta2(1, i) = result_delta2;
+
+                // Apply operator Theta4 (Eqn.35 in the SI) to obtain the 
+                // weights of 
+                // - spanning forests rooted at \{(A,0),(B,i+1)\} with path (A,i+1) -> (B,i+1)
+                // - spanning forests rooted at \{(A,0),(A,i+1)\} with path (B,i+1) -> (A,i+1)
+                // on the (i+1)-th grid subgraph 
+                //
+                // The i-th rung includes the labels between (A,i), (B,i), (A,i+1), (B,i+1)
+                //
+                // The (i-1)-th column of v_beta4 contains the weights of: 
+                // - spanning forests rooted at \{(A,0)\}
+                // - spanning forests rooted at \{(A,0),(A,i)\} 
+                // - spanning forests rooted at \{(A,0),(B,i)\} 
+                // - spanning forests rooted at \{(A,0),(A,i),(B,i)\} 
+                // on the i-th grid subgraph
+                //
+                // The (i-1)-th column of v_theta2 contains the weights of:
+                // - spanning forests rooted at \{(A,0),(B,i)\} with path (A,i) -> (B,i) 
+                // - spanning forests rooted at \{(A,0),(A,i)\} with path (B,i) -> (A,i)
+                // on the i-th grid subgraph 
+                Matrix<InternalType, 6, 1> w;
+                w << v_beta4(0, i-1), v_beta4(1, i-1), v_beta4(2, i-1), v_beta4(3, i-1), 
+                     v_theta2(0, i-1), v_theta2(1, i-1); 
+                v_theta2.col(i) = theta4<InternalType>(this->rung_labels[i], w); 
+            }
+           
+            return std::make_tuple(v_alpha, v_beta1, v_beta2, v_beta3, v_delta1, v_delta2, v_theta1, v_theta2); 
         }
 
     public:
@@ -665,20 +1539,23 @@ class GridGraph : public LabeledDigraph<InternalType, IOType>
         }
         
         /**
-         * Compute and return two quantities: 
+         * Compute and return three quantities: 
          *
          * - the *splitting probability* of exiting the graph through
          *   `"B{this->N}"` (reaching an auxiliary upper exit node), and not
          *   through `"A0"` (reaching an auxiliary lower exit node);
          * - the reciprocal of the *unconditional mean first-passage time* to
          *   exiting the graph through `"A0"`, given that the exit rate from
-         *   `"B{this->N}"` is zero. 
+         *   `"B{this->N}"` is zero.
+         * - the reciprocal of the *conditional mean first-passage time* to 
+         *   exiting the graph through `"B{this->N}"`, given that the exit
+         *   through `"B{this->N}"` indeed occurs.  
          *
          * @param lower_exit_rate Rate of lower exit from `A0`.
          * @param upper_exit_rate Rate of upper exit from `B{this->N}`.
-         * @returns               The above two quantities. 
+         * @returns               The above three quantities. 
          */
-        std::pair<IOType, IOType> getExitStats(IOType lower_exit_rate, IOType upper_exit_rate)
+        std::tuple<IOType, IOType, IOType> getExitStats(IOType lower_exit_rate, IOType upper_exit_rate)
         {
             InternalType _lower_exit_rate = static_cast<InternalType>(lower_exit_rate); 
             InternalType _upper_exit_rate = static_cast<InternalType>(upper_exit_rate);
@@ -689,295 +1566,200 @@ class GridGraph : public LabeledDigraph<InternalType, IOType>
             if (this->N == 0)
             {
                 // Compute the splitting probability of exiting the graph 
-                // through B0
+                // through (B,0)
                 //
-                // Start with the weight of all spanning forests rooted at 
-                // lower & upper exits with a path from A0 to upper exit
-                InternalType weight_exits_with_path_A0_to_upper = this->edges[node_A0][node_B0] * _upper_exit_rate;
-
-                // Then get the weight of all spanning forests rooted at 
-                // the two exits
-                InternalType weight_exits = weight_exits_with_path_A0_to_upper; 
-                weight_exits += _lower_exit_rate * (this->edges[node_B0][node_A0] + _upper_exit_rate);
+                // Get the following weights:
+                // - spanning forests rooted at lower & upper exits with path
+                //   (A,0) -> upper exit
+                // - spanning forests rooted at lower & upper exits 
+                InternalType weight_lower_upper_with_path_A0_to_upper = this->edges[node_A0][node_B0] * _upper_exit_rate;
+                InternalType weight_lower_upper = weight_lower_upper_with_path_A0_to_upper; 
+                weight_lower_upper += _lower_exit_rate * (this->edges[node_B0][node_A0] + _upper_exit_rate);
+                InternalType upper_exit_prob = weight_lower_upper_with_path_A0_to_upper / weight_lower_upper; 
 
                 // Compute the unconditional mean first-passage time to
-                // exiting the graph through A0 (disregarding the given 
+                // exiting the graph through (A,0) (disregarding the given 
                 // upper exit rate)
                 // 
-                // Start with the weight of all spanning forests rooted at
-                // A0 & lower exit (with a path from A0 to A0)
+                // Get the following weights:
+                // - spanning forests rooted at (A,0) & lower exit
+                // - spanning forests rooted at (B,0) & lower exit with path 
+                //   (A,0) -> (B,0)
+                // - spanning forests rooted at lower exit
                 InternalType weight_A0_lower = this->edges[node_B0][node_A0];
-
-                // Then get the weight of all spanning forests rooted at
-                // B0 & lower exit with a path from A0 to B0
                 InternalType weight_B0_lower_with_path_A0_to_B0 = this->edges[node_A0][node_B0];
+                InternalType weight_lower = this->edges[node_B0][node_A0] * _lower_exit_rate;
+                InternalType uncond_inv_mean_FPT = weight_lower / (
+                    weight_A0_lower + weight_B0_lower_with_path_A0_to_B0
+                );
 
-                // Then get the weight of all spanning trees rooted at lower exit
-                InternalType weight_lower = this->edges[node_B0][node_A0] * _lower_exit_rate; 
+                // Now compute the conditional mean first-passage time to 
+                // exiting the graph through (B,N), given that this exit 
+                // indeed occurs 
+                //
+                // Get the following weights:
+                // - spanning forests rooted at \{(A,0), lower exit, upper exit\}
+                // - spanning forests rooted at \{(B,0), lower exit, upper exit\}
+                //   with path (A,0) -> (B,0)
+                // - spanning forests rooted at \{lower exit, upper exit\} with 
+                //   path (A,0) -> upper exit
+                // - spanning forests rooted at \{lower exit, upper exit\} with
+                //   path (B,0) -> upper exit
+                InternalType weight_A0_lower_upper = this->edges[node_B0][node_A0] + _upper_exit_rate;
+                InternalType weight_B0_lower_upper_with_path_A0_to_B0 = this->edges[node_A0][node_B0];
+                InternalType weight_lower_upper_with_path_B0_to_upper = (
+                    this->edges[node_A0][node_B0] * _upper_exit_rate +
+                    _lower_exit_rate * _upper_exit_rate
+                );
+                InternalType cond_inv_mean_FPT = (weight_lower_upper_with_path_A0_to_upper * weight_lower_upper) / (
+                    (weight_A0_lower_upper * weight_lower_upper_with_path_A0_to_upper) +
+                    (weight_B0_lower_upper_with_path_A0_to_B0 * weight_lower_upper_with_path_B0_to_upper)
+                );
 
-                return std::make_pair(
-                    static_cast<IOType>(
-                        weight_exits_with_path_A0_to_upper / weight_exits
-                    ), 
-                    static_cast<IOType>(
-                        weight_lower /
-                        (weight_A0_lower + weight_B0_lower_with_path_A0_to_B0)
-                    )
+                return std::make_tuple(
+                    static_cast<IOType>(upper_exit_prob), 
+                    static_cast<IOType>(uncond_inv_mean_FPT), 
+                    static_cast<IOType>(cond_inv_mean_FPT)
                 );  
-            } 
-
-            // First define the Laplacian matrix of the subgraph on A0, B0, A1, B1
-            Matrix<InternalType, Dynamic, Dynamic> laplacian = Matrix<InternalType, Dynamic, Dynamic>::Zero(4, 4);
-            Node* node_A1 = this->getNode("A1");
-            Node* node_B1 = this->getNode("B1");
-            laplacian(0, 1) = -this->edges[node_A0][node_B0];    // A0 -> B0
-            laplacian(0, 2) = -this->edges[node_A0][node_A1];    // A0 -> A1
-            laplacian(1, 0) = -this->edges[node_B0][node_A0];    // B0 -> A0
-            laplacian(1, 3) = -this->edges[node_B0][node_B1];    // B0 -> B1
-            laplacian(2, 0) = -this->edges[node_A1][node_A0];    // A1 -> A0
-            laplacian(2, 3) = -this->edges[node_A1][node_B1];    // A1 -> B1
-            laplacian(3, 1) = -this->edges[node_B1][node_B0];    // B1 -> B0
-            laplacian(3, 2) = -this->edges[node_B1][node_A1];    // B1 -> A1
-            for (unsigned i = 0; i < 4; ++i)
-                laplacian(i, i) = -laplacian.row(i).sum();
-
-            // Remove the edges outgoing from A1 and apply the Chebotarev-Agaev
-            // recurrence to obtain the required spanning forest weights
-            Matrix<InternalType, Dynamic, Dynamic> curr = Matrix<InternalType, Dynamic, Dynamic>::Identity(4, 4);
-            laplacian(2, 0) = 0; 
-            laplacian(2, 2) = 0; 
-            laplacian(2, 3) = 0; 
-            curr = chebotarevAgaevRecurrence<InternalType>(0, laplacian, curr);
-            curr = chebotarevAgaevRecurrence<InternalType>(1, laplacian, curr);
-            // All spanning forests rooted at A0, A1
-            InternalType weight_A0_A1 = curr(0, 0);
-            // All spanning forests rooted at A0, A1 with path from B0 to A0
-            InternalType weight_A0_A1_with_path_B0_to_A0 = curr(1, 0); 
-            // All spanning forests rooted at A0, A1 with path from B1 to A0
-            InternalType weight_A0_A1_with_path_B1_to_A0 = curr(3, 0);
-            // All spanning forests rooted at B0, A1 with path from A0 to B0
-            InternalType weight_B0_A1_with_path_A0_to_B0 = curr(0, 1); 
-            // All spanning forests rooted at B0, A1 with path from B1 to B0
-            InternalType weight_B0_A1_with_path_B1_to_B0 = curr(3, 1);
-            // All spanning forests rooted at A1, B1
-            InternalType weight_A1_B1 = curr(3, 3);
-            // All spanning forests rooted at A1, B1 with path from A0 to B1
-            InternalType weight_A1_B1_with_path_A0_to_B1 = curr(0, 3);
-
-            // Now remove the edges outgoing from B1 (without adding the edges
-            // outgoing from A1 back into the graph!) and apply the Chebotarev-
-            // Agaev recurrence again
-            laplacian(3, 1) = 0;
-            laplacian(3, 2) = 0;
-            laplacian(3, 3) = 0;
-            curr = Matrix<InternalType, Dynamic, Dynamic>::Identity(4, 4);
-            curr = chebotarevAgaevRecurrence<InternalType>(0, laplacian, curr);
-            // All spanning forests rooted at A0, A1, B1
-            InternalType weight_A0_A1_B1 = curr(0, 0);
-            // All spanning forests rooted at A0, A1, B1 with path from B0 to A0
-            InternalType weight_A0_A1_B1_with_path_B0_to_A0 = curr(1, 0);  
-            // All spanning forests rooted at B0, A1, B1 with path from A0 to B0
-            InternalType weight_B0_A1_B1_with_path_A0_to_B0 = curr(0, 1); 
-
-            // Now add the edges outgoing from A1 back into the graph, and 
-            // apply the Chebotarev-Agaev recurrence again 
-            laplacian(2, 0) = -this->edges[node_A1][node_A0];    // A1 -> A0
-            laplacian(2, 3) = -this->edges[node_A1][node_B1];    // A1 -> B1
-            laplacian(2, 2) = -laplacian(2, 0) - laplacian(2, 3); 
-            curr = Matrix<InternalType, Dynamic, Dynamic>::Identity(4, 4); 
-            curr = chebotarevAgaevRecurrence<InternalType>(0, laplacian, curr);
-            curr = chebotarevAgaevRecurrence<InternalType>(1, laplacian, curr);
-            // All spanning forests rooted at A0, B1
-            InternalType weight_A0_B1 = curr(0, 0);
-            // All spanning forests rooted at A0, B1 with path from B0 to A0
-            InternalType weight_A0_B1_with_path_B0_to_A0 = curr(1, 0); 
-            // All spanning forests rooted at A0, B1 with path from A1 to A0
-            InternalType weight_A0_B1_with_path_A1_to_A0 = curr(2, 0);
-            // All spanning forests rooted at B0, B1 with path from A0 to B0
-            InternalType weight_B0_B1_with_path_A0_to_B0 = curr(0, 1);  
-            // All spanning forests rooted at B0, B1 with path from A1 to B0
-            InternalType weight_B0_B1_with_path_A1_to_B0 = curr(2, 1);
-            // All spanning forests rooted at A1, B1 with path from A0 to A1
-            InternalType weight_A1_B1_with_path_A0_to_A1 = curr(0, 2);
-
-            // Finally add the edges outgoing from B1 back into the graph, 
-            // and apply the Chebotarev-Agaev recurrence again
-            laplacian(3, 1) = -this->edges[node_B1][node_B0];    // B1 -> B0
-            laplacian(3, 2) = -this->edges[node_B1][node_A1];    // B1 -> A1
-            laplacian(3, 3) = -laplacian(3, 1) - laplacian(3, 2);
-            curr = Matrix<InternalType, Dynamic, Dynamic>::Identity(4, 4);
-            curr = chebotarevAgaevRecurrence<InternalType>(0, laplacian, curr);
-            curr = chebotarevAgaevRecurrence<InternalType>(1, laplacian, curr);
-            curr = chebotarevAgaevRecurrence<InternalType>(2, laplacian, curr);
-            InternalType weight_A0 = curr(0, 0);    // All spanning trees rooted at A0
-            InternalType weight_B0 = curr(1, 1);    // All spanning trees rooted at B0
-            InternalType weight_A1 = curr(2, 2);    // All spanning trees rooted at A1
-            InternalType weight_B1 = curr(3, 3);    // All spanning trees rooted at B1
-
-            // Assemble vectors to pass to the five operators defined above
-            Matrix<InternalType, 3, Dynamic> v_alpha(3, 2 * this->N);
-            Matrix<InternalType, 3, 1> v_beta, v_epsilon; 
-            Matrix<InternalType, 4, Dynamic> v_gamma(4, 2 * this->N);
-            Matrix<InternalType, 4, Dynamic> w_gamma(4, 2 * this->N); 
-            Matrix<InternalType, 4, 1> v_delta; 
-            v_alpha(0, 0) = weight_A0;
-            v_alpha(1, 0) = weight_A0_A1_with_path_B1_to_A0;
-            v_alpha(2, 0) = weight_A0_B1_with_path_A1_to_A0; 
-            v_alpha(0, 1) = weight_B0;
-            v_alpha(1, 1) = weight_B0_A1_with_path_B1_to_B0;
-            v_alpha(2, 1) = weight_B0_B1_with_path_A1_to_B0;
-            v_beta << weight_A1,
-                      weight_B1,
-                      weight_A1_B1;
-            v_gamma(0, 0) = weight_A0;
-            v_gamma(1, 0) = weight_A0_A1;
-            v_gamma(2, 0) = weight_A0_B1;
-            v_gamma(3, 0) = weight_A0_A1;
-            v_gamma(0, 1) = weight_B0;
-            v_gamma(1, 1) = weight_B0_A1_with_path_A0_to_B0;
-            v_gamma(2, 1) = weight_B0_B1_with_path_A0_to_B0;
-            v_gamma(3, 1) = weight_B0_A1_B1_with_path_A0_to_B0;
-            w_gamma(0, 0) = weight_A0;
-            w_gamma(1, 0) = weight_A0_A1;
-            w_gamma(2, 0) = weight_A0_B1;
-            w_gamma(3, 0) = weight_A0_A1_B1;
-            w_gamma(0, 1) = weight_A0;
-            w_gamma(1, 1) = weight_A0_A1_with_path_B0_to_A0;
-            w_gamma(2, 1) = weight_A0_B1_with_path_B0_to_A0;
-            w_gamma(3, 1) = weight_A0_A1_B1_with_path_B0_to_A0;
-            v_delta << weight_A1,
-                       weight_B1,
-                       weight_A1_B1_with_path_A0_to_B1,
-                       weight_A1_B1_with_path_A0_to_A1;
-            v_epsilon << weight_A0,
-                         weight_A0_A1_with_path_B1_to_A0,
-                         weight_A0_B1_with_path_A1_to_A0;
-
-            for (unsigned i = 1; i < this->N; ++i)
-            {
-                int next = 2 * i; 
-                int after = 2 * i + 1;
-
-                // Apply operator alpha onto the first 2 * i columns of v_alpha,
-                // and overwrite these columns with the results
-                for (unsigned j = 0; j < next; ++j)
-                    v_alpha.col(j) = alpha<InternalType>(this->rung_labels[i], v_alpha.col(j));
-
-                // Apply operator beta onto v_beta, populate the next 2 columns 
-                // of v_alpha, and update v_beta
-                Matrix<InternalType, 9, 1> w_beta = beta<InternalType>(this->rung_labels[i], v_beta); 
-                v_alpha(0, next) = w_beta(0); 
-                v_alpha(1, next) = w_beta(4); 
-                v_alpha(2, next) = w_beta(5); 
-                v_alpha(0, after) = w_beta(1); 
-                v_alpha(1, after) = w_beta(6); 
-                v_alpha(2, after) = w_beta(7);
-                v_beta(0) = w_beta(2); 
-                v_beta(1) = w_beta(3); 
-                v_beta(2) = w_beta(8);
-
-                // Apply operator gamma onto the first 2 * i columns of v_gamma,
-                // and overwrite these columns with the results
-                for (unsigned j = 0; j < next; ++j)
-                {
-                    Matrix<InternalType, 3, 1> u_gamma = gamma<InternalType>(this->rung_labels[i], v_gamma.col(j));
-                    v_gamma(0, j) = v_alpha(0, j); 
-                    v_gamma(1, j) = u_gamma(0); 
-                    v_gamma(2, j) = u_gamma(1); 
-                    v_gamma(3, j) = u_gamma(2); 
-                }
-
-                // Apply operator delta onto v_delta, populate the next 2 columns
-                // of v_gamma, and update v_delta
-                Matrix<InternalType, 8, 1> w_delta = delta<InternalType>(this->rung_labels[i], v_delta);
-                v_gamma(0, next) = v_alpha(0, next);
-                v_gamma(1, next) = w_delta(0); 
-                v_gamma(2, next) = w_delta(2); 
-                v_gamma(3, next) = w_delta(6); 
-                v_gamma(0, after) = v_alpha(0, after); 
-                v_gamma(1, after) = w_delta(1); 
-                v_gamma(2, after) = w_delta(3); 
-                v_gamma(3, after) = w_delta(7); 
-                v_delta(0) = v_beta(0); 
-                v_delta(1) = v_beta(1); 
-                v_delta(2) = w_delta(4); 
-                v_delta(3) = w_delta(5);
-
-                // Apply operator gamma onto the first 2 * i columns of w_gamma,
-                // and overwrite these columns with the results
-                for (unsigned j = 0; j < next; ++j)
-                {
-                    Matrix<InternalType, 3, 1> u_gamma = gamma<InternalType>(this->rung_labels[i], w_gamma.col(j));
-                    w_gamma(0, j) = v_alpha(0, j); 
-                    w_gamma(1, j) = u_gamma(0); 
-                    w_gamma(2, j) = u_gamma(1); 
-                    w_gamma(3, j) = u_gamma(2); 
-                }
-
-                // Apply operator epsilon onto v_epsilon, populate the next 
-                // 2 columns of w_gamma, and update v_epsilon
-                Matrix<InternalType, 8, 1> w_epsilon = epsilon<InternalType>(this->rung_labels[i], v_epsilon);
-                w_gamma(0, next) = v_alpha(0, next); 
-                w_gamma(1, next) = w_epsilon(0); 
-                w_gamma(2, next) = w_epsilon(1); 
-                w_gamma(3, next) = w_epsilon(6); 
-                w_gamma(0, after) = v_alpha(0, after); 
-                w_gamma(1, after) = w_epsilon(2); 
-                w_gamma(2, after) = w_epsilon(3); 
-                w_gamma(3, after) = w_epsilon(7); 
-                v_epsilon(0) = v_alpha(0, 0);
-                v_epsilon(1) = w_epsilon(4); 
-                v_epsilon(2) = w_epsilon(5);
             }
+
+            // Compute the exit-related spanning forest weights of the graph 
+            auto forest_weights = this->getExitRelatedSpanningForestWeights();
+
+            // The (2*i)-th column of v_alpha contains the weights of 
+            // - spanning forests rooted at (A,i)
+            // - spanning forests rooted at \{(A,i),(A,N)\} with path (B,N) -> (A,i)
+            // - spanning forests rooted at \{(A,i),(B,N)\} with path (A,N) -> (A,i)
+            //
+            // The (2*i+1)-th column of v_alpha contains the weights of  
+            // - spanning forests rooted at (B,i)
+            // - spanning forests rooted at \{(B,i),(A,N)\} with path (B,N) -> (B,i)
+            // - spanning forests rooted at \{(B,i),(B,N)\} with path (A,N) -> (B,i)
+            Matrix<InternalType, 3, Dynamic> v_alpha = std::get<0>(forest_weights);    // size (3, 2 * this->N + 2) 
+            
+            // The i-th column of v_beta1 contains the weights of 
+            // - spanning forests rooted at (A,i+1)
+            // - spanning forests rooted at (B,i+1)
+            // - spanning forests rooted at \{(A,i+1),(B,i+1)\}
+            // on the (i+1)-th grid subgraph
+            Matrix<InternalType, 3, Dynamic> v_beta1 = std::get<1>(forest_weights);    // size (3, this->N)
+
+            // The (2*i)-th column of v_beta2 contains the weights of 
+            // - spanning forests rooted at \{(A,i),(A,N)\}
+            // - spanning forests rooted at \{(A,i),(B,N)\}
+            // - spanning forests rooted at \{(A,i),(A,N),(B,N)\}
+            //
+            // The (2*i+1)-th column of v_beta2 contains the weights of 
+            // - spanning forests rooted at \{(B,i),(A,N)\}
+            // - spanning forests rooted at \{(B,i),(B,N)\}
+            // - spanning forests rooted at \{(B,i),(A,N),(B,N)\}
+            Matrix<InternalType, 3, Dynamic> v_beta2 = std::get<2>(forest_weights);    // size (3, 2 * this->N + 2)
+            
+            // The (2*i)-th column of v_beta3 contains the weights of 
+            // - spanning forests rooted at \{(A,i),(A,N)\} with path (A,0) -> (A,i)
+            // - spanning forests rooted at \{(A,i),(B,N)\} with path (A,0) -> (A,i)
+            // - spanning forests rooted at \{(A,i),(A,N),(B,N)\} with path (A,0) -> (A,i)
+            //
+            // The (2*i+1)-th column of v_beta3 contains the weights of 
+            // - spanning forests rooted at \{(B,i),(A,N)\} with path (A,0) -> (B,i)
+            // - spanning forests rooted at \{(B,i),(B,N)\} with path (A,0) -> (B,i)
+            // - spanning forests rooted at \{(B,i),(A,N),(B,N)\} with path (A,0) -> (B,i)
+            Matrix<InternalType, 3, Dynamic> v_beta3 = std::get<3>(forest_weights);    // size (3, 2 * this->N + 2)
+            
+            // The i-th column of v_delta1 contains the weights of 
+            // - spanning forests rooted at (A,i+1)
+            // - spanning forests rooted at \{(A,i+1),(B,i+1)\} with path (A,0) -> (A,i+1)
+            // on the (i+1)-th grid subgraph
+            //
+            // The i-th column of v_delta2 contains the weights of 
+            // - spanning forests rooted at (B,i+1)
+            // - spanning forests rooted at \{(A,i+1),(B,i+1)\} with path (A,0) -> (B,i+1)
+            // on the (i+1)-th grid subgraph
+            Matrix<InternalType, 2, Dynamic> v_delta1 = std::get<4>(forest_weights);   // size (2, this->N)
+            Matrix<InternalType, 2, Dynamic> v_delta2 = std::get<5>(forest_weights);   // size (2, this->N)
+
+            // The (2*i)-th column of v_theta1 contains the weights of 
+            // - spanning forests rooted at \{(A,0),(A,N)\} with path (A,i) -> (A,N)
+            // - spanning forests rooted at \{(A,0),(B,N)\} with path (A,i) -> (B,N)
+            // - spanning forests rooted at \{(A,0),(A,N),(B,N)\} with path (A,i) -> (B,N)
+            // - spanning forests rooted at \{(A,0),(A,N),(B,N)\} with path (A,i) -> (A,N)
+            // 
+            // The (2*i+1)-th column of v_theta1 contains the weights of 
+            // - spanning forests rooted at \{(A,0),(A,N)\} with path (B,i) -> (A,N)
+            // - spanning forests rooted at \{(A,0),(B,N)\} with path (B,i) -> (B,N)
+            // - spanning forests rooted at \{(A,0),(A,N),(B,N)\} with path (B,i) -> (B,N)
+            // - spanning forests rooted at \{(A,0),(A,N),(B,N)\} with path (B,i) -> (A,N)
+            Matrix<InternalType, 4, Dynamic> v_theta1 = std::get<6>(forest_weights);   // size (4, 2 * this->N + 2)
+
+            // The i-th column of v_theta2 contains the weights of 
+            // - spanning forests rooted at \{(A,0),(B,i+1)\} with path (A,i+1) -> (B,i+1)
+            // - spanning forests rooted at \{(A,0),(A,i+1)\} with path (B,i+1) -> (A,i+1)
+            // on the (i+1)-th grid subgraph 
+            Matrix<InternalType, 2, Dynamic> v_theta2 = std::get<7>(forest_weights);   // size (2, this->N) 
 
             // Compute the splitting probability of exiting the graph through
             // B{this->N}
-            weight_A0 = v_alpha(0, 0); 
-            InternalType weight_AN = v_beta(0); 
-            InternalType weight_BN = v_beta(1);
-            InternalType weight_A0_BN = v_gamma(2, 0);
+            InternalType weight_A0 = v_alpha(0, 0); 
+            InternalType weight_AN = v_beta1(0, this->N - 1); 
+            InternalType weight_BN = v_beta1(1, this->N - 1);
+            InternalType weight_A0_BN = v_beta2(1, 0);
             InternalType tmp0 = weight_A0 * _lower_exit_rate;
             InternalType tmp1 = _lower_exit_rate * _upper_exit_rate;
             InternalType tmp2 = weight_BN * _upper_exit_rate; 
-            InternalType tmp3 = weight_A0_BN * tmp1; 
-            InternalType _upper_exit_prob = tmp2 / (tmp0 + tmp2 + tmp3);
+            InternalType tmp3 = weight_A0_BN * tmp1;
+            InternalType weight_lower_upper = tmp0 + tmp2 + tmp3;  
+            InternalType upper_exit_prob = tmp2 / weight_lower_upper; 
 
             // Compute the unconditional mean first-passage time to exiting
             // the graph through A0 (disregarding the given upper exit rate) 
             InternalType numer = 0;
-            InternalType denom = 0;
             for (unsigned i = 0; i < this->N; ++i)
             {
                 int index_Ai = 2 * i; 
                 int index_Bi = 2 * i + 1;
                 InternalType weight_Ai = v_alpha(0, index_Ai); 
                 InternalType weight_Bi = v_alpha(0, index_Bi);
-                InternalType weight_Ai_BN_with_path_A0_to_Ai = v_gamma(2, index_Ai); 
-                InternalType weight_Bi_BN_with_path_A0_to_Bi = v_gamma(2, index_Bi);
-                InternalType weight_A0_BN_with_path_Ai_to_A0 = w_gamma(2, index_Ai);
-                InternalType weight_A0_BN_with_path_Bi_to_A0 = w_gamma(2, index_Bi);
-                numer += (
-                    (weight_Ai + weight_Ai_BN_with_path_A0_to_Ai * _upper_exit_rate) *
-                    (tmp0 + weight_A0_BN_with_path_Ai_to_A0 * tmp1)
-                );
-                numer += (
-                    (weight_Bi + weight_Bi_BN_with_path_A0_to_Bi * _upper_exit_rate) *
-                    (tmp0 + weight_A0_BN_with_path_Bi_to_A0 * tmp1)
-                );
+                numer += weight_Ai; 
+                numer += weight_Bi; 
             }
-            InternalType weight_AN_BN_with_path_A0_to_AN = v_delta(3); 
-            InternalType weight_A0_BN_with_path_AN_to_A0 = v_epsilon(2);
-            numer += (
-                (weight_AN + weight_AN_BN_with_path_A0_to_AN * _upper_exit_rate) * 
-                (tmp0 + weight_A0_BN_with_path_AN_to_A0 * tmp1)
-            );
-            numer += (weight_BN * tmp0);
-            denom = (tmp0 + tmp3) * (tmp0 + tmp2 + tmp3);
+            numer += weight_AN; 
+            numer += weight_BN;
+            InternalType uncond_inv_mean_FPT = _lower_exit_rate * weight_A0 / numer; 
 
-            return std::make_pair(
-                static_cast<IOType>(_upper_exit_prob),
-                static_cast<IOType>(denom / numer)
-            ); 
+            // Compute the conditional mean first-passage time to exiting 
+            // the graph through (B,N), given that exit through (B,N) indeed
+            // occurs 
+            numer = 0; 
+            //InternalType weight_A0_1 = weight_A0 + _upper_exit_rate * weight_A0_BN;
+            //InternalType weight_A0_2 = tmp2;  
+            //InternalType weight_B0_1 = v_alpha(0, 1) + _upper_exit_rate * v_beta3(1, 1); 
+            //InternalType weight_B0_2 = tmp2 + tmp1 * v_theta1(1, 1);
+            //numer += (weight_A0_1 * weight_A0_2); 
+            //numer += (weight_B0_1 * weight_B0_2);  
+            for (unsigned i = 0; i < this->N; ++i)
+            {
+                int index_Ai = 2 * i;
+                int index_Bi = 2 * i + 1;
+                InternalType weight_Ai_1 = v_alpha(0, index_Ai) + _upper_exit_rate * v_beta3(1, index_Ai);
+                InternalType weight_Ai_2 = tmp2 + tmp1 * v_theta1(1, index_Ai);
+                InternalType weight_Bi_1 = v_alpha(0, index_Bi) + _upper_exit_rate * v_beta3(1, index_Bi); 
+                InternalType weight_Bi_2 = tmp2 + tmp1 * v_theta1(1, index_Bi);
+                numer += (weight_Ai_1 * weight_Ai_2); 
+                numer += (weight_Bi_1 * weight_Bi_2);  
+            }
+            InternalType weight_AN_1 = v_beta1(0, this->N - 1) + _upper_exit_rate * v_delta1(1, this->N - 1);
+            InternalType weight_AN_2 = tmp2 + tmp1 * v_theta2(0, this->N - 1);  
+            InternalType weight_BN_1 = weight_BN; 
+            InternalType weight_BN_2 = tmp2 + tmp1 * weight_A0_BN;
+            numer += (weight_AN_1 * weight_AN_2); 
+            numer += (weight_BN_1 * weight_BN_2);  
+            InternalType cond_inv_mean_FPT = tmp2 * weight_lower_upper / numer;  
+
+            return std::make_tuple(
+                static_cast<IOType>(upper_exit_prob),
+                static_cast<IOType>(uncond_inv_mean_FPT), 
+                static_cast<IOType>(cond_inv_mean_FPT)
+            );
         }
 };
 
