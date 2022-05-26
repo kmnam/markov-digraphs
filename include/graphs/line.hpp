@@ -7,7 +7,7 @@
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  * **Last updated:**
- *     1/18/2022
+ *     5/26/2022
  */
 
 #ifndef LINE_LABELED_DIGRAPH_HPP
@@ -27,12 +27,15 @@
  * we have `this->numnodes == this->N + 1`.
  *
  * Additional methods implemented for this graph include: 
- * - `getUpperExitProb()`: compute the *splitting probability* of exiting
- *   the graph through `this->N` (reaching an auxiliary upper exit node),
- *   and not through `0` (reaching an auxiliary lower exit node). 
- * - `getLowerExitRate()`: compute the reciprocal of the *unconditional mean
- *   first-passage time* to exiting the graph through `0`, given that the 
- *   exit rate from `this->N` is zero. 
+ * - `getUpperExitProb(IOType, IOType)`: compute the *splitting probability*
+ *   of exiting the graph through `this->N` (reaching an auxiliary upper exit
+ *   node), and not through `0` (reaching an auxiliary lower exit node). 
+ * - `getLowerExitRate(IOType)`: compute the reciprocal of the *unconditional
+ *   mean first-passage time* to exiting the graph through `0`, given that
+ *   the exit rate from `this->N` is zero.
+ * - `getLowerExitRate(IOType, IOType)`: compute the reciprocal of the *conditional
+ *   mean first-passage time* to exiting the graph through `0`, given that 
+ *   (1) both exit rates are nonzero and (2) exit through `0` does occur.  
  * - `getUpperExitRate(IOType, IOType)`: compute the reciprocal of the *conditional
  *   mean first-passage time* to exiting the graph through `this->N`, given that
  *   (1) both exit rates are nonzero and (2) exit through `this->N` does occur. 
@@ -414,6 +417,103 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
 
             // Finally divide by label(0 -> exit) and take the reciprocal
             return static_cast<IOType>(_lower_exit_rate / invrate);  
+        }
+
+        /**
+         * Compute the reciprocal of the *conditional* mean first-passage
+         * time to exit from the line graph through the lower node, `0` 
+         * (to an auxiliary "lower exit" node), starting from `0`, given that
+         * exit through the lower node indeed occurs. 
+         *
+         * @param lower_exit_rate Rate of exit through the lower node (`0`). 
+         * @param upper_exit_rate Rate of exit through the upper node (`this->N`).
+         * @returns               Reciprocal of conditional mean first-passage
+         *                        time from `0` to exit through `0`.
+         */
+        IOType getLowerExitRate(IOType lower_exit_rate, IOType upper_exit_rate) 
+        {
+            // Initialize the three recurrences for the main factors in the 
+            // numerator and denominator
+            std::vector<InternalType> recur1, recur2, recur3; 
+            for (unsigned i = 0; i <= this->N; ++i)
+            {
+                recur1.push_back(1); 
+                recur2.push_back(1);
+                recur3.push_back(1); 
+            }
+
+            // Running product of label(N -> exit), label(N-1 -> N), label(N-2 -> N-1), ...
+            InternalType _upper_exit_rate = static_cast<InternalType>(upper_exit_rate); 
+            InternalType prod1 = _upper_exit_rate;
+
+            // Running product of label(0 -> exit), label(1 -> 0), label(2 -> 1), ...
+            InternalType _lower_exit_rate = static_cast<InternalType>(lower_exit_rate); 
+            InternalType prod2 = _lower_exit_rate;
+
+            // Apply first recurrence for i = N-1: multiply by label(N -> N-1), then add label(N -> exit)
+            recur1[this->N-1] = this->line_labels[this->N-1].second + prod1;
+
+            // Apply second recurrence for i = 1: multiply by label(0 -> 1), then add label(0 -> exit)
+            recur2[1] = this->line_labels[0].first + prod2;
+
+            // Apply third recurrence for i = 1: multiply by label(0 -> 1) * label(1 -> 0)
+            recur3[1] = this->line_labels[0].first * this->line_labels[0].second; 
+
+            // Apply the first recurrence for i = N-2, ..., 0, keeping track of 
+            // each term in the recurrence
+            for (int i = this->N - 2; i >= 0; --i)
+            {
+                // Multiply by label(i+1 -> i)
+                recur1[i] = recur1[i+1] * this->line_labels[i].second;
+
+                // Then add the product of label(i+1 -> i+2), ..., label(N-1 -> N),
+                // label(N -> exit)
+                prod1 *= this->line_labels[i+1].first;     // rhs == label(i+1 -> i+2)
+                recur1[i] += prod1;
+            }
+
+            // Apply the second and third recurrences for i = 2, ..., N, keeping
+            // track of each term in the recurrence
+            for (int i = 2; i <= this->N; ++i)
+            {
+                // -------------------------------------------------------- //
+                // Computing second recurrence ...
+                //
+                // Multiply by label(i-1 -> i)
+                recur2[i] = recur2[i-1] * this->line_labels[i-1].first;
+
+                // Then add the product of label(0 -> exit), label(1 -> 0),
+                // ..., label(i-1 -> i-2)
+                prod2 *= this->line_labels[i-2].second;    // rhs == label(i-1 -> i-2) 
+                recur2[i] += prod2;
+
+                // -------------------------------------------------------- //
+                // Computing third recurrence ...
+                //
+                // Multiply by label(i-1 -> i) * label(i -> i-1)
+                recur3[i] = recur3[i-1] * this->line_labels[i-1].first * this->line_labels[i-1].second; 
+            }
+
+            // Apply the second recurrence once more to obtain the remaining factor
+            // in the denominator: multiply by label(N -> exit) ... 
+            InternalType denom_factor = recur2[this->N] * _upper_exit_rate;
+
+            // ... then add the product of label(0 -> exit), label(1 -> 0), ...,
+            // label(N -> N-1)
+            prod2 *= this->line_labels[this->N-1].second;   // rhs == label(N -> N-1)
+            denom_factor += prod2;
+
+            // Compute the numerator
+            InternalType numer = 0;
+            for (int i = 0; i <= this->N; ++i)
+                numer += (recur1[i] * recur1[i] * recur3[i]);
+
+            // Compute the denominator
+            InternalType denom = recur1[0] * denom_factor; 
+
+            // Now give the reciprocal of the mean first-passage time (i.e., 
+            // denominator / numerator) 
+            return static_cast<IOType>(denom / numer);  
         }
 
         /**
