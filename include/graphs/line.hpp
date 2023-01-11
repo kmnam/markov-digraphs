@@ -566,7 +566,7 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
          * @returns               Reciprocal of mean first-passage time from
          *                        `0` to exit through `this->N`.   
          */
-        IOType getUpperExitRateFromZero(IO upper_exit_rate)
+        IOType getUpperExitRateFromZero(IOType upper_exit_rate)
         {
             // Start with label(N -> N-1) / label(N-1 -> N), then add one
             InternalType _upper_exit_rate = static_cast<InternalType>(upper_exit_rate); 
