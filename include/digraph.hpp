@@ -1654,7 +1654,7 @@ class LabeledDigraph
          *
          * @param init_node_id ID of initial node.
          * @param max_time     Time limit.
-         * @param rng          Random number generator instance.
+         * @param seed         Seed for random number generator. 
          * @returns Vector of visited nodes and their lifetimes.
          * @throws std::invalid_argument If a node with the given ID does
          *                               not exist or if the maximum time 
@@ -1662,8 +1662,10 @@ class LabeledDigraph
          */
         std::vector<std::pair<std::string, double> > simulate(const std::string init_node_id,
                                                               const IOType max_time
-                                                              boost::random::mt19937& rng)
+                                                              const int seed)
         {
+            boost::random::mt19937 rng(seed);
+
             // Check that a Node with the given ID exists 
             Node* node = this->getNode(init_node_id);
             if (node == nullptr)
@@ -1685,7 +1687,7 @@ class LabeledDigraph
                 for (auto it = this->edges[curr_node].begin(); it != this->edges[curr_node].end(); ++it)
                     rate_sum += it->second;
                 boost::random::exponential_distribution<double> dist_time(static_cast<double>(1 / rate_sum));
-                FloatIOType lifetime = dist_time(rng);
+                double lifetime = dist_time(rng);
                 simulation.emplace_back(std::make_pair(curr_id, lifetime));
                 time += lifetime;
 
