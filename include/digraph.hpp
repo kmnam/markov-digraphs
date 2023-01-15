@@ -1661,7 +1661,7 @@ class LabeledDigraph
          *                               is not positive.
          */
         std::vector<std::pair<std::string, double> > simulate(const std::string init_node_id,
-                                                              const IOType max_time
+                                                              const IOType max_time,
                                                               const int seed)
         {
             boost::random::mt19937 rng(seed);
