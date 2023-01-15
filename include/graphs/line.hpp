@@ -361,6 +361,31 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
         }
 
         /**
+         * Compute the mean first-passage time from `0` to `this->N`.
+         *
+         * @returns Mean first-passage time from `0` to `this->N`.
+         */
+        IOType getUpperEndToEndTime()
+        {
+            // For each i = 0, ... , N-1 ...
+            InternalType time = 0; 
+            for (int i = 0; i < this->N; ++i)
+            {
+                InternalType term = 0;
+                for (int j = i; j < this->N; ++j)
+                {
+                    InternalType term1 = 1;
+                    for (int k = i + 1; k <= j; ++k)
+                        term1 *= (this->line_labels[j-1].second / this->line_labels[j].first);
+                    term += term1;
+                }
+                time += term / this->line_labels[i].first;
+            }
+
+            return static_cast<IOType>(time);
+        }
+
+        /**
          * Compute the probability of exiting the line graph through the upper 
          * node, `this->N` (to an auxiliary "upper exit" node), rather than 
          * through the lower node, `0` (to an auxiliary "lower exit" node), 
