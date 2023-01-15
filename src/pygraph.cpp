@@ -576,6 +576,15 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("lower_exit_rate"),
             py::arg("upper_exit_rate")
         )
+        .def("get_lower_end_to_end_time",
+            &LineGraph<PreciseType, double>::getLowerEndToEndTime,
+            R"delim(
+    Compute the mean first-passage time from `self.N` to `0`.
+
+    :return: Mean first-passage time from `self.N` to `0`.
+    :rtype: float
+)delim"
+        )
         .def("get_upper_end_to_end_time",
             &LineGraph<PreciseType, double>::getUpperEndToEndTime,
             R"delim(
