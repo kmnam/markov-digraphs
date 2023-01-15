@@ -432,34 +432,6 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
         }
 
         /**
-         * Compute the reciprocal of the *unconditional* mean first-passage
-         * time to exit from the line graph through the lower node, `0`
-         * (to an auxiliary "lower exit" node), starting from `this->N`, given
-         * that exit through the upper node, `this->N`, is impossible.
-         *
-         * @param lower_exit_rate Rate of exit through the lower node (`0`). 
-         * @returns               Reciprocal of mean first-passage time from
-         *                        `this->N` to exit through `0`.   
-         */
-        IOType getLowerExitRateFromN(IOType lower_exit_rate)
-        {
-            // Start with label(0 -> 1) / label(1 -> 0), then add one
-            InternalType _lower_exit_rate = static_cast<InternalType>(lower_exit_rate); 
-            InternalType invrate = this->line_labels[0].first / this->line_labels[0].second;
-            invrate += 1; 
-            for (int i = 1; i < this->N; ++i)
-            {
-                // Multiply by label(i -> i+1) / label(i+1 -> i) then add one
-                // for i = 1, ..., N-1
-                invrate *= (this->line_labels[i].first / this->line_labels[i].second);
-                invrate += 1; 
-            }
-
-            // Finally divide by label(0 -> exit) and take the reciprocal
-            return static_cast<IOType>(_lower_exit_rate / invrate);  
-        }
-
-        /**
          * Compute the reciprocal of the *conditional* mean first-passage
          * time to exit from the line graph through the lower node, `0` 
          * (to an auxiliary "lower exit" node), starting from `0`, given that
@@ -554,34 +526,6 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
             // Now give the reciprocal of the mean first-passage time (i.e., 
             // denominator / numerator) 
             return static_cast<IOType>(denom / numer);  
-        }
-
-        /**
-         * Compute the reciprocal of the *unconditional* mean first-passage
-         * time to exit from the line graph through the upper node, `this->N`
-         * (to an auxiliary "upper exit" node), starting from `0`, given
-         * that exit through the lower node, `0`, is impossible.
-         *
-         * @param upper_exit_rate Rate of exit through the upper node (`this->N`). 
-         * @returns               Reciprocal of mean first-passage time from
-         *                        `0` to exit through `this->N`.   
-         */
-        IOType getUpperExitRateFromZero(IOType upper_exit_rate)
-        {
-            // Start with label(N -> N-1) / label(N-1 -> N), then add one
-            InternalType _upper_exit_rate = static_cast<InternalType>(upper_exit_rate); 
-            InternalType invrate = this->line_labels[this->N-1].second / this->line_labels[this->N-1].first;
-            invrate += 1; 
-            for (int i = this->N - 2; i >= 0; --i)
-            {
-                // Multiply by label(i+1 -> i) / label(i -> i+1) then add one
-                // for i = N-2, ..., 0
-                invrate *= (this->line_labels[i].second / this->line_labels[i].first);
-                invrate += 1; 
-            }
-
-            // Finally divide by label(N -> exit) and take the reciprocal
-            return static_cast<IOType>(_upper_exit_rate / invrate);  
         }
 
         /**
