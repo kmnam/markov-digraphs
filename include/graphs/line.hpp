@@ -365,7 +365,7 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
          *
          * @returns Mean first-passage time from `this->N` to `0`.
          */
-        IOType getUpperEndToEndTime()
+        IOType getLowerEndToEndTime()
         {
             // For each i = 0, ... , N-1 ...
             InternalType time = 0; 
@@ -384,7 +384,6 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
 
             return static_cast<IOType>(time);
         }
-
 
         /**
          * Compute the mean first-passage time from `0` to `this->N`.
