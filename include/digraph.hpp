@@ -1686,7 +1686,7 @@ class LabeledDigraph
                 InternalType rate_sum = 0;
                 for (auto it = this->edges[curr_node].begin(); it != this->edges[curr_node].end(); ++it)
                     rate_sum += it->second;
-                boost::random::exponential_distribution<double> dist_time(static_cast<double>(1 / rate_sum));
+                boost::random::exponential_distribution<> dist_time(static_cast<double>(1 / rate_sum));
                 double lifetime = dist_time(rng);
                 simulation.emplace_back(std::make_pair(curr_id, lifetime));
                 time += lifetime;
@@ -1697,9 +1697,9 @@ class LabeledDigraph
                 for (auto it = this->edges[curr_node].begin(); it != this->edges[curr_node].end(); ++it)
                 {
                     dests.push_back(it->first);
-                    weights.push_back(it->second);
+                    weights.push_back(static_cast<double>(it->second));
                 }
-                boost::random::discrete_distribution<double> dist_next(weights);
+                boost::random::discrete_distribution<> dist_next(weights);
                 int next_idx = dist_next(rng);
                 curr_node = dests[next_idx];
                 curr_id = curr_node->getId();
