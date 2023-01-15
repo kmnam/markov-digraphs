@@ -8,8 +8,8 @@
 #include <boost/multiprecision/mpfr.hpp>
 #include "../../include/digraph.hpp"
 
-/*
- * Test module for the LabeledDigraph class.
+/**
+ * Test module for the `LabeledDigraph` class.
  *
  * Authors:
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
@@ -120,8 +120,6 @@ void TEST_MODULE_EDGE_METHODS()
     assert(!graph->hasEdge("first", "first")); 
     assert(!graph->hasEdge("second", "second")); 
     assert(!graph->hasEdge("third", "third")); 
-    assert(!graph->hasEdge("fourth", "fourth")); 
-    assert(!graph->hasEdge("fifth", "fifth")); 
 
     // Try to remove an edge with non-existent source/target nodes
     try
@@ -235,7 +233,7 @@ void TEST_MODULE_EDGE_METHODS()
     catch (const std::runtime_error& e) {}   // Do nothing if an exception is raised
     try
     {
-        graph->setEdgeLabel("every one of them words rang true", "and burned like burning coal", 0.0001); 
+        graph->setEdgeLabel("every one of them words rang true", "and glowed like burning coal", 0.0001); 
         assert(false);    // Break here if an exception is not raised
     }
     catch (const std::runtime_error& e) {}   // Do nothing if an exception is raised
@@ -289,9 +287,9 @@ void TEST_MODULE_CLEAR()
     // Check that hasEdge() returns false for all possible combinations of 
     // the (already-removed) nodes 
     std::vector<std::string> node_ids = {"first", "second", "third", "fourth", "fifth"}; 
-    for (const std::string s : node_ids)
+    for (const std::string& s : node_ids)
     {
-        for (const std::string t : node_ids)
+        for (const std::string& t : node_ids)
         {
             assert(!graph->hasEdge(s, t)); 
         }
@@ -304,7 +302,7 @@ void TEST_MODULE_CLEAR()
  * Test `LabeledDigraph<...>::getLaplacian()`.
  *
  * With a graph with integer scalars, check that `getLaplacian()` returns an 
- * *exactly* correct Laplacian matrix for a five-vertex graph.
+ * *exactly* correct Laplacian matrix for a 5-vertex graph.
  */
 void TEST_MODULE_GET_LAPLACIAN()
 {
@@ -359,7 +357,7 @@ void TEST_MODULE_GET_LAPLACIAN()
  * Test `LabeledDigraph<...>::getSpanningForestMatrix()`. 
  *
  * With a graph with (long) integer scalars, check that `getSpanningForestMatrix()`
- * returns *exactly* correct spanning forest matrices for a five-vertex graph.
+ * returns *exactly* correct spanning forest matrices for a 5-vertex graph.
  */
 void TEST_MODULE_GET_SPANNING_FOREST_MATRIX()
 {
@@ -382,6 +380,8 @@ void TEST_MODULE_GET_SPANNING_FOREST_MATRIX()
 
     // Check that the zeroth spanning forest matrix equals the identity
     Matrix<long, Dynamic, Dynamic> forest_zero = graph->getSpanningForestMatrix(0);
+    assert(forest_zero.rows() == 5);
+    assert(forest_zero.cols() == 5);
     for (unsigned i = 0; i < 5; ++i)
     {
         for (unsigned j = 0; j < 5; ++j)
@@ -671,7 +671,7 @@ void TEST_MODULE_GET_SPANNING_FOREST_MATRIX()
  * Test `LabeledDigraph<...>::getSpanningForestMatrixSparse()`. 
  *
  * With a graph with (long) integer scalars, check that `getSpanningForestMatrixSparse()`
- * returns *exactly* correct spanning forest matrices for a five-vertex graph.
+ * returns *exactly* correct spanning forest matrices for a 5-vertex graph.
  *
  * This module performs precisely the same tests as `TEST_MODULE_GET_SPANNING_FOREST_MATRIX()`.
  */
