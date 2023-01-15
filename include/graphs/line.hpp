@@ -7,7 +7,7 @@
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  * **Last updated:**
- *     1/12/2023
+ *     1/15/2023
  */
 
 #ifndef LINE_LABELED_DIGRAPH_HPP
@@ -361,6 +361,32 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
         }
 
         /**
+         * Compute the mean first-passage time from `this->N` to `0`.
+         *
+         * @returns Mean first-passage time from `this->N` to `0`.
+         */
+        IOType getUpperEndToEndTime()
+        {
+            // For each i = 0, ... , N-1 ...
+            InternalType time = 0; 
+            for (int i = this->N; i >= 1; --i)
+            {
+                InternalType term = 0;
+                for (int j = i; j >= 1; --j)
+                {
+                    InternalType term1 = 1;
+                    for (int k = i - 1; k >= j; --k)
+                        term1 *= (this->line_labels[k].first / this->line_labels[k-1].second);
+                    term += term1;
+                }
+                time += term / this->line_labels[i-1].second;
+            }
+
+            return static_cast<IOType>(time);
+        }
+
+
+        /**
          * Compute the mean first-passage time from `0` to `this->N`.
          *
          * @returns Mean first-passage time from `0` to `this->N`.
@@ -376,7 +402,7 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
                 {
                     InternalType term1 = 1;
                     for (int k = i + 1; k <= j; ++k)
-                        term1 *= (this->line_labels[j-1].second / this->line_labels[j].first);
+                        term1 *= (this->line_labels[k-1].second / this->line_labels[k].first);
                     term += term1;
                 }
                 time += term / this->line_labels[i].first;
