@@ -15,7 +15,7 @@
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  * **Last updated:**
- *     1/18/2022
+ *     1/15/2023
  */
 
 namespace py = pybind11;
@@ -404,6 +404,27 @@ PYBIND11_MODULE(pygraph, m)
 )delim", 
             py::arg("target_id"),
             py::arg("sparse")
+        )
+        .def("simulate",
+            &LabeledDigraph<PreciseType, double>::simulate,
+            R"delim(
+    Simulate the Markov process associated with the graph up to a given 
+    maximum time.
+
+    :param init_node_id: ID of initial node.
+    :type init_node_id: str
+    :param max_time: Time limit.
+    :type max_time: float
+    :param seed: Seed for random number generator.
+    :type seed: int
+    :return: List of visited nodes and their lifetimes.
+    :rtype: list
+    :raise ValueError: If initial node does not exist or time limit is not 
+        positive.
+)delim",
+            py::arg("init_node_id"),
+            py::arg("max_time"),
+            py::arg("seed")
         );
 
     /**
@@ -556,7 +577,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("upper_exit_rate")
         )
         .def("get_lower_exit_rate",
-            &LineGraph<PreciseType, double>::getLowerExitRate,
+            py::overload_cast<double>(&LineGraph<PreciseType, double>::getLowerExitRate),
             R"delim(
     Compute the reciprocal of the *unconditional* mean first-passage
     time to exit from the line graph through the lower node, `0`
@@ -570,6 +591,25 @@ PYBIND11_MODULE(pygraph, m)
     :rtype: float
 )delim",
             py::arg("lower_exit_rate")
+        )
+        .def("get_lower_exit_rate",
+            py::overload_cast<double, double>(&LineGraph<PreciseType, double>::getLowerExitRate),
+            R"delim(
+    Compute the reciprocal of the *conditional* mean first-passage
+    time to exit from the line graph through the lower node, `0`
+    (to an auxiliary "lower exit" node), starting from `0`, given that
+    exit through the lower node indeed occurs.
+
+    :param lower_exit_rate: Rate of exit through the lower node (`0`).
+    :type lower_exit_rate: float
+    :param upper_exit_rate: Rate of exit through the upper node (`self.N`).
+    :type upper_exit_rate: float
+    :return: Reciprocal of conditional mean first-passage time from `0`
+        to exit through `0`. 
+    :rtype: float
+)delim",
+            py::arg("lower_exit_rate"),
+            py::arg("upper_exit_rate")
         )
         .def("get_upper_exit_rate",
             &LineGraph<PreciseType, double>::getUpperExitRate,
