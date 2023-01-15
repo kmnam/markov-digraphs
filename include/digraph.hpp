@@ -6,7 +6,7 @@
  *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  *  **Last updated:** 
- *      1/4/2022
+ *      1/15/2023
  */
 
 #ifndef LABELED_DIGRAPHS_HPP
@@ -21,6 +21,8 @@
 #include <algorithm>
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <boost/random.hpp>
+#include <boost/random/exponential_distribution.hpp>
 #include "math.hpp"
 
 using namespace Eigen;
@@ -1642,6 +1644,66 @@ class LabeledDigraph
             return (2 * second_moments).template cast<FloatIOType>() / (
                 static_cast<FloatIOType>(forest_one_root(t, t) * forest_one_root(t, t))
             );
+        }
+
+        /**
+         * Simulate the Markov process associated with the graph up to a 
+         * given maximum time.
+         *
+         * This method returns a vector of lifetimes of scalar type double.
+         *
+         * @param init_node_id ID of initial node.
+         * @param max_time     Time limit.
+         * @param rng          Random number generator instance.
+         * @returns Vector of visited nodes and their lifetimes.
+         * @throws std::invalid_argument If a node with the given ID does
+         *                               not exist or if the maximum time 
+         *                               is not positive.
+         */
+        std::vector<std::pair<std::string, double> > simulate(const std::string init_node_id,
+                                                              const IOType max_time
+                                                              boost::random::mt19937& rng)
+        {
+            // Check that a Node with the given ID exists 
+            Node* node = this->getNode(init_node_id);
+            if (node == nullptr)
+                throw std::invalid_argument("Node with specified ID does not exist");
+
+            // Check that the given time limit is positive 
+            if (max_time <= 0)
+                throw std::invalid_argument("Specified time limit is not positive");
+
+            // Simulate the process until the time limit is exceeded
+            std::vector<std::pair<std::string, double> > simulation;
+            double time = 0;
+            std::string curr_id = init_node_id;
+            Node* curr_node = this->getNode(curr_id); 
+            while (time < max_time)
+            {
+                // Add the current node and its lifetime
+                InternalType rate_sum = 0;
+                for (auto it = this->edges[curr_node].begin(); it != this->edges[curr_node].end(); ++it)
+                    rate_sum += it->second;
+                boost::random::exponential_distribution<double> dist_time(static_cast<double>(1 / rate_sum));
+                FloatIOType lifetime = dist_time(rng);
+                simulation.emplace_back(std::make_pair(curr_id, lifetime));
+                time += lifetime;
+
+                // Choose the next node
+                std::vector<Node*> dests; 
+                std::vector<double> weights;
+                for (auto it = this->edges[curr_node].begin(); it != this->edges[curr_node].end(); ++it)
+                {
+                    dests.push_back(it->first);
+                    weights.push_back(it->second);
+                }
+                boost::random::discrete_distribution<double> dist_next(weights);
+                int next_idx = dist_next(rng);
+                curr_node = dests[next_idx];
+                curr_id = curr_node->getId();
+            }
+
+            return simulation; 
         }
 };
 
