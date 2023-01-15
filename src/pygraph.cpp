@@ -611,6 +611,38 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("lower_exit_rate"),
             py::arg("upper_exit_rate")
         )
+        .def("get_lower_exit_rate_from_zero",
+            &LineGraph<PreciseType, double>::getLowerExitRateFromZero,
+            R"delim(
+    Compute the reciprocal of the *unconditional* mean first-passage 
+    time to exit from the line graph through the lower node, `0` (to
+    an auxiliary "lower exit" node), starting from `0`, given that
+    exit through the upper node, `self.N`, is impossible.
+
+    :param lower_exit_rate: Rate of exit through the lower node (`0`).
+    :type lower_exit_rate: float
+    :return: Reciprocal of unconditional mean first-passage time from `0`
+        to exit through `0`. 
+    :rtype: float
+)delim",
+            py::arg("lower_exit_rate")
+        )
+        .def("get_lower_exit_rate_from_N",
+            &LineGraph<PreciseType, double>::getLowerExitRateFromN,
+            R"delim(
+    Compute the reciprocal of the *unconditional* mean first-passage
+    time to exit from the line graph through the lower node, `0` (to
+    an auxiliary "lower exit" node), starting from `self.N`, given that
+    exit through the upper node, `self.N` is impossible.
+
+    :param lower_exit_rate: Rate of exit through the lower node (`0`).
+    :type lower_exit_rate: float
+    :return: Reciprocal of unconditional mean first-passage time from
+        `self.N` to exit through `0`. 
+    :rtype: float
+)delim",
+            py::arg("lower_exit_rate")
+        )
         .def("get_upper_exit_rate",
             &LineGraph<PreciseType, double>::getUpperExitRate,
             R"delim(
@@ -628,6 +660,22 @@ PYBIND11_MODULE(pygraph, m)
     :rtype: float
 )delim",
             py::arg("lower_exit_rate"),
+            py::arg("upper_exit_rate")
+        )
+        .def("get_upper_exit_rate_from_zero",
+            &LineGraph<PreciseType, double>::getUpperExitRateFromZero,
+            R"delim(
+    Compute the reciprocal of the *conditional* mean first-passage 
+    time to exit from the line graph through the upper node, `self.N`
+    (to an auxiliary "upper exit" node), starting from `0`, given that
+    exit through the lower node, `0`, is impossible.
+
+    :param upper_exit_rate: Rate of exit through the upper node (`self.N`).
+    :type upper_exit_rate: float
+    :return: Reciprocal of unconditional mean first-passage time from `0`
+        to exit through `self.N`.
+    :rtype: float
+)delim",
             py::arg("upper_exit_rate")
         );
 
@@ -793,14 +841,14 @@ PYBIND11_MODULE(pygraph, m)
             &GridGraph<PreciseType, double>::getExitStats, 
             R"delim(
     Compute and return two quantities: the *splitting probability* of exiting
-    the graph through `B{this->N}` (reaching an auxiliary upper exit node),
+    the graph through `B{self.N}` (reaching an auxiliary upper exit node),
     and not through `A0` (reaching an auxiliary lower exit node); and the
     reciprocal of the *unconditional mean first-passage time* to exiting the
-    graph through `A0`, given that the exit rate from `B{this->N}` is zero.
+    graph through `A0`, given that the exit rate from `B{self.N}` is zero.
 
     :param lower_exit_rate: Rate of lower exit from `A0`.
     :type lower_exit_rate: float
-    :param upper_exit_rate: Rate of upper exit from `B{this->N}`.
+    :param upper_exit_rate: Rate of upper exit from `B{self.N}`.
     :type upper_exit_rate: float
     :return: The above two quantities.
     :rtype: tuple of three floats
