@@ -6,7 +6,7 @@
  *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  *  **Last updated:** 
- *      1/15/2023
+ *      1/23/2023
  */
 
 #ifndef LABELED_DIGRAPHS_HPP
@@ -1675,23 +1675,15 @@ class LabeledDigraph
             if (max_time <= 0)
                 throw std::invalid_argument("Specified time limit is not positive");
 
-            // Simulate the process until the time limit is exceeded
+            // Simulate the process until the time limit is exceeded or a node 
+            // with no outgoing edges (an absorbing node) is reached
             std::vector<std::pair<std::string, double> > simulation;
             double time = 0;
             std::string curr_id = init_node_id;
             Node* curr_node = this->getNode(curr_id); 
             while (time < max_time)
             {
-                // Add the current node and its lifetime
-                InternalType rate_sum = 0;
-                for (auto it = this->edges[curr_node].begin(); it != this->edges[curr_node].end(); ++it)
-                    rate_sum += it->second;
-                boost::random::exponential_distribution<> dist_time(static_cast<double>(rate_sum));
-                double lifetime = dist_time(rng);
-                simulation.emplace_back(std::make_pair(curr_id, lifetime));
-                time += lifetime;
-
-                // Choose the next node
+                // First choose the next node
                 std::vector<Node*> dests; 
                 std::vector<double> weights;
                 for (auto it = this->edges[curr_node].begin(); it != this->edges[curr_node].end(); ++it)
@@ -1699,8 +1691,22 @@ class LabeledDigraph
                     dests.push_back(it->first);
                     weights.push_back(static_cast<double>(it->second));
                 }
+                if (dests.size() == 0)    // If there is no node to go to from here
+                    break;
                 boost::random::discrete_distribution<> dist_next(weights);
                 int next_idx = dist_next(rng);
+
+                // If the next node was successfully selected, add current node
+                // and its lifetime
+                InternalType rate_sum = 0;
+                for (auto it = this->edges[curr_node].begin(); it != this->edges[curr_node].end(); ++it)
+                    rate_sum += it->second;
+                boost::random::exponential_distribution<> dist_time(static_cast<double>(rate_sum));
+                double lifetime = dist_time(rng);
+                simulation.emplace_back(std::make_pair(curr_id, lifetime));
+                time += lifetime;
+                
+                // Update current node
                 curr_node = dests[next_idx];
                 curr_id = curr_node->getId();
             }
