@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <Eigen/Dense>
 #include <boost/multiprecision/mpfr.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include "../../include/digraph.hpp"
 #include "../../include/graphs/line.hpp"
 
@@ -30,8 +31,13 @@ const PreciseType TOLERANCE("1e-900");
  * Test `LineGraph<...>::getUpperEndToEndTime()` by comparing its output 
  * with values computed via `LabeledDigraph<...>::getSpanningForestMatrix()`.
  */
-void TEST_MODULE_GET_UPPER_END_TO_END_TIME_VS_GET_SPANNING_FOREST_MATRIX(int length)
+TEST_CASE(
+    "Test that getUpperEndToEndTime() and getSpanningForestMatrix() match",
+    "[TEST_MODULE_GET_UPPER_END_TO_END_TIME_VS_GET_SPANNING_FOREST_MATRIX]"
+)
 {
+    int length = 20; 
+
     // Define a LineGraph instance with one forward and one reverse edge label 
     LineGraph<PreciseType, PreciseType>* graph = new LineGraph<PreciseType, PreciseType>(); 
     PreciseType a = 2;
@@ -74,14 +80,23 @@ void TEST_MODULE_GET_UPPER_END_TO_END_TIME_VS_GET_SPANNING_FOREST_MATRIX(int len
     PreciseType numer = two_forest_matrix.row(0).head(length).sum();    // Node "0" is 0, "1" is 1, ...
     PreciseType denom = one_forest_matrix(length, length); 
     PreciseType error = abs(graph->getUpperEndToEndTime() - numer / denom);
+    REQUIRE(error < TOLERANCE);
+
+    delete graph;
+    delete graph2;
 }
 
 /**
  * Test `LineGraph<...>::getUpperExitProb()` by comparing its output with 
  * values computed via `LabeledDigraph<...>::getSpanningForestMatrix()`.
  */
-void TEST_MODULE_GET_UPPER_EXIT_PROB_VS_GET_SPANNING_FOREST_MATRIX(int length)
+TEST_CASE(
+    "Test that getUpperExitProb() and getSpanningForestMatrix() match",
+    "[TEST_MODULE_GET_UPPER_EXIT_PROB_VS_GET_SPANNING_FOREST_MATRIX]"
+)
 {
+    int length = 20;
+
     // Define a LineGraph instance with one forward and one reverse edge label
     LineGraph<PreciseType, PreciseType>* graph = new LineGraph<PreciseType, PreciseType>();
     PreciseType a = 2; 
@@ -123,10 +138,8 @@ void TEST_MODULE_GET_UPPER_EXIT_PROB_VS_GET_SPANNING_FOREST_MATRIX(int length)
     Matrix<PreciseType, Dynamic, Dynamic> two_forest_matrix = graph2->getSpanningForestMatrix(length + 1);
     PreciseType numer = two_forest_matrix(1, length + 2);            // Path from 0 to bound
     PreciseType denom = two_forest_matrix(length + 2, length + 2);   // All double-rooted forests
-    PreciseType error = abs(
-        graph->getUpperExitProb(1, 1) - two_forest_matrix(1, length + 2) / two_forest_matrix(length + 2, length + 2)
-    );
-    assert(error < TOLERANCE); 
+    PreciseType error = abs(graph->getUpperExitProb(1, 1) - numer / denom);
+    REQUIRE(error < TOLERANCE); 
 
     delete graph;
     delete graph2;  
@@ -136,8 +149,13 @@ void TEST_MODULE_GET_UPPER_EXIT_PROB_VS_GET_SPANNING_FOREST_MATRIX(int length)
  * Test `LineGraph<...>::getLowerExitRate(PreciseType)` by comparing its output
  * with values computed via `LabeledDigraph<...>::getSpanningForestMatrix()`.
  */
-void TEST_MODULE_GET_LOWER_EXIT_RATE_ONE_ARG_VS_GET_SPANNING_FOREST_MATRIX(int length)
+TEST_CASE(
+    "Test that getLowerExitRate(PreciseType) and getSpanningForestMatrix() match",
+    "[TEST_MODULE_GET_LOWER_EXIT_RATE_ONE_ARG_VS_GET_SPANNING_FOREST_MATRIX]"
+)
 {
+    int length = 20;
+
     // Define a LineGraph instance with one forward and one reverse edge label
     LineGraph<PreciseType, PreciseType>* graph = new LineGraph<PreciseType, PreciseType>();
     PreciseType a = 2; 
@@ -177,12 +195,10 @@ void TEST_MODULE_GET_LOWER_EXIT_RATE_ONE_ARG_VS_GET_SPANNING_FOREST_MATRIX(int l
     // no "bound" node 
     Matrix<PreciseType, Dynamic, Dynamic> two_forest_matrix = graph2->getSpanningForestMatrix(length);
     Matrix<PreciseType, Dynamic, Dynamic> one_forest_matrix = graph2->getSpanningForestMatrix(length + 1); 
-    PreciseType numer = two_forest_matrix.row(1)(Eigen::seqN(1, length + 1)).sum(); 
-    //PreciseType numer = 0;
-    //for (unsigned i = 1; i < length + 2; ++i)     // "empty" is node 0, "0" is node 1, ...
-    //    numer += two_forest_matrix(1, i);
-    PreciseType error = abs(graph->getLowerExitRate(1) - one_forest_matrix(0, 0) / numer);
-    assert(error < TOLERANCE); 
+    PreciseType numer = two_forest_matrix.row(1)(Eigen::seqN(1, length + 1)).sum();
+    PreciseType denom = one_forest_matrix(0, 0); 
+    PreciseType error = abs(graph->getLowerExitRate(1) - denom / numer);
+    REQUIRE(error < TOLERANCE); 
 
     delete graph;
     delete graph2;  
@@ -192,8 +208,13 @@ void TEST_MODULE_GET_LOWER_EXIT_RATE_ONE_ARG_VS_GET_SPANNING_FOREST_MATRIX(int l
  * Test `LineGraph<...>::getLowerExitRate(PreciseType, PreciseType)` by comparing
  * its output with values computed via `LabeledDigraph<...>::getSpanningForestMatrix()`.
  */
-void TEST_MODULE_GET_LOWER_EXIT_RATE_TWO_ARGS_VS_GET_SPANNING_FOREST_MATRIX(int length)
+TEST_CASE(
+    "Test that getLowerExitRate(PreciseType, PreciseType) and getSpanningForestMatrix() match",
+    "TEST_MODULE_GET_LOWER_EXIT_RATE_TWO_ARGS_VS_GET_SPANNING_FOREST_MATRIX"
+)
 {
+    int length = 20;
+
     // Define a LineGraph instance with one forward and one reverse edge label
     LineGraph<PreciseType, PreciseType>* graph = new LineGraph<PreciseType, PreciseType>();
     PreciseType a = 2; 
@@ -249,7 +270,7 @@ void TEST_MODULE_GET_LOWER_EXIT_RATE_TWO_ARGS_VS_GET_SPANNING_FOREST_MATRIX(int 
         numer += (three_forest_matrix(1, i) * two_forest_matrix(i, 0));
     PreciseType denom = two_forest_matrix(1, 0) * two_forest_matrix(length + 2, length + 2); 
     PreciseType error = abs(graph->getLowerExitRate(1, 1) - denom / numer); 
-    assert(error < TOLERANCE); 
+    REQUIRE(error < TOLERANCE); 
 
     delete graph;
     delete graph2;  
@@ -259,8 +280,13 @@ void TEST_MODULE_GET_LOWER_EXIT_RATE_TWO_ARGS_VS_GET_SPANNING_FOREST_MATRIX(int 
  * Test `LineGraph<...>::getUpperExitRate()` by comparing its output with
  * values computed via `LabeledDigraph<...>::getSpanningForestMatrix()`.
  */
-void TEST_MODULE_GET_UPPER_EXIT_RATE_VS_GET_SPANNING_FOREST_MATRIX(int length)
+TEST_CASE(
+    "Test that getUpperExitRate() and getSpanningForestMatrix() match",
+    "TEST_MODULE_GET_UPPER_EXIT_RATE_VS_GET_SPANNING_FOREST_MATRIX"
+)
 {
+    int length = 20;
+
     // Define a LineGraph instance with one forward and one reverse edge label
     LineGraph<PreciseType, PreciseType>* graph = new LineGraph<PreciseType, PreciseType>();
     PreciseType a = 2;
@@ -316,27 +342,10 @@ void TEST_MODULE_GET_UPPER_EXIT_RATE_VS_GET_SPANNING_FOREST_MATRIX(int length)
         numer += (three_forest_matrix(1, i) * two_forest_matrix(i, length + 2));
     PreciseType denom = two_forest_matrix(1, length + 2) * two_forest_matrix(length + 2, length + 2);
     PreciseType error = abs(graph->getUpperExitRate(1, 1) - denom / numer);
-    assert(error < TOLERANCE);  
+    REQUIRE(error < TOLERANCE);  
 
     delete graph;
     delete graph2;  
 }
 
-int main()
-{
-    int length = 20;
-
-    TEST_MODULE_GET_UPPER_END_TO_END_TIME_VS_GET_SPANNING_FOREST_MATRIX(length); 
-    std::cout << "TEST_MODULE_GET_UPPER_END_TO_END_TIME_VS_GET_SPANNING_FOREST_MATRIX(): all tests passed" << std::endl;
-    TEST_MODULE_GET_UPPER_EXIT_PROB_VS_GET_SPANNING_FOREST_MATRIX(length); 
-    std::cout << "TEST_MODULE_GET_UPPER_EXIT_PROB_VS_GET_SPANNING_FOREST_MATRIX(): all tests passed" << std::endl;
-    TEST_MODULE_GET_LOWER_EXIT_RATE_ONE_ARG_VS_GET_SPANNING_FOREST_MATRIX(length); 
-    std::cout << "TEST_MODULE_GET_LOWER_EXIT_RATE_ONE_ARG_VS_GET_SPANNING_FOREST_MATRIX(): all tests passed" << std::endl;
-    TEST_MODULE_GET_LOWER_EXIT_RATE_TWO_ARGS_VS_GET_SPANNING_FOREST_MATRIX(length); 
-    std::cout << "TEST_MODULE_GET_LOWER_EXIT_RATE_TWO_ARGS_VS_GET_SPANNING_FOREST_MATRIX(): all tests passed" << std::endl;  
-    TEST_MODULE_GET_UPPER_EXIT_RATE_VS_GET_SPANNING_FOREST_MATRIX(length); 
-    std::cout << "TEST_MODULE_GET_UPPER_EXIT_RATE_VS_GET_SPANNING_FOREST_MATRIX(): all tests passed" << std::endl;  
-
-    return 0; 
-}
 
