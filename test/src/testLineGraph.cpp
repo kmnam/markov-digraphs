@@ -204,20 +204,20 @@ TEST_CASE("Test that getLowerExitRate(PreciseType) and getSpanningForestMatrix()
     LineGraph<PreciseType, PreciseType>* graph = new LineGraph<PreciseType, PreciseType>();
     PreciseType a = 2; 
     PreciseType b = 3; 
-    for (unsigned i = 0; i < length; ++i) 
+    for (int i = 0; i < length; ++i) 
         graph->addNodeToEnd(std::make_pair(a, b));
 
     // Define an equivalent LabeledDigraph instance with lower exit node
     LabeledDigraph<PreciseType, PreciseType>* graph2 = new LabeledDigraph<PreciseType, PreciseType>();
     graph2->addNode("empty"); 
-    for (unsigned i = 0; i <= length; ++i)
+    for (int i = 0; i <= length; ++i)
     {
         std::stringstream ss; 
         ss << i; 
         graph2->addNode(ss.str()); 
     }
     graph2->addEdge("0", "empty", 1); 
-    for (unsigned i = 0; i < length; ++i)
+    for (int i = 0; i < length; ++i)
     {
         std::stringstream ssi, ssj; 
         ssi << i;
@@ -249,6 +249,64 @@ TEST_CASE("Test that getLowerExitRate(PreciseType) and getSpanningForestMatrix()
 }
 
 /**
+ * Test `LineGraph<...>::getEntryToUpperExitTime()` by comparing its output 
+ * with values computed via `LabeledDigraph<...>::getSpanningForestMatrix()`.
+ */
+TEST_CASE("Test that getEntryToUpperExitTime() and getSpanningForestMatrix() match")
+{
+    int length = 20; 
+
+    // Define a LineGraph instance with one forward and one reverse edge label 
+    LineGraph<PreciseType, PreciseType>* graph = new LineGraph<PreciseType, PreciseType>(); 
+    PreciseType a = 2;
+    PreciseType b = 3;
+    for (int i = 0; i < length; ++i)
+        graph->addNodeToEnd(std::make_pair(a, b));
+
+    // Define an equivalent LabeledDigraph instance with exit nodes
+    LabeledDigraph<PreciseType, PreciseType>* graph2 = new LabeledDigraph<PreciseType, PreciseType>();
+    graph2->addNode("empty");
+    for (int i = 0; i <= length; ++i)
+    {
+        std::stringstream ss; 
+        ss << i; 
+        graph2->addNode(ss.str()); 
+    }
+    graph2->addNode("bound");  
+    graph2->addEdge("0", "empty", 1);
+    graph2->addEdge("empty", "0", 1);
+    for (int i = 0; i < length; ++i)
+    {
+        std::stringstream ssi, ssj; 
+        ssi << i;
+        ssj << i + 1; 
+        graph2->addEdge(ssi.str(), ssj.str(), a);
+        graph2->addEdge(ssj.str(), ssi.str(), b); 
+    }
+    std::stringstream ss_final; 
+    ss_final << length; 
+    graph2->addEdge(ss_final.str(), "bound", 1);
+
+    // Compute the mean first-passage time to 0 from N as the following 
+    // ratio of spanning forest weights:
+    //
+    // Weight of spanning forests rooted at i, "bound" with path "empty" -> i for i = "empty", 1, ..., N
+    // -------------------------------------------------------------------------------------------------
+    //                          Weight of spanning forests rooted at "bound"
+    //
+    // Note that the full line graph has (length + 3) nodes 
+    Matrix<PreciseType, Dynamic, Dynamic> one_forest_matrix = graph2->getSpanningForestMatrix(length); 
+    Matrix<PreciseType, Dynamic, Dynamic> two_forest_matrix = graph2->getSpanningForestMatrix(length - 1);
+    PreciseType numer = two_forest_matrix.row(0).head(length + 2).sum();    // Node "0" is 1, "1" is 2, ...
+    PreciseType denom = one_forest_matrix(length + 2, length + 2);
+    PreciseType error = abs(graph->getEntryToUpperExitTime(1, 1, 1) - numer / denom);
+    REQUIRE(error < TOLERANCE);
+
+    delete graph;
+    delete graph2;
+}
+
+/**
  * Test `LineGraph<...>::getLowerExitRate(PreciseType, PreciseType)` by comparing
  * its output with values computed via `LabeledDigraph<...>::getSpanningForestMatrix()`.
  */
@@ -260,13 +318,13 @@ TEST_CASE("Test that getLowerExitRate(PreciseType, PreciseType) and getSpanningF
     LineGraph<PreciseType, PreciseType>* graph = new LineGraph<PreciseType, PreciseType>();
     PreciseType a = 2; 
     PreciseType b = 3; 
-    for (unsigned i = 0; i < length; ++i) 
+    for (int i = 0; i < length; ++i) 
         graph->addNodeToEnd(std::make_pair(a, b));
 
     // Define an equivalent LabeledDigraph instance with exit nodes 
     LabeledDigraph<PreciseType, PreciseType>* graph2 = new LabeledDigraph<PreciseType, PreciseType>();
     graph2->addNode("empty");
-    for (unsigned i = 0; i <= length; ++i)
+    for (int i = 0; i <= length; ++i)
     {
         std::stringstream ss; 
         ss << i; 
@@ -274,7 +332,7 @@ TEST_CASE("Test that getLowerExitRate(PreciseType, PreciseType) and getSpanningF
     }
     graph2->addNode("bound");  
     graph2->addEdge("0", "empty", 1);
-    for (unsigned i = 0; i < length; ++i)
+    for (int i = 0; i < length; ++i)
     {
         std::stringstream ssi, ssj; 
         ssi << i;
@@ -307,7 +365,7 @@ TEST_CASE("Test that getLowerExitRate(PreciseType, PreciseType) and getSpanningF
     Matrix<PreciseType, Dynamic, Dynamic> three_forest_matrix = graph2->getSpanningForestMatrix(length);
     Matrix<PreciseType, Dynamic, Dynamic> two_forest_matrix = graph2->getSpanningForestMatrix(length + 1);
     PreciseType numer = 0; 
-    for (unsigned i = 1; i < length + 2; ++i)     // "empty" is node 0, "0" is node 1, ...
+    for (int i = 1; i < length + 2; ++i)     // "empty" is node 0, "0" is node 1, ...
         numer += (three_forest_matrix(1, i) * two_forest_matrix(i, 0));
     PreciseType denom = two_forest_matrix(1, 0) * two_forest_matrix(length + 2, length + 2); 
     PreciseType error = abs(graph->getLowerExitRate(1, 1) - denom / numer); 
@@ -329,13 +387,13 @@ TEST_CASE("Test that getUpperExitRate() and getSpanningForestMatrix() match")
     LineGraph<PreciseType, PreciseType>* graph = new LineGraph<PreciseType, PreciseType>();
     PreciseType a = 2;
     PreciseType b = 3;
-    for (unsigned i = 0; i < length; ++i) 
+    for (int i = 0; i < length; ++i) 
         graph->addNodeToEnd(std::make_pair(a, b));
 
     // Define an equivalent LabeledDigraph instance with exit nodes 
     LabeledDigraph<PreciseType, PreciseType>* graph2 = new LabeledDigraph<PreciseType, PreciseType>();
     graph2->addNode("empty"); 
-    for (unsigned i = 0; i <= length; ++i)
+    for (int i = 0; i <= length; ++i)
     {
         std::stringstream ss; 
         ss << i; 
@@ -343,7 +401,7 @@ TEST_CASE("Test that getUpperExitRate() and getSpanningForestMatrix() match")
     }
     graph2->addNode("bound");
     graph2->addEdge("0", "empty", 1); 
-    for (unsigned i = 0; i < length; ++i)
+    for (int i = 0; i < length; ++i)
     {
         std::stringstream ssi, ssj; 
         ssi << i;
@@ -376,7 +434,7 @@ TEST_CASE("Test that getUpperExitRate() and getSpanningForestMatrix() match")
     Matrix<PreciseType, Dynamic, Dynamic> three_forest_matrix = graph2->getSpanningForestMatrix(length);
     Matrix<PreciseType, Dynamic, Dynamic> two_forest_matrix = graph2->getSpanningForestMatrix(length + 1);
     PreciseType numer = 0; 
-    for (unsigned i = 1; i < length + 2; ++i)     // "empty" is node 0, "1" is node 1, ...
+    for (int i = 1; i < length + 2; ++i)     // "empty" is node 0, "1" is node 1, ...
         numer += (three_forest_matrix(1, i) * two_forest_matrix(i, length + 2));
     PreciseType denom = two_forest_matrix(1, length + 2) * two_forest_matrix(length + 2, length + 2);
     PreciseType error = abs(graph->getUpperExitRate(1, 1) - denom / numer);
