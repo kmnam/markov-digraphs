@@ -7,7 +7,7 @@
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  * **Last updated:**
- *     1/15/2023
+ *     1/31/2023
  */
 
 #ifndef LINE_LABELED_DIGRAPH_HPP
@@ -26,13 +26,20 @@
  * The nodes in the line graph are denoted by 0, ..., `this->N`, and therefore
  * we have `this->numnodes == this->N + 1`.
  *
- * Additional methods implemented for this graph include: 
+ * Additional methods implemented for this graph include:
+ * - `getUpperEndToEndTime()`: compute the *unconditional mean first-passage
+ *   time* from `0` to `this->N`.
+ * - `getLowerEndToEndTime()`: compute the *unconditional mean first-passage
+ *   time* from `this->N` to `0`.
  * - `getUpperExitProb(IOType, IOType)`: compute the *splitting probability*
  *   of exiting the graph through `this->N` (reaching an auxiliary upper exit
  *   node), and not through `0` (reaching an auxiliary lower exit node). 
  * - `getLowerExitRate(IOType)`: compute the reciprocal of the *unconditional
  *   mean first-passage time* to exiting the graph through `0`, given that
  *   the exit rate from `this->N` is zero.
+ * - `getEntryToUpperExitTime(IOType, IOType, IOType)`: compute the *unconditional
+ *   mean first-passage time* to exiting the graph through `this->N` from 
+ *   an auxiliary entry node through `0`. 
  * - `getLowerExitRate(IOType, IOType)`: compute the reciprocal of the *conditional
  *   mean first-passage time* to exiting the graph through `0`, given that 
  *   (1) both exit rates are nonzero and (2) exit through `0` does occur.  
@@ -479,6 +486,58 @@ class LineGraph : public LabeledDigraph<InternalType, IOType>
 
             // Finally divide by label(0 -> exit) and take the reciprocal
             return static_cast<IOType>(_lower_exit_rate / invrate);  
+        }
+
+        /**
+         * Compute the *unconditional* mean first-passage time to exit from 
+         * the line graph through the upper node, `this->N` (to an auxiliary
+         * "upper exit" node), starting from an auxiliary "lower entry" node 
+         * into `0`.
+         *
+         * @param lower_entry_rate Rate of entry through the lower node (`0`).
+         * @param lower_exit_rate  Rate of exit through the lower node (`0`).
+         * @param upper_exit_rate  Rate of exit through the upper node (`this->N`).
+         * @returns                Unconditional mean first-passage time from 
+         *                         the entry node to exit through `this->N`.
+         */
+        IOType getEntryToUpperExitTime(IOType lower_entry_rate, 
+                                       IOType lower_exit_rate,
+                                       IOType upper_exit_rate)
+        {
+            // For each i = 0, ... , N-1 ...
+            InternalType time = 0;
+            for (int i = 0; i < this->N; ++i)
+            {
+                InternalType term = 0;
+                InternalType term1;
+                
+                // For each j = i, ..., N-1 ...
+                for (int j = i; j < this->N; ++j)
+                {
+                    term1 = 1;
+                    for (int k = i + 1; k <= j; ++k)
+                        term1 *= (this->line_labels[k-1].second / this->line_labels[k].first);
+                    term += term1;
+                }
+                
+                // Add extra term for j = N
+                term1 = 1;
+                for (int k = i + 1; k < this->N; ++k)                     // Run through k = i+1, ..., N-1
+                    term1 *= (this->line_labels[k-1].second / this->line_labels[k].first); 
+                term1 *= (this->line_labels[this->N-1].second / upper_exit_rate);   // Then add k = N term 
+                term += term1; 
+                
+                // Add the i-th term to the mean first-passage time 
+                time += term / this->line_labels[i].first;
+            }
+
+            // Add extra term for i = N
+            time += 1 / upper_exit_rate;
+
+            // Get probability of upper exit 
+            InternalType prob = this->getUpperExitProb(lower_exit_rate, upper_exit_rate); 
+
+            return static_cast<IOType>(1 / (prob * lower_entry_rate) + time);
         }
 
         /**
