@@ -287,16 +287,16 @@ TEST_CASE("Test that getEntryToUpperExitTime() and getSpanningForestMatrix() mat
     ss_final << length; 
     graph2->addEdge(ss_final.str(), "bound", 1);
 
-    // Compute the mean first-passage time to 0 from N as the following 
+    // Compute the mean first-passage time to "empty" from "bound" as the following 
     // ratio of spanning forest weights:
     //
-    // Weight of spanning forests rooted at i, "bound" with path "empty" -> i for i = "empty", 1, ..., N
+    // Weight of spanning forests rooted at i, "bound" with path "empty" -> i for i = "empty", 0, ..., N
     // -------------------------------------------------------------------------------------------------
     //                          Weight of spanning forests rooted at "bound"
     //
     // Note that the full line graph has (length + 3) nodes 
-    Matrix<PreciseType, Dynamic, Dynamic> one_forest_matrix = graph2->getSpanningForestMatrix(length); 
-    Matrix<PreciseType, Dynamic, Dynamic> two_forest_matrix = graph2->getSpanningForestMatrix(length - 1);
+    Matrix<PreciseType, Dynamic, Dynamic> one_forest_matrix = graph2->getSpanningForestMatrix(length + 2); 
+    Matrix<PreciseType, Dynamic, Dynamic> two_forest_matrix = graph2->getSpanningForestMatrix(length + 1);
     PreciseType numer = two_forest_matrix.row(0).head(length + 2).sum();    // Node "0" is 1, "1" is 2, ...
     PreciseType denom = one_forest_matrix(length + 2, length + 2);
     PreciseType error = abs(graph->getEntryToUpperExitTime(1, 1, 1) - numer / denom);
