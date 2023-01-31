@@ -31,10 +31,7 @@ const PreciseType TOLERANCE("1e-900");
  * Test `LineGraph<...>::getUpperEndToEndTime()` by comparing its output 
  * with values computed via `LabeledDigraph<...>::getSpanningForestMatrix()`.
  */
-TEST_CASE(
-    "Test that getUpperEndToEndTime() and getSpanningForestMatrix() match",
-    "[TEST_MODULE_GET_UPPER_END_TO_END_TIME_VS_GET_SPANNING_FOREST_MATRIX]"
-)
+TEST_CASE("Test that getUpperEndToEndTime() and getSpanningForestMatrix() match")
 {
     int length = 20; 
 
@@ -87,13 +84,63 @@ TEST_CASE(
 }
 
 /**
+ * Test `LineGraph<...>::getLowerEndToEndTime()` by comparing its output 
+ * with values computed via `LabeledDigraph<...>::getSpanningForestMatrix()`.
+ */
+TEST_CASE("Test that getLowerEndToEndTime() and getSpanningForestMatrix() match")
+{
+    int length = 20; 
+
+    // Define a LineGraph instance with one forward and one reverse edge label 
+    LineGraph<PreciseType, PreciseType>* graph = new LineGraph<PreciseType, PreciseType>(); 
+    PreciseType a = 2;
+    PreciseType b = 3;
+    for (int i = 0; i < length; ++i)
+        graph->addNodeToEnd(std::make_pair(a, b));
+
+    // Define an equivalent LabeledDigraph instance with no outgoing edges
+    // from 0
+    LabeledDigraph<PreciseType, PreciseType>* graph2 = new LabeledDigraph<PreciseType, PreciseType>();
+    for (int i = 0; i <= length; ++i)
+    {
+        std::stringstream ss; 
+        ss << i; 
+        graph2->addNode(ss.str()); 
+    }
+    graph2->addEdge("1", "0", b);
+    for (int i = 1; i < length; ++i)
+    {
+        std::stringstream ssi, ssj; 
+        ssi << i;
+        ssj << i + 1; 
+        graph2->addEdge(ssi.str(), ssj.str(), a);
+        graph2->addEdge(ssj.str(), ssi.str(), b); 
+    }
+
+    // Compute the mean first-passage time to 0 from N as the following 
+    // ratio of spanning forest weights:
+    //
+    // Weight of spanning forests rooted at 0, i with path N -> i for i = 1, ..., N
+    // ----------------------------------------------------------------------------
+    //                    Weight of spanning forests rooted at 0
+    //
+    // Note that the line graph without exit nodes has (length + 1) nodes
+    Matrix<PreciseType, Dynamic, Dynamic> one_forest_matrix = graph2->getSpanningForestMatrix(length); 
+    Matrix<PreciseType, Dynamic, Dynamic> two_forest_matrix = graph2->getSpanningForestMatrix(length - 1);
+    PreciseType numer = two_forest_matrix.row(length).tail(length).sum();    // Node "0" is 0, "1" is 1, ...
+    PreciseType denom = one_forest_matrix(0, 0);
+    PreciseType error = abs(graph->getLowerEndToEndTime() - numer / denom);
+    REQUIRE(error < TOLERANCE);
+
+    delete graph;
+    delete graph2;
+}
+
+/**
  * Test `LineGraph<...>::getUpperExitProb()` by comparing its output with 
  * values computed via `LabeledDigraph<...>::getSpanningForestMatrix()`.
  */
-TEST_CASE(
-    "Test that getUpperExitProb() and getSpanningForestMatrix() match",
-    "[TEST_MODULE_GET_UPPER_EXIT_PROB_VS_GET_SPANNING_FOREST_MATRIX]"
-)
+TEST_CASE("Test that getUpperExitProb() and getSpanningForestMatrix() match")
 {
     int length = 20;
 
@@ -149,10 +196,7 @@ TEST_CASE(
  * Test `LineGraph<...>::getLowerExitRate(PreciseType)` by comparing its output
  * with values computed via `LabeledDigraph<...>::getSpanningForestMatrix()`.
  */
-TEST_CASE(
-    "Test that getLowerExitRate(PreciseType) and getSpanningForestMatrix() match",
-    "[TEST_MODULE_GET_LOWER_EXIT_RATE_ONE_ARG_VS_GET_SPANNING_FOREST_MATRIX]"
-)
+TEST_CASE("Test that getLowerExitRate(PreciseType) and getSpanningForestMatrix() match")
 {
     int length = 20;
 
@@ -208,10 +252,7 @@ TEST_CASE(
  * Test `LineGraph<...>::getLowerExitRate(PreciseType, PreciseType)` by comparing
  * its output with values computed via `LabeledDigraph<...>::getSpanningForestMatrix()`.
  */
-TEST_CASE(
-    "Test that getLowerExitRate(PreciseType, PreciseType) and getSpanningForestMatrix() match",
-    "TEST_MODULE_GET_LOWER_EXIT_RATE_TWO_ARGS_VS_GET_SPANNING_FOREST_MATRIX"
-)
+TEST_CASE("Test that getLowerExitRate(PreciseType, PreciseType) and getSpanningForestMatrix() match")
 {
     int length = 20;
 
@@ -280,10 +321,7 @@ TEST_CASE(
  * Test `LineGraph<...>::getUpperExitRate()` by comparing its output with
  * values computed via `LabeledDigraph<...>::getSpanningForestMatrix()`.
  */
-TEST_CASE(
-    "Test that getUpperExitRate() and getSpanningForestMatrix() match",
-    "TEST_MODULE_GET_UPPER_EXIT_RATE_VS_GET_SPANNING_FOREST_MATRIX"
-)
+TEST_CASE("Test that getUpperExitRate() and getSpanningForestMatrix() match")
 {
     int length = 20;
 
