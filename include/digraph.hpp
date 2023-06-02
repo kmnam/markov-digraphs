@@ -6,7 +6,7 @@
  *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  *  **Last updated:** 
- *      1/23/2023
+ *      6/1/2023
  */
 
 #ifndef LABELED_DIGRAPHS_HPP
@@ -1650,19 +1650,21 @@ class LabeledDigraph
          * Simulate the Markov process associated with the graph up to a 
          * given maximum time.
          *
-         * This method returns a vector of lifetimes of scalar type double.
+         * This method returns a vector of lifetimes of scalar type double,
+         * together with the ID of the last node that was reached.
          *
          * @param init_node_id ID of initial node.
          * @param max_time     Time limit.
          * @param seed         Seed for random number generator. 
-         * @returns Vector of visited nodes and their lifetimes.
+         * @returns Vector of visited nodes and their lifetimes, together 
+         *          with the ID of the last node that was reached.
          * @throws std::invalid_argument If a node with the given ID does
          *                               not exist or if the maximum time 
          *                               is not positive.
          */
-        std::vector<std::pair<std::string, double> > simulate(const std::string init_node_id,
-                                                              const IOType max_time,
-                                                              const int seed)
+        std::pair<std::vector<std::pair<std::string, double> >, std::string> simulate(const std::string init_node_id,
+                                                                                      const IOType max_time,
+                                                                                      const int seed)
         {
             boost::random::mt19937 rng(seed);
 
@@ -1680,7 +1682,8 @@ class LabeledDigraph
             std::vector<std::pair<std::string, double> > simulation;
             double time = 0;
             std::string curr_id = init_node_id;
-            Node* curr_node = this->getNode(curr_id); 
+            Node* curr_node = this->getNode(curr_id);
+            Node* final_node = this->getNode(curr_id); 
             while (time < max_time)
             {
                 // First choose the next node
@@ -1709,9 +1712,10 @@ class LabeledDigraph
                 // Update current node
                 curr_node = dests[next_idx];
                 curr_id = curr_node->getId();
+                final_node = curr_node;
             }
 
-            return simulation; 
+            return std::make_pair(simulation, final_node->getId()); 
         }
 };
 
