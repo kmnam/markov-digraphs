@@ -15,7 +15,7 @@
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  * **Last updated:**
- *     1/15/2023
+ *     6/1/2023
  */
 
 namespace py = pybind11;
@@ -417,7 +417,8 @@ PYBIND11_MODULE(pygraph, m)
     :type max_time: float
     :param seed: Seed for random number generator.
     :type seed: int
-    :return: List of visited nodes and their lifetimes.
+    :return: List of visited nodes and their lifetimes, together with the 
+        final node reached throughout the simulation.
     :rtype: list
     :raise ValueError: If initial node does not exist or time limit is not 
         positive.
@@ -644,6 +645,27 @@ PYBIND11_MODULE(pygraph, m)
     :rtype: float
 )delim",
             py::arg("lower_exit_rate")
+        )
+        .def("get_entry_to_upper_exit_time",
+            &LineGraph<PreciseType, double>::getEntryToUpperExitTime,
+            R"delim(
+    Compute the *unconditional* mean first-passage time to exit from the 
+    line graph through the upper node, `self.N` (to an auxiliary "upper
+    exit" node), starting from an auxiliary "lower entry" node into `0`.
+
+    :param lower_entry_rate: Rate of entry through the lower node (`0`).
+    :type lower_entry_rate: float
+    :param lower_exit_rate: Rate of exit through the lower node (`0`).
+    :type lower_exit_rate: float
+    :param upper_exit_rate: Rate of exit through the upper node (`self.N`).
+    :type upper_exit_rate: float
+    :return: Unconditional mean first-passage time from the entry node to
+        exit through `self.N`.
+    :rtype: float
+)delim",
+            py::arg("lower_entry_rate"),
+            py::arg("lower_exit_rate"),
+            py::arg("upper_exit_rate")
         )
         .def("get_upper_exit_rate",
             &LineGraph<PreciseType, double>::getUpperExitRate,
