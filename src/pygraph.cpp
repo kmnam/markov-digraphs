@@ -15,7 +15,7 @@
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  * **Last updated:**
- *     6/1/2023
+ *     2/27/2024
  */
 
 namespace py = pybind11;
@@ -895,8 +895,8 @@ PYBIND11_MODULE(pygraph, m)
     :type layout: str
 )delim",
         py::arg("graph"),
-        py::arg("format"),  
-        py::arg("layout"), 
+        py::arg("layout"),  
+        py::arg("format"), 
         py::arg("filename")
     );
 }
