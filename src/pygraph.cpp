@@ -15,16 +15,13 @@
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  * **Last updated:**
- *     2/27/2024
+ *     7/10/2024
  */
 
 namespace py = pybind11;
 
-// MANTISSA_PRECISION is a parameter to be defined at compile-time
-#ifndef MANTISSA_PRECISION
-#define MANTISSA_PRECISION 100
-#endif
-typedef boost::multiprecision::number<boost::multiprecision::mpfr_float_backend<MANTISSA_PRECISION> > PreciseType;
+// Use variable-precision floating-point arithmetic 
+typedef boost::multiprecision::number<boost::multiprecision::mpfr_float_backend<0> > PreciseType; 
 
 /**
  * Python bindings for `LabeledDigraph<PreciseType, double>` and all of its 
@@ -301,17 +298,46 @@ PYBIND11_MODULE(pygraph, m)
 )delim",
             py::arg("sparse")
         )
-        .def("get_mean_first_passage_times_from_solver",
-            &LabeledDigraph<PreciseType, double>::getMeanFirstPassageTimesFromSolver<PreciseType, double>,
+        .def("get_fpt_moments_from_solver",
+            &LabeledDigraph<PreciseType, double>::getFPTMomentsFromSolver<PreciseType, double>,
             R"delim(
-    Compute the vector of *unconditional* mean first-passage times in 
-    the Markov process associated with the graph from each node to the
-    target node, using the given linear solver method. 
+    Compute the vector of r-th moments for the *unconditional* first-passage
+    times (FPTs) in the Markov process associated with the graph from each
+    node to the target node, using the given linear solver method. 
 
-    This method assumes that the associated Markov process certainly 
-    eventually reaches the target node from each node in the graph, 
-    meaning that there are no alternative terminal nodes (or rather 
-    SCCs) to which the process can travel and get "stuck."
+    This method assumes that the associated Markov process eventually reaches
+    the target node from every other node in the graph with certainty, meaning
+    that there are, e.g., no alternative terminal nodes to which the process
+    can travel and get "stuck".
+
+    :param target_id: ID of target node.
+    :type target_id: str
+    :param r: Index of the desired moment.
+    :type r: int
+    :param method: Linear solver method for computing the mean first-
+        passage time vector.
+    :type method: SolverMethod
+    :return: Vector of mean first-passage times to the target node from
+        every node in the graph.
+    :rtype: numpy.ndarray 
+    :raise ValueError: If solver method is not recognized.
+    :raise RuntimeError: If target node does not exist.
+)delim",
+            py::arg("target_id"),
+            py::arg("r"),
+            py::arg("method") = SolverMethod::QRDecomposition
+        )
+        .def("get_mean_fpts_from_solver",
+            &LabeledDigraph<PreciseType, double>::getMeanFPTsFromSolver<PreciseType, double>,
+            R"delim(
+    Compute the vector of *unconditional* mean FPTs in the Markov process
+    associated with the graph from each node to the target node, using the
+    given linear solver method. 
+
+    This method assumes that the associated Markov process eventually reaches
+    the target node from every other node in the graph with certainty, meaning
+    that there are, e.g., no alternative terminal nodes to which the process
+    can travel and get "stuck".
 
     :param target_id: ID of target node.
     :type target_id: str
@@ -327,83 +353,109 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("target_id"),
             py::arg("method") = SolverMethod::QRDecomposition
         )
-        .def("get_mean_first_passage_times_from_recurrence",
-            &LabeledDigraph<PreciseType, double>::getMeanFirstPassageTimesFromRecurrence<double>,
+        .def("get_fpt_variances_from_solver",
+            &LabeledDigraph<PreciseType, double>::getFPTVariancesFromSolver<PreciseType, double>,
             R"delim(
-    Compute the vector of *unconditional* mean first-passage times in 
-    the Markov process associated with the graph from each node to the
-    target node, using the recurrence of Chebotarev and Agaev (Lin Alg
-    Appl, 2002, Eqs.\ 17-18).
+    Compute the vector of variances of the *unconditional* FPTs in the
+    Markov process associated with the graph from each node to the target
+    node, using the given linear solver method. 
 
-    This method assumes that the associated Markov process certainly 
-    eventually reaches the target node from each node in the graph, 
-    meaning that there are no alternative terminal nodes (or rather 
-    SCCs) to which the process can travel and get "stuck."
+    This method assumes that the associated Markov process eventually reaches
+    the target node from every other node in the graph with certainty, meaning
+    that there are, e.g., no alternative terminal nodes to which the process
+    can travel and get "stuck".
 
     :param target_id: ID of target node.
     :type target_id: str
-    :param sparse: If True, use a sparse Laplacian matrix in the
-        calculations.
-    :type sparse: bool
+    :param method: Linear solver method for computing the mean first-
+        passage time vector.
+    :type method: SolverMethod
     :return: Vector of mean first-passage times to the target node from
         every node in the graph.
+    :rtype: numpy.ndarray 
+    :raise ValueError: If solver method is not recognized.
+    :raise RuntimeError: If target node does not exist.
+)delim",
+            py::arg("target_id"),
+            py::arg("method") = SolverMethod::QRDecomposition
+        )
+        .def("get_fpt_moments_from_recurrence",
+            &LabeledDigraph<PreciseType, double>::getFPTMomentsFromRecurrence<PreciseType, double>,
+            R"delim(
+    Compute the vector of r-th moments for the *unconditional* first-passage
+    times (FPTs) in the Markov process associated with the graph from each
+    node to the target node, using the recurrence of Chebotarev and Agaev
+    (Lin Alg Appl, 2002, Eqs.\ 17-18).
+
+    This method assumes that the associated Markov process eventually reaches
+    the target node from every other node in the graph with certainty, meaning
+    that there are, e.g., no alternative terminal nodes to which the process
+    can travel and get "stuck".
+
+    :param target_id: ID of target node.
+    :type target_id: str
+    :param r: Index of the desired moment.
+    :type r: int
+    :param sparse: If True, use a sparse Laplacian matrix in the calculations.
+    :type sparse: bool
+    :return: Vector of r-th moments for the FPT to the target node from every
+        node in the graph.
+    :rtype: numpy.ndarray 
+    :raise ValueError: If solver method is not recognized.
+    :raise RuntimeError: If target node does not exist.
+)delim",
+            py::arg("target_id"),
+            py::arg("r"),
+            py::arg("sparse")
+        )
+        .def("get_mean_fpts_from_recurrence",
+            &LabeledDigraph<PreciseType, double>::getMeanFPTsFromRecurrence<double>,
+            R"delim(
+    Compute the vector of *unconditional* mean FPTs in the Markov process 
+    associated with the graph from each node to the target node, using the
+    recurrence of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18).
+
+    This method assumes that the associated Markov process eventually reaches
+    the target node from every other node in the graph with certainty, meaning
+    that there are, e.g., no alternative terminal nodes to which the process
+    can travel and get "stuck".
+
+    :param target_id: ID of target node.
+    :type target_id: str
+    :param sparse: If True, use a sparse Laplacian matrix in the calculations.
+    :type sparse: bool
+    :return: Vector of mean FPTs to the target node from every node in the
+        graph.
     :rtype: numpy.ndarray 
     :raise RuntimeError: If target node does not exist.
 )delim",
             py::arg("target_id"),
             py::arg("sparse") 
         )
-        .def("get_second_moments_of_first_passage_times_from_solver",
-            &LabeledDigraph<PreciseType, double>::getSecondMomentsOfFirstPassageTimesFromSolver<PreciseType, double>,
+        .def("get_fpt_variances_from_recurrence",
+            &LabeledDigraph<PreciseType, double>::getFPTVariancesFromRecurrence<double>,
             R"delim(
-    Compute the vector of second moments of the *unconditional* first-
-    passage times in the Markov process associated with the graph from
-    each node to the target node, using the given linear solver method.
+    Compute the vector of variances of the *unconditional* FPTs in the
+    Markov process associated with the graph from each node to the target
+    node, using the recurrence of Chebotarev and Agaev (Lin Alg Appl, 2002,
+    Eqs.\ 17-18).
 
-    This method assumes that the associated Markov process certainly
-    eventually reaches the target node from each node in the graph,
-    meaning that there are no alternative terminal nodes (or rather
-    SCCs) to which the process can travel and get "stuck".
+    This method assumes that the associated Markov process eventually reaches
+    the target node from every other node in the graph with certainty, meaning
+    that there are, e.g., no alternative terminal nodes to which the process
+    can travel and get "stuck".
 
     :param target_id: ID of target node.
     :type target_id: str
-    :param method: Linear solver method for computing the vector of 
-        first-passage time second moments.
-    :type method: SolverMethod
-    :return: Vector of first-passage time second moments to the target
-        node from every node in the graph.
-    :rtype: numpy.ndarray 
-    :raise ValueError: If solver method is not recognized.
-    :raise RuntimeError: If target node does not exist.
-)delim", 
-            py::arg("target_id"),
-            py::arg("method") = SolverMethod::QRDecomposition
-        )
-        .def("get_second_moments_of_first_passage_times_from_recurrence",
-            &LabeledDigraph<PreciseType, double>::getSecondMomentsOfFirstPassageTimesFromRecurrence<double>,
-            R"delim(
-    Compute the vector of second moments of the *unconditional* first-
-    passage times in the Markov process associated with the graph from
-    each node to the target node, using the recurrence of Chebotarev
-    and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18).
-
-    This method assumes that the associated Markov process certainly
-    eventually reaches the target node from each node in the graph,
-    meaning that there are no alternative terminal nodes (or rather
-    SCCs) to which the process can travel and get "stuck".
-
-    :param target_id: ID of target node.
-    :type target_id: str
-    :param sparse: If True, use a sparse Laplacian matrix in the
-        calculations.
+    :param sparse: If True, use a sparse Laplacian matrix in the calculations.
     :type sparse: bool
-    :return: Vector of first-passage time second moments to the target
-        node from every node in the graph.
+    :return: Vector of variances of the FPTs to the target node from every 
+        node in the graph.
     :rtype: numpy.ndarray 
     :raise RuntimeError: If target node does not exist.
-)delim", 
+)delim",
             py::arg("target_id"),
-            py::arg("sparse")
+            py::arg("sparse") 
         )
         .def("simulate",
             &LabeledDigraph<PreciseType, double>::simulate,
