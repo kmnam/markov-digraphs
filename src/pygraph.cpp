@@ -380,7 +380,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("method") = SolverMethod::QRDecomposition
         )
         .def("get_fpt_moments_from_recurrence",
-            &LabeledDigraph<PreciseType, double>::getFPTMomentsFromRecurrence<PreciseType, double>,
+            &LabeledDigraph<PreciseType, double>::getFPTMomentsFromRecurrence<double>,
             R"delim(
     Compute the vector of r-th moments for the *unconditional* first-passage
     times (FPTs) in the Markov process associated with the graph from each
