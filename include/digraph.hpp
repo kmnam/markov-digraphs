@@ -1555,9 +1555,9 @@ class LabeledDigraph
                                                                       const bool sparse)
         {
             Matrix<InternalType, Dynamic, 1> v
-                = this->getFPTMomentsFromRecurrence<InternalType, InternalType>(target_id, 1, sparse);
+                = this->getFPTMomentsFromRecurrence<InternalType>(target_id, 1, sparse);
             Matrix<InternalType, Dynamic, 1> w
-                = this->getFPTMomentsFromRecurrence<InternalType, InternalType>(target_id, 2, sparse);
+                = this->getFPTMomentsFromRecurrence<InternalType>(target_id, 2, sparse);
             return (w - (v.array() * v.array()).matrix()).template cast<FloatIOType>(); 
         }
 
