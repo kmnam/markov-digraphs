@@ -1396,13 +1396,13 @@ class LabeledDigraph
          *          in the graph. 
          * @throws std::runtime_error if target node does not exist. 
          */
-        template <typename FloatInternalType = InternalType, typename FloatIOType = IOType>
+        template <typename FloatIOType = IOType>
         Matrix<FloatIOType, Dynamic, 1> getFPTMomentsFromRecurrence(std::string target_id,
                                                                     const int r,
                                                                     const bool sparse)
         {
-            typedef Matrix<FloatInternalType, Dynamic, Dynamic> MatrixInternalType; 
-            typedef Matrix<FloatInternalType, Dynamic, 1>       VectorInternalType; 
+            typedef Matrix<InternalType, Dynamic, Dynamic> MatrixInternalType; 
+            typedef Matrix<InternalType, Dynamic, 1>       VectorInternalType; 
 
             Node* target = this->getNode(target_id);
             if (target == nullptr)
@@ -1506,7 +1506,7 @@ class LabeledDigraph
                 if (i != t)
                     fpts(i) = Ar(i, t); 
             }
-            fpts *= boost::math::factorial<FloatInternalType>(r); 
+            fpts *= boost::math::factorial<InternalType>(r); 
 
             return fpts.template cast<FloatIOType>(); 
         }
