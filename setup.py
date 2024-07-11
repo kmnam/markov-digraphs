@@ -1,11 +1,12 @@
 from setuptools import setup
 from pybind11.setup_helpers import Pybind11Extension, build_ext
 
-GMP_INCLUDE = '/usr/local/Cellar/gmp/6.2.1_1/include'
-MPFR_INCLUDE = '/usr/local/Cellar/mpfr/4.1.0/include'
-BOOST_INCLUDE = '/usr/local/Cellar/boost/1.76.0/include'
-EIGEN_INCLUDE = '/usr/local/Cellar/eigen/3.4.0_1/include/eigen3'
-GRAPHVIZ_INCLUDE = '/usr/local/Cellar/graphviz/2.40.1/include'
+# INCLUDE paths should be specified by the user prior to building
+GMP_INCLUDE = '/opt/homebrew/Cellar/gmp/6.3.0/include'
+MPFR_INCLUDE = '/opt/homebrew/Cellar/mpfr/4.2.1/include'
+BOOST_INCLUDE = '/opt/homebrew/Cellar/boost/1.84.0_1/include'
+EIGEN_INCLUDE = '/opt/homebrew/Cellar/eigen/3.4.0_1/include/eigen3'
+GRAPHVIZ_INCLUDE = '/opt/homebrew/Cellar/graphviz/12.0.0/include'
 
 # Infer LIB paths from INCLUDE paths (which should end with /include)
 GMP_LIB = GMP_INCLUDE[:-8] + '/lib'
