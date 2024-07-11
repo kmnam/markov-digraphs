@@ -21,44 +21,27 @@
 namespace py = pybind11;
 
 // Use variable-precision floating-point arithmetic 
-typedef boost::multiprecision::number<boost::multiprecision::mpfr_float_backend<0> > PreciseType; 
+typedef boost::multiprecision::number<boost::multiprecision::mpfr_float_backend<0> > PreciseType;
 
+/** ----------------------------------------------------------------- // 
+ *           FUNCTIONS FOR DECLARING GENERIC PYGRAPH CLASSES          //
+ *  ----------------------------------------------------------------- */
 /**
- * Python bindings for `LabeledDigraph<PreciseType, double>` and all of its 
- * subclasses.
+ * A templated function for exposing versions of the `LabeledDigraph`
+ * class with different numeric types to Python.
+ *
+ * @param m pybind11 module. 
+ * @param class_name Name to be given to the (Python) class.
  */
-PYBIND11_MODULE(pygraph, m)
+template <typename T>
+void declareLabeledDigraphClass(py::module& m, const std::string& class_name)
 {
-    m.doc() = R"delim(
-    .. currentmodule:: pygraph
-
-    .. autosummary::
-       :toctree: _generate
-
-       PreciseDigraph
-       PreciseLineGraph
-       PreciseGridGraph
-       viz_digraph
-)delim"; 
-
-    py::enum_<SolverMethod>(m, "SolverMethod")
-        .value("QRDecomposition", SolverMethod::QRDecomposition)
-        .value("LUDecomposition", SolverMethod::LUDecomposition);  
-
-    py::class_<Node>(m, "Node")
-        .def(py::init<std::string>())
-        .def("get_id", &Node::getId)
-        .def("set_id", &Node::setId);
-
-    /**
-     * Expose `LabeledDigraph<PreciseType, double>` as `pygraph.PreciseDigraph`. 
-     */
-    py::class_<LabeledDigraph<PreciseType, double> >(m, "PreciseDigraph")
+    py::class_<LabeledDigraph<T, double> >(m, class_name.c_str())
         .def(py::init<>(),
             R"delim(Empty constructor.)delim"
         )
         .def("get_num_nodes",
-            &LabeledDigraph<PreciseType, double>::getNumNodes,
+            &LabeledDigraph<T, double>::getNumNodes,
             R"delim(
     Return the number of nodes in the graph.
     
@@ -67,7 +50,7 @@ PYBIND11_MODULE(pygraph, m)
 )delim"
         )
         .def("add_node",
-            &LabeledDigraph<PreciseType, double>::addNode,
+            &LabeledDigraph<T, double>::addNode,
             R"delim(
     Add a node to the graph with the given ID.
 
@@ -78,7 +61,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("id")
         )
         .def("remove_node",
-            &LabeledDigraph<PreciseType, double>::removeNode,
+            &LabeledDigraph<T, double>::removeNode,
             R"delim(
     Remove a node from the graph with the given ID.
 
@@ -89,7 +72,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("id")
         )
         .def("has_node",
-            &LabeledDigraph<PreciseType, double>::hasNode,
+            &LabeledDigraph<T, double>::hasNode,
             R"delim(
     Return True if node with given ID exists in the graph.
 
@@ -101,7 +84,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("id")
         )
         .def("get_all_node_ids",
-            &LabeledDigraph<PreciseType, double>::getAllNodeIds,
+            &LabeledDigraph<T, double>::getAllNodeIds,
             R"delim(
     Return the list of IDs of all nodes in the graph, ordered
     according to the graph's canonical ordering of nodes.
@@ -111,7 +94,7 @@ PYBIND11_MODULE(pygraph, m)
 )delim" 
         )
         .def("add_edge",
-            &LabeledDigraph<PreciseType, double>::addEdge,
+            &LabeledDigraph<T, double>::addEdge,
             R"delim(
     Add an edge between two nodes.
 
@@ -131,7 +114,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("label") = 1
         )
         .def("remove_edge",
-            &LabeledDigraph<PreciseType, double>::removeEdge,
+            &LabeledDigraph<T, double>::removeEdge,
             R"delim(
     Remove the edge between the two given nodes.
 
@@ -149,8 +132,8 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("target_id")
         )
         .def("has_edge",
-            static_cast<bool (LabeledDigraph<PreciseType, double>::*)(std::string, std::string) const>(
-                &LabeledDigraph<PreciseType, double>::hasEdge
+            static_cast<bool (LabeledDigraph<T, double>::*)(std::string, std::string) const>(
+                &LabeledDigraph<T, double>::hasEdge
             ),
             R"delim(
     Return True if the specified edge exists, given the IDs of
@@ -169,8 +152,8 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("target_id")
         )
         .def("get_all_edges_from_node", 
-            static_cast<std::vector<std::pair<std::string, double> > (LabeledDigraph<PreciseType, double>::*)(std::string)>(
-                &LabeledDigraph<PreciseType, double>::getAllEdgesFromNode
+            static_cast<std::vector<std::pair<std::string, double> > (LabeledDigraph<T, double>::*)(std::string)>(
+                &LabeledDigraph<T, double>::getAllEdgesFromNode
             ), 
             R"delim(
     Return a list of nodes to which there are edges outgoing from
@@ -187,7 +170,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("source_id")
         )
         .def("get_edge_label",
-            &LabeledDigraph<PreciseType, double>::getEdgeLabel,
+            &LabeledDigraph<T, double>::getEdgeLabel,
             R"delim(
     Get the label on the specified edge. 
 
@@ -206,7 +189,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("target_id")
         )
         .def("set_edge_label",
-            &LabeledDigraph<PreciseType, double>::setEdgeLabel,
+            &LabeledDigraph<T, double>::setEdgeLabel,
             R"delim(
     Set the label on the specified edge to the given value.
 
@@ -226,13 +209,13 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("value")
         )
         .def("clear",
-            &LabeledDigraph<PreciseType, double>::clear,
+            &LabeledDigraph<T, double>::clear,
             R"delim(
     Clear the graph's contents.
 )delim"
         )
         .def("get_laplacian",
-            &LabeledDigraph<PreciseType, double>::getLaplacian,
+            &LabeledDigraph<T, double>::getLaplacian,
             R"delim(
     Return the Laplacian matrix, with the nodes ordered according 
     to the graph's canonical ordering of nodes.
@@ -242,8 +225,8 @@ PYBIND11_MODULE(pygraph, m)
 )delim"
         )
         .def("get_spanning_forest_matrix",
-            static_cast<Eigen::MatrixXd (LabeledDigraph<PreciseType, double>::*)(const int)>(
-                &LabeledDigraph<PreciseType, double>::getSpanningForestMatrix
+            static_cast<Eigen::MatrixXd (LabeledDigraph<T, double>::*)(const int)>(
+                &LabeledDigraph<T, double>::getSpanningForestMatrix
             ),
             R"delim(
     Compute the k-th spanning forest matrix, using the recurrence 
@@ -258,7 +241,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("k")
         )
         .def("get_steady_state_from_svd",
-            &LabeledDigraph<PreciseType, double>::getSteadyStateFromSVD<PreciseType, double>,
+            &LabeledDigraph<T, double>::template getSteadyStateFromSVD<T, double>,
             R"delim(
     Compute a vector in the kernel of the Laplacian matrix of the
     graph, normalized by its 1-norm, by singular value decomposition.
@@ -276,7 +259,7 @@ PYBIND11_MODULE(pygraph, m)
 )delim"
         )
         .def("get_steady_state_from_recurrence",
-            &LabeledDigraph<PreciseType, double>::getSteadyStateFromRecurrence<double>,
+            &LabeledDigraph<T, double>::template getSteadyStateFromRecurrence<double>,
             R"delim(
     Compute a vector in the kernel of the Laplacian matrix of the
     graph, normalized by its 1-norm, by the recurrence of Chebotarev
@@ -299,9 +282,9 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("sparse")
         )
         .def("get_fpt_moments_from_solver",
-            &LabeledDigraph<PreciseType, double>::getFPTMomentsFromSolver<PreciseType, double>,
+            &LabeledDigraph<T, double>::template getFPTMomentsFromSolver<T, double>,
             R"delim(
-    Compute the vector of r-th moments for the *unconditional* first-passage
+    Compute the vector of `r`-th moments for the *unconditional* first-passage
     times (FPTs) in the Markov process associated with the graph from each
     node to the target node, using the given linear solver method. 
 
@@ -317,7 +300,7 @@ PYBIND11_MODULE(pygraph, m)
     :param method: Linear solver method for computing the mean first-
         passage time vector.
     :type method: SolverMethod
-    :return: Vector of mean first-passage times to the target node from
+    :return: Vector of `r`-th moments for the FPT to the target node from
         every node in the graph.
     :rtype: numpy.ndarray 
     :raise ValueError: If solver method is not recognized.
@@ -328,7 +311,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("method") = SolverMethod::QRDecomposition
         )
         .def("get_mean_fpts_from_solver",
-            &LabeledDigraph<PreciseType, double>::getMeanFPTsFromSolver<PreciseType, double>,
+            &LabeledDigraph<T, double>::template getMeanFPTsFromSolver<T, double>,
             R"delim(
     Compute the vector of *unconditional* mean FPTs in the Markov process
     associated with the graph from each node to the target node, using the
@@ -344,8 +327,8 @@ PYBIND11_MODULE(pygraph, m)
     :param method: Linear solver method for computing the mean first-
         passage time vector.
     :type method: SolverMethod
-    :return: Vector of mean first-passage times to the target node from
-        every node in the graph.
+    :return: Vector of mean FPTs to the target node from every node in the 
+        graph.
     :rtype: numpy.ndarray 
     :raise ValueError: If solver method is not recognized.
     :raise RuntimeError: If target node does not exist.
@@ -354,7 +337,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("method") = SolverMethod::QRDecomposition
         )
         .def("get_fpt_variances_from_solver",
-            &LabeledDigraph<PreciseType, double>::getFPTVariancesFromSolver<PreciseType, double>,
+            &LabeledDigraph<T, double>::template getFPTVariancesFromSolver<T, double>,
             R"delim(
     Compute the vector of variances of the *unconditional* FPTs in the
     Markov process associated with the graph from each node to the target
@@ -370,8 +353,8 @@ PYBIND11_MODULE(pygraph, m)
     :param method: Linear solver method for computing the mean first-
         passage time vector.
     :type method: SolverMethod
-    :return: Vector of mean first-passage times to the target node from
-        every node in the graph.
+    :return: Vector of mean FPTs to the target node from every node in the 
+        graph.
     :rtype: numpy.ndarray 
     :raise ValueError: If solver method is not recognized.
     :raise RuntimeError: If target node does not exist.
@@ -380,9 +363,9 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("method") = SolverMethod::QRDecomposition
         )
         .def("get_fpt_moments_from_recurrence",
-            &LabeledDigraph<PreciseType, double>::getFPTMomentsFromRecurrence<double>,
+            &LabeledDigraph<T, double>::template getFPTMomentsFromRecurrence<double>,
             R"delim(
-    Compute the vector of r-th moments for the *unconditional* first-passage
+    Compute the vector of `r`-th moments for the *unconditional* first-passage
     times (FPTs) in the Markov process associated with the graph from each
     node to the target node, using the recurrence of Chebotarev and Agaev
     (Lin Alg Appl, 2002, Eqs.\ 17-18).
@@ -398,8 +381,8 @@ PYBIND11_MODULE(pygraph, m)
     :type r: int
     :param sparse: If True, use a sparse Laplacian matrix in the calculations.
     :type sparse: bool
-    :return: Vector of r-th moments for the FPT to the target node from every
-        node in the graph.
+    :return: Vector of `r`-th moments for the FPT to the target node from
+        every node in the graph.
     :rtype: numpy.ndarray 
     :raise ValueError: If solver method is not recognized.
     :raise RuntimeError: If target node does not exist.
@@ -409,7 +392,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("sparse")
         )
         .def("get_mean_fpts_from_recurrence",
-            &LabeledDigraph<PreciseType, double>::getMeanFPTsFromRecurrence<double>,
+            &LabeledDigraph<T, double>::template getMeanFPTsFromRecurrence<double>,
             R"delim(
     Compute the vector of *unconditional* mean FPTs in the Markov process 
     associated with the graph from each node to the target node, using the
@@ -433,7 +416,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("sparse") 
         )
         .def("get_fpt_variances_from_recurrence",
-            &LabeledDigraph<PreciseType, double>::getFPTVariancesFromRecurrence<double>,
+            &LabeledDigraph<T, double>::template getFPTVariancesFromRecurrence<double>,
             R"delim(
     Compute the vector of variances of the *unconditional* FPTs in the
     Markov process associated with the graph from each node to the target
@@ -458,7 +441,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("sparse") 
         )
         .def("simulate",
-            &LabeledDigraph<PreciseType, double>::simulate,
+            &LabeledDigraph<T, double>::simulate,
             R"delim(
     Simulate the Markov process associated with the graph up to a given 
     maximum time.
@@ -479,11 +462,19 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("max_time"),
             py::arg("seed")
         );
+}
 
-    /**
-     * Expose `LineGraph<PreciseType, double>` as `pygraph.PreciseLineGraph`. 
-     */
-    py::class_<LineGraph<PreciseType, double>, LabeledDigraph<PreciseType, double> >(m, "PreciseLineGraph")
+/**
+ * A templated function for exposing versions of the `LineGraph` class 
+ * with different numeric types to Python. 
+ *
+ * @param m pybind11 module. 
+ * @param class_name Name to be given to the (Python) class.
+ */
+template <typename T>
+void declareLineGraphClass(py::module& m, const std::string& class_name)
+{
+    py::class_<LineGraph<T, double>, LabeledDigraph<T, double> >(m, class_name.c_str())
         .def(py::init<>(),
             R"delim(
     Constructor for a line graph of length 0, i.e., a single vertex
@@ -502,7 +493,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("N")
         )
         .def("add_node",
-            &LineGraph<PreciseType, double>::addNode,
+            &LineGraph<T, double>::addNode,
             R"delim(
     Ban node addition via `addNode()`: nodes can be added or removed 
     only at the upper end of the graph. 
@@ -515,7 +506,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("id")
         )
         .def("remove_node",
-            &LineGraph<PreciseType, double>::removeNode,
+            &LineGraph<T, double>::removeNode,
             R"delim(
     Ban node removal via `removeNode()`: nodes can be added or removed 
     only at the upper end of the graph.
@@ -528,7 +519,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("id")
         )
         .def("add_edge",
-            &LineGraph<PreciseType, double>::addEdge,
+            &LineGraph<T, double>::addEdge,
             R"delim(
     Ban edge addition via `addEdge()`: edges can be added or removed 
     only at the upper end of the graph.
@@ -549,7 +540,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("label") = 1
         )
         .def("remove_edge",
-            &LineGraph<PreciseType, double>::removeEdge,
+            &LineGraph<T, double>::removeEdge,
             R"delim(
     Ban edge removal via `removeEdge()`: edges can be added or removed 
     only at the upper end of the graph.
@@ -566,7 +557,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("target_id")
         )
         .def("add_node_to_end",
-            &LineGraph<PreciseType, double>::addNodeToEnd,
+            &LineGraph<T, double>::addNodeToEnd,
             R"delim(
     Add a new node to the end of the graph (along with the two edges), 
     increasing its length by one.
@@ -577,7 +568,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("labels")
         )
         .def("remove_node_from_end",
-            &LineGraph<PreciseType, double>::removeNodeFromEnd,
+            &LineGraph<T, double>::removeNodeFromEnd,
             R"delim(
     Remove the last node (N) from the graph (along with the two edges),
     decreasing its length by one.
@@ -586,7 +577,7 @@ PYBIND11_MODULE(pygraph, m)
 )delim"
         )
         .def("set_edge_labels",
-            &LineGraph<PreciseType, double>::setEdgeLabels,
+            &LineGraph<T, double>::setEdgeLabels,
             R"delim(
     Set the edge labels between the i-th and (i+1)-th nodes (`i -> i+1`
     then `i+1 -> i`) to the given values.
@@ -600,7 +591,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("labels")
         )
         .def("clear",
-            &LineGraph<PreciseType, double>::clear,
+            &LineGraph<T, double>::clear,
             R"delim(
     Ban clearing via `clear()`: the graph must be non-empty.
     
@@ -608,11 +599,11 @@ PYBIND11_MODULE(pygraph, m)
 )delim"
         )
         .def("reset",
-            &LineGraph<PreciseType, double>::reset,
+            &LineGraph<T, double>::reset,
             R"delim(Remove all nodes and edges but 0.)delim"
         )
         .def("get_upper_exit_prob",
-            &LineGraph<PreciseType, double>::getUpperExitProb,
+            &LineGraph<T, double>::getUpperExitProb,
             R"delim(
     Compute the probability of exiting the line graph through the upper
     node, `self.N` (to an auxiliary "upper exit" node), rather than 
@@ -630,7 +621,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("upper_exit_rate")
         )
         .def("get_lower_end_to_end_time",
-            &LineGraph<PreciseType, double>::getLowerEndToEndTime,
+            &LineGraph<T, double>::getLowerEndToEndTime,
             R"delim(
     Compute the mean first-passage time from `self.N` to `0`.
 
@@ -639,7 +630,7 @@ PYBIND11_MODULE(pygraph, m)
 )delim"
         )
         .def("get_upper_end_to_end_time",
-            &LineGraph<PreciseType, double>::getUpperEndToEndTime,
+            &LineGraph<T, double>::getUpperEndToEndTime,
             R"delim(
     Compute the mean first-passage time from `0` to `self.N`.
 
@@ -648,7 +639,7 @@ PYBIND11_MODULE(pygraph, m)
 )delim"
         )
         .def("get_lower_exit_rate",
-            py::overload_cast<double>(&LineGraph<PreciseType, double>::getLowerExitRate),
+            py::overload_cast<double>(&LineGraph<T, double>::getLowerExitRate),
             R"delim(
     Compute the reciprocal of the *unconditional* mean first-passage
     time to exit from the line graph through the lower node, `0`
@@ -664,7 +655,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("lower_exit_rate")
         )
         .def("get_lower_exit_rate",
-            py::overload_cast<double, double>(&LineGraph<PreciseType, double>::getLowerExitRate),
+            py::overload_cast<double, double>(&LineGraph<T, double>::getLowerExitRate),
             R"delim(
     Compute the reciprocal of the *conditional* mean first-passage
     time to exit from the line graph through the lower node, `0`
@@ -683,7 +674,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("upper_exit_rate")
         )
         .def("get_lower_exit_rate_from_zero",
-            &LineGraph<PreciseType, double>::getLowerExitRateFromZero,
+            &LineGraph<T, double>::getLowerExitRateFromZero,
             R"delim(
     Compute the reciprocal of the *unconditional* mean first-passage 
     time to exit from the line graph through the lower node, `0` (to
@@ -699,7 +690,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("lower_exit_rate")
         )
         .def("get_entry_to_upper_exit_time",
-            &LineGraph<PreciseType, double>::getEntryToUpperExitTime,
+            &LineGraph<T, double>::getEntryToUpperExitTime,
             R"delim(
     Compute the *unconditional* mean first-passage time to exit from the 
     line graph through the upper node, `self.N` (to an auxiliary "upper
@@ -720,7 +711,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("upper_exit_rate")
         )
         .def("get_upper_exit_rate",
-            &LineGraph<PreciseType, double>::getUpperExitRate,
+            &LineGraph<T, double>::getUpperExitRate,
             R"delim(
     Compute the reciprocal of the *conditional* mean first-passage 
     time to exit from the line graph through the upper node, `self.N`
@@ -738,11 +729,19 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("lower_exit_rate"),
             py::arg("upper_exit_rate")
         );
+}
 
-    /**
-     * Expose `GridGraph<PreciseType, double>` as `pygraph.PreciseGridGraph`. 
-     */
-    py::class_<GridGraph<PreciseType, double>, LabeledDigraph<PreciseType, double> >(m, "PreciseGridGraph")
+/**
+ * A templated function for exposing versions of the `GridGraph` class 
+ * with different numeric types to Python. 
+ *
+ * @param m pybind11 module. 
+ * @param class_name Name to be given to the (Python) class.
+ */
+template <typename T>
+void declareGridGraphClass(py::module& m, const std::string& class_name)
+{
+    py::class_<GridGraph<T, double>, LabeledDigraph<T, double> >(m, class_name.c_str())
         .def(py::init<>(),
             R"delim(
     Constructor for a grid graph of length 0, i.e., the two nodes 
@@ -762,7 +761,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("N")
         )
         .def("set_zeroth_labels",
-            &GridGraph<PreciseType, double>::setZerothLabels,
+            &GridGraph<T, double>::setZerothLabels,
             R"delim(
     Set the labels on the edges `A0 -> B0` and `B0 -> A0` to the 
     given values.
@@ -776,7 +775,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("B0_to_A0")
         )
         .def("add_rung_to_end",
-            &GridGraph<PreciseType, double>::addRungToEnd,
+            &GridGraph<T, double>::addRungToEnd,
             R"delim(
     Add a new pair of nodes to the end of the graph (along with the 
     six new edges), increasing its length by one.
@@ -789,7 +788,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("labels")
         )
         .def("remove_rung_from_end",
-            &GridGraph<PreciseType, double>::removeRungFromEnd,
+            &GridGraph<T, double>::removeRungFromEnd,
             R"delim(
     Remove the last pair of nodes from the graph (along with the six 
     associated edges), decreasing its length by one.
@@ -798,7 +797,7 @@ PYBIND11_MODULE(pygraph, m)
 )delim"
         )
         .def("add_node",
-            &GridGraph<PreciseType, double>::addNode,
+            &GridGraph<T, double>::addNode,
             R"delim(
     Ban node addition via `add_node()`: nodes can be added or removed 
     only at the upper end of the graph.
@@ -811,7 +810,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("id")
         )
         .def("remove_node",
-            &GridGraph<PreciseType, double>::removeNode,
+            &GridGraph<T, double>::removeNode,
             R"delim(
     Ban node removal via `remove_node()`: nodes can be added or removed
     only at the upper end of the graph.
@@ -824,7 +823,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("id")
         )
         .def("add_edge",
-            &GridGraph<PreciseType, double>::addEdge,
+            &GridGraph<T, double>::addEdge,
             R"delim(
     Ban edge addition via `add_edge()`: edges can be added or removed
     only at the upper end of the graph.
@@ -845,7 +844,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("label") = 1
         )
         .def("remove_edge",
-            &GridGraph<PreciseType, double>::removeEdge,
+            &GridGraph<T, double>::removeEdge,
             R"delim(
     Ban edge removal via `removeEdge()`: edges can be added or removed 
     only at the upper end of the graph.
@@ -862,7 +861,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("target_id")
         )
         .def("clear",
-            &GridGraph<PreciseType, double>::clear,
+            &GridGraph<T, double>::clear,
             R"delim(
     Ban clearing via `clear()`: the graph must be non-empty.
 
@@ -870,14 +869,14 @@ PYBIND11_MODULE(pygraph, m)
 )delim"
         )
         .def("reset",
-            &GridGraph<PreciseType, double>::reset,
+            &GridGraph<T, double>::reset,
             R"delim(
     Remove all nodes and edges but `A0` and `B0` and the edges in
     between.
 )delim"
         )
         .def("set_rung_labels",
-            &GridGraph<PreciseType, double>::setRungLabels,
+            &GridGraph<T, double>::setRungLabels,
             R"delim(
     Set the labels on the i-th sextet of edges (`A{i} -> A{i+1}`, 
     `A{i+1} -> A{i}`, `B{i} -> B{i+1}`, `B{i+1} -> B{i}`,
@@ -898,7 +897,7 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("labels")
         )
         .def("get_exit_stats",
-            &GridGraph<PreciseType, double>::getExitStats, 
+            &GridGraph<T, double>::getExitStats, 
             R"delim(
     Compute and return two quantities: the *splitting probability* of exiting
     the graph through `B{self.N}` (reaching an auxiliary upper exit node),
@@ -916,10 +915,41 @@ PYBIND11_MODULE(pygraph, m)
             py::arg("lower_exit_rate"),
             py::arg("upper_exit_rate")
         );
+}
 
-    /**
-     * Expose `vizLabeledDigraph<PreciseType, double>()` as `viz_digraph()`.
-     */
+/** ----------------------------------------------------------------- // 
+ *                     PYGRAPH MODULE DECLARATIONS                    //
+ *  ----------------------------------------------------------------- */
+PYBIND11_MODULE(pygraph, m)
+{
+    m.doc() = R"delim(
+    .. currentmodule:: pygraph
+
+    .. autosummary::
+       :toctree: _generate
+
+       PreciseDigraph
+       PreciseLineGraph
+       PreciseGridGraph
+       viz_digraph
+)delim"; 
+
+    py::enum_<SolverMethod>(m, "SolverMethod")
+        .value("QRDecomposition", SolverMethod::QRDecomposition)
+        .value("LUDecomposition", SolverMethod::LUDecomposition);  
+
+    py::class_<Node>(m, "Node")
+        .def(py::init<std::string>())
+        .def("get_id", &Node::getId)
+        .def("set_id", &Node::setId);
+
+    // Expose the desired LabeledDigraph classes ... 
+    declareLabeledDigraphClass<PreciseType>(m, "PreciseDigraph");
+    declareLineGraphClass<PreciseType>(m, "PreciseLineGraph");
+    declareGridGraphClass<PreciseType>(m, "PreciseGridGraph");
+
+    // Expose a version of vizLabeledDigraph<PreciseType, double>() that 
+    // can be called from Python
     m.def("viz_digraph",
         [](LabeledDigraph<PreciseType, double>& graph,
            std::string layout,
