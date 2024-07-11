@@ -5,7 +5,7 @@
  *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  *  **Last updated:** 
- *      12/29/2021
+ *      7/10/2024
  */
 
 #ifndef MATH_HELPER_FUNCTIONS_FOR_LABELED_DIGRAPH_HPP
@@ -118,44 +118,6 @@ Matrix<T, Dynamic, Dynamic> getNullspaceFromSVD(const Ref<const Matrix<T, Dynami
     }
 
     return nullmat;
-}
-
-/**
- * Solve the non-homogeneous linear system Ax = b by obtaining an LU 
- * decomposition of a matrix A. 
- * 
- * @param A Input matrix. 
- * @param b Input vector.
- * @returns Solution vector to Ax = b.  
- */
-template <typename T>
-Matrix<T, Dynamic, 1> solveByLUD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A,
-                                 const Ref<const Matrix<T, Dynamic, 1> >& b)
-{
-    // Obtain a full-pivot LU decomposition of A 
-    FullPivLU<Matrix<T, Dynamic, Dynamic> > lud(A); 
-
-    // Get and return the solution to Ax = b
-    return lud.solve(b); 
-}
-
-/**
- * Solve the non-homogeneous linear system Ax = b by obtaining a QR 
- * decomposition of A. 
- *
- * @param A Input matrix. 
- * @param b Input vector. 
- * @returns Solution vector to Ax = b. 
- */
-template <typename T>
-Matrix<T, Dynamic, 1> solveByQRD(const Ref<const Matrix<T, Dynamic, Dynamic> >& A, 
-                                 const Ref<const Matrix<T, Dynamic, 1> >& b)
-{
-    // Obtain a QR decomposition of A 
-    ColPivHouseholderQR<Matrix<T, Dynamic, Dynamic> > qrd(A);
-
-    // Get and return the solution to Ax = b
-    return qrd.solve(b); 
 }
 
 /**
