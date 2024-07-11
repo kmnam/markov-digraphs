@@ -6,7 +6,7 @@
  *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  *  **Last updated:** 
- *      6/1/2023
+ *      7/10/2024
  */
 
 #ifndef LABELED_DIGRAPHS_HPP
@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <boost/math/special_functions/factorials.hpp>
 #include <boost/random.hpp>
 #include <boost/random/exponential_distribution.hpp>
 #include "math.hpp"
@@ -334,7 +335,7 @@ class LabeledDigraph
          * according to the graph's canonical ordering of nodes, as a *dense*
          * matrix.
          *
-         * @returns      Laplacian matrix of the graph (as a dense matrix). 
+         * @returns Laplacian matrix of the graph (as a dense matrix). 
          */
         Matrix<InternalType, Dynamic, Dynamic> getColumnLaplacianDense()
         {
@@ -976,7 +977,7 @@ class LabeledDigraph
          * Return the Laplacian matrix, with the nodes ordered according to
          * the graph's canonical ordering of nodes.
          *
-         * @returns      Laplacian matrix of the graph (as a dense matrix). 
+         * @returns Laplacian matrix of the graph (as a dense matrix). 
          */
         Matrix<IOType, Dynamic, Dynamic> getLaplacian()
         {
@@ -1021,8 +1022,8 @@ class LabeledDigraph
          * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18), with
          * a *dense* Laplacian matrix.
          *
-         * @param k      Index of the desired spanning forest matrix. 
-         * @returns      k-th spanning forest matrix.
+         * @param k Index of the desired spanning forest matrix. 
+         * @returns k-th spanning forest matrix.
          */
         Matrix<IOType, Dynamic, Dynamic> getSpanningForestMatrix(const int k)
         {
@@ -1210,41 +1211,44 @@ class LabeledDigraph
         }
 
         /**
-         * Compute the vector of *unconditional* mean first-passage times in 
-         * the Markov process associated with the graph from each node to the 
-         * target node, using the given linear solver method.
+         * Compute the vector of r-th moments for the *unconditional* first-
+         * passage times (FPTs) in the Markov process associated with the
+         * graph from each node to the target node, using the given linear 
+         * solver method. 
          *
-         * This method assumes that the associated Markov process certainly 
-         * eventually reaches the target node from each node in the graph,
-         * meaning that there are no alternative terminal nodes (or rather
-         * SCCs) to which the process can travel and get "stuck".
+         * This method assumes that the associated Markov process eventually 
+         * reaches the target node from every other node in the graph with
+         * certainty, meaning that there are, e.g., no alternative terminal
+         * nodes to which the process can travel and get "stuck". 
          *
          * Since this method necessarily returns a vector with floating-point
-         * quantities, which may not be accommodated by `IOType`, this method 
+         * quantities, which may not be accommodated by `IOType`, this method
          * allows the specification of a new output type, `FloatIOType`.
-         * Moreover, since Eigen's QR/LU solvers requires a floating-point 
+         * Moreover, since Eigen's QR/LU solvers require a floating-point 
          * scalar type, this method also allows the specification of a new 
          * internal type, `FloatInternalType`.
          *
-         * @param target_id ID of target node. 
-         * @param method    Linear solver method for computing the mean first-passage
-         *                  time vector. 
-         * @returns Vector of mean first-passage times to the target node from
-         *          every node in the graph.
-         * @throws std::invalid_argument if solver method is not recognized. 
-         * @throws std::runtime_error    if target node does not exist.
+         * @param target_id ID of target node.
+         * @param r         Index of the desired moment. 
+         * @param method    Linear solver method for computing the r-th FPT
+         *                  moment vector. 
+         * @returns Vector of FPT moments to the target node from every node
+         *          in the graph. 
+         * @throws std::invalid_argument if solver method is not recognized.
+         * @throws std::runtime_error    if target node does not exist. 
          */
         template <typename FloatInternalType = InternalType, typename FloatIOType = IOType>
-        Matrix<FloatIOType, Dynamic, 1> getMeanFirstPassageTimesFromSolver(std::string target_id,
-                                                                           const SolverMethod method = QRDecomposition) 
+        Matrix<FloatIOType, Dynamic, 1> getFPTMomentsFromSolver(std::string target_id,
+                                                                const int r,
+                                                                const SolverMethod method = QRDecomposition)
         {
+            typedef Matrix<FloatInternalType, Dynamic, Dynamic> MatrixInternalType; 
+            typedef Matrix<FloatInternalType, Dynamic, 1>       VectorInternalType; 
+
             // Get the index of the target node
             Node* target = this->getNode(target_id);
             if (target == nullptr)
-            {
-                std::cout << "here?\n"; 
                 throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
-            }
             int t = 0;  
             for (auto it = this->order.begin(); it != this->order.end(); ++it)
             {
@@ -1253,54 +1257,52 @@ class LabeledDigraph
                     t = std::distance(this->order.begin(), it);
                     break;
                 }
-            } 
+            }
 
             // Get the Laplacian matrix of the graph and drop the row and column
-            // corresponding to the target node 
-            Matrix<FloatInternalType, Dynamic, Dynamic> laplacian = this->getColumnLaplacianDense().template cast<FloatInternalType>();
-            Matrix<FloatInternalType, Dynamic, Dynamic> sublaplacian(this->numnodes - 1, this->numnodes - 1);
-            int z = this->numnodes - 1 - t;
+            // corresponding to the target node
+            const int n = this->numnodes; 
+            MatrixInternalType laplacian = this->getColumnLaplacianDense().template cast<FloatInternalType>();
+            MatrixInternalType A(n - 1, n - 1);
             if (t == 0)
             {
-                sublaplacian = laplacian.block(1, 1, z, z);
+                A = laplacian(Eigen::seq(1, n - 1), Eigen::seq(1, n - 1));
             }
-            else if (z == 0)
+            else if (t == n - 1)
             {
-                sublaplacian = laplacian.block(0, 0, t, t); 
+                A = laplacian(Eigen::seq(0, n - 2), Eigen::seq(0, n - 2));
             }
             else 
-            { 
-                sublaplacian.block(0, 0, t, t) = laplacian.block(0, 0, t, t);
-                sublaplacian.block(0, t, t, z) = laplacian.block(0, t + 1, t, z); 
-                sublaplacian.block(t, 0, z, t) = laplacian.block(t + 1, 0, z, t); 
-                sublaplacian.block(t, t, z, z) = laplacian.block(t + 1, t + 1, z, z);
-            } 
-
-            // Get the left-hand matrix in the first-passage time linear system
-            Matrix<FloatInternalType, Dynamic, Dynamic> A = sublaplacian.transpose() * sublaplacian.transpose();
-
-            // Get the right-hand vector in the first-passage time linear system 
-            Matrix<FloatInternalType, Dynamic, 1> b = Matrix<FloatInternalType, Dynamic, 1>::Zero(this->numnodes - 1); 
-            for (unsigned i = 0; i < t; ++i)
             {
-                if (this->hasEdge(this->order[i], target))
-                    b(i) = this->edges[this->order[i]][target];
+                auto seq1 = Eigen::seq(0, t - 1); 
+                auto lseq2 = Eigen::seq(t, n - 2); 
+                auto rseq2 = Eigen::seq(t + 1, n - 1);
+                A(seq1, seq1) = laplacian(seq1, seq1);
+                A(seq1, lseq2) = laplacian(seq1, rseq2);
+                A(lseq2, seq1) = laplacian(rseq2, seq1); 
+                A(lseq2, lseq2) = laplacian(rseq2, rseq2);
             }
-            for (unsigned i = t + 1; i < this->numnodes; ++i)
-            {
-                if (this->hasEdge(this->order[i], target))
-                    b(i - 1) = this->edges[this->order[i]][target]; 
-            }
+            A = A.transpose().eval();
 
             // Solve the linear system with the specified method 
-            Matrix<FloatInternalType, Dynamic, 1> solution;
-            if (method == QRDecomposition)
+            VectorInternalType solution = VectorInternalType::Ones(n - 1);
+            if (method == LUDecomposition)
             {
-                solution = solveByQRD<FloatInternalType>(A, b);
+                // Obtain a full-pivot LU decomposition of the left-hand matrix
+                FullPivLU<MatrixInternalType> lu(A);
+
+                // Solve the iterated linear system
+                for (int i = 0; i < r; ++i)
+                    solution = lu.solve(solution).eval();
             }
-            else if (method == LUDecomposition)
+            else if (method == QRDecomposition)
             {
-                solution = solveByLUD<FloatInternalType>(A, b);
+                // Obtain a QR decomposition of the left-hand matrix
+                ColPivHouseholderQR<MatrixInternalType> qr(A);
+
+                // Solve the iterated linear system
+                for (int i = 0; i < r; ++i)
+                    solution = qr.solve(solution).eval(); 
             }
             else 
             {
@@ -1308,43 +1310,100 @@ class LabeledDigraph
                 ss << "Invalid linear system solution method specified: " << method; 
                 throw std::invalid_argument(ss.str());
             } 
+            solution *= boost::math::factorial<FloatInternalType>(r); 
 
-            // Return an augmented vector with the zero mean FPT from the 
-            // target node to itself
-            Matrix<FloatInternalType, Dynamic, 1> fpt_vec = Matrix<FloatInternalType, Dynamic, 1>::Zero(this->numnodes);
-            for (unsigned i = 0; i < t; ++i)
-                fpt_vec(i) = solution(i); 
-            for (unsigned i = t + 1; i < this->numnodes; ++i)
-                fpt_vec(i) = solution(i - 1);
+            // Return an augmented vector with the zero FPT from the target
+            // node to itself
+            VectorInternalType fpts = VectorInternalType::Zero(n);
+            for (int i = 0; i < t; ++i)
+                fpts(i) = solution(i); 
+            for (int i = t + 1; i < n; ++i)
+                fpts(i) = solution(i - 1);
 
-            return fpt_vec.template cast<FloatIOType>(); 
+            return fpts.template cast<FloatIOType>(); 
         }
 
         /**
-         * Compute the vector of *unconditional* mean first-passage times in 
-         * the Markov process associated with the graph from each node to the 
-         * target node, using the recurrence of Chebotarev and Agaev (Lin Alg
-         * Appl, 2002, Eqs.\ 17-18).
+         * Compute the vector of *unconditional* mean FPTs in the Markov 
+         * process associated with the graph from each node to the target node,
+         * using the given linear solver method.
          *
-         * This method assumes that the associated Markov process certainly 
-         * eventually reaches the target node from each node in the graph,
-         * meaning that there are no alternative terminal nodes (or rather
-         * SCCs) to which the process can travel and get "stuck".   
+         * This method calls `getFPTMomentsFromSolver()` and is subject to the
+         * same assumptions. 
          *
-         * Since this method necessarily returns a vector with floating-point
-         * quantities, which may not be accommodated by `IOType`, this method 
-         * allows the specification of a new output type, `FloatIOType`. 
+         * @param target_id ID of target node. 
+         * @param method    Linear solver method for computing the mean FPT 
+         *                  vector.
+         * @returns Vector of mean FPTs to the target node from every node in
+         *          the graph.
+         * @throws std::invalid_argument if solver method is not recognized. 
+         * @throws std::runtime_error    if target node does not exist.
+         */
+        template <typename FloatInternalType = InternalType, typename FloatIOType = IOType>
+        Matrix<FloatIOType, Dynamic, 1> getMeanFPTsFromSolver(std::string target_id,
+                                                              const SolverMethod method = QRDecomposition) 
+        {
+            return this->getFPTMomentsFromSolver<FloatInternalType, FloatIOType>(target_id, 1, method); 
+        }
+
+        /**
+         * Compute the vector of variances of the *unconditional* FPTs in the
+         * Markov process associated with the graph from each node to the 
+         * target node, using the given linear solver method. 
          *
-         * @param target_id ID of target node.
-         * @param sparse    If true, use a sparse Laplacian matrix in the calculations. 
-         * @returns Vector of mean first-passage times to the target node from
+         * This method calls `getFPTMomentsFromSolver()` and is subject to the
+         * same assumptions. 
+         *
+         * @param target_id ID of target node. 
+         * @param method    Linear solver method for computing the vector of 
+         *                  FPT variances.
+         * @returns Vector of variances for the FPT to the target node from
          *          every node in the graph.
+         * @throws std::invalid_argument if solver method is not recognized.
          * @throws std::runtime_error    if target node does not exist. 
          */
-        template <typename FloatIOType = IOType>
-        Matrix<FloatIOType, Dynamic, 1> getMeanFirstPassageTimesFromRecurrence(std::string target_id,
-                                                                               const bool sparse)
+        template <typename FloatInternalType = InternalType, typename FloatIOType = IOType>
+        Matrix<FloatIOType, Dynamic, 1> getFPTVariancesFromSolver(std::string target_id,
+                                                                  const SolverMethod method = QRDecomposition)
         {
+            Matrix<FloatInternalType, Dynamic, 1> v
+                = this->getFPTMomentsFromSolver<FloatInternalType, FloatInternalType>(target_id, 1, method);
+            Matrix<FloatInternalType, Dynamic, 1> w
+                = this->getFPTMomentsFromSolver<FloatInternalType, FloatInternalType>(target_id, 2, method); 
+            return (w - (v.array() * v.array()).matrix()).template cast<FloatIOType>(); 
+        }
+
+        /**
+         * Compute the vector of r-th moments for the *unconditional* first-
+         * passage times (FPTs) in the Markov process associated with the
+         * graph from each node to the target node, using the recurrence of
+         * Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18).
+         *
+         * This method assumes that the associated Markov process eventually 
+         * reaches the target node from every other node in the graph with
+         * certainty, meaning that there are, e.g., no alternative terminal
+         * nodes to which the process can travel and get "stuck". 
+         *
+         * Since this method necessarily returns a vector with floating-point
+         * quantities, which may not be accommodated by `IOType`, this method
+         * allows the specification of a new output type, `FloatIOType`.
+         *
+         * @param target_id ID of target node.
+         * @param r         Index of the desired moment.
+         * @param sparse    If true, use a sparse Laplacian matrix in the
+         *                  calculations. 
+         * @returns Vector of FPT moments to the target node from every node
+         *          in the graph. 
+         * @throws std::runtime_error if target node does not exist. 
+         */
+        template <typename FloatInternalType = InternalType, typename FloatIOType = IOType>
+        Matrix<FloatIOType, Dynamic, 1> getFPTMomentsFromRecurrence(std::string target_id,
+                                                                    const int r,
+                                                                    const bool sparse)
+        {
+            typedef Matrix<FloatInternalType, Dynamic, Dynamic> MatrixInternalType; 
+            typedef Matrix<FloatInternalType, Dynamic, 1>       VectorInternalType; 
+
             Node* target = this->getNode(target_id);
             if (target == nullptr)
             {
@@ -1352,7 +1411,8 @@ class LabeledDigraph
             }
 
             // Compute the required spanning forest matrices ...
-            Matrix<InternalType, Dynamic, Dynamic> forest_one_root, forest_two_roots; 
+            const int n = this->numnodes; 
+            MatrixInternalType forest1, forest2;
             if (sparse)
             {
                 // Instantiate a *sparse row-major* sub-Laplacian matrix
@@ -1360,24 +1420,24 @@ class LabeledDigraph
 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // spanning forest matrix
-                forest_two_roots = this->getSpanningForestMatrix(this->numnodes - 2, sublaplacian);
+                forest2 = this->getSpanningForestMatrix(n - 2, sublaplacian);
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root spanning forest (tree) matrix  
-                forest_one_root = chebotarevAgaevRecurrence<InternalType>(this->numnodes - 2, sublaplacian, forest_two_roots); 
+                forest1 = chebotarevAgaevRecurrence<InternalType>(n - 2, sublaplacian, forest2); 
             }
             else 
             {
                 // Instantiate a *dense* sub-Laplacian matrix
-                Matrix<InternalType, Dynamic, Dynamic> sublaplacian = this->getRowSublaplacianDense(target); 
+                MatrixInternalType sublaplacian = this->getRowSublaplacianDense(target); 
 
                 // Then run the Chebotarev-Agaev recurrence to get the two-root
                 // forest matrix 
-                forest_two_roots = this->getSpanningForestMatrix(this->numnodes - 2, sublaplacian);
+                forest2 = this->getSpanningForestMatrix(n - 2, sublaplacian);
 
                 // Then run the Chebotarev-Agaev recurrence one more time to get 
                 // the one-root forest (tree) matrix  
-                forest_one_root = chebotarevAgaevRecurrence<InternalType>(this->numnodes - 2, sublaplacian, forest_two_roots); 
+                forest1 = chebotarevAgaevRecurrence<InternalType>(n - 2, sublaplacian, forest2); 
             }
 
             // Get the index of the target node
@@ -1389,261 +1449,116 @@ class LabeledDigraph
                     t = std::distance(this->order.begin(), it);
                     break;
                 }
-            } 
+            }
 
-            // Now compute the desired mean first-passage times ...
-            int z = this->numnodes - 1 - t;
-            Matrix<InternalType, Dynamic, 1> mean_times = Matrix<InternalType, Dynamic, 1>::Zero(this->numnodes); 
+            // The (i,j)-th entry in the two-root forest matrix is the total 
+            // weight of all two-root forests in which j is a root and there
+            // is a path from i to j
+            //
+            // Since we assume that the target node is terminal, one of the
+            // roots must indeed be the target node
+            //
+            // This means that, for any i != t, the (i,t)-th entry in the
+            // matrix is the total weight of all two-root forests, and the
+            // (t,i)-th entry in the matrix is zero
+            //
+            // On the other hand, we are merely concerned with the forests
+            // in which the source node, i, has a path to the other root 
+            //
+            // Therefore, we remove the t-th row and column from the matrix
+            MatrixInternalType A(n - 1, n - 1); 
             if (t == 0)
             {
-                mean_times.tail(z) = forest_two_roots.block(1, 1, z, z).rowwise().sum(); 
+                A = forest2(Eigen::seq(1, n - 1), Eigen::seq(1, n - 1));
             }
-            else if (z == 0)
+            else if (t == n - 1)
             {
-                mean_times.head(t) = forest_two_roots.block(0, 0, t, t).rowwise().sum();
-            }
-            else
-            {
-                mean_times.head(t) = forest_two_roots.block(0, 0, t, t).rowwise().sum(); 
-                mean_times.head(t) += forest_two_roots.block(0, t + 1, t, z).rowwise().sum(); 
-                mean_times.tail(z) = forest_two_roots.block(t + 1, 0, z, t).rowwise().sum(); 
-                mean_times.tail(z) += forest_two_roots.block(t + 1, t + 1, z, z).rowwise().sum();
-            } 
-
-            return (mean_times / forest_one_root(t, t)).template cast<FloatIOType>(); 
-        }
-
-        /**
-         * Compute the vector of second moments of the *unconditional* 
-         * first-passage times in the Markov process associated with the
-         * graph from each node to the target node, using the given linear
-         * solver method.
-         *
-         * This method assumes that the associated Markov process certainly 
-         * eventually reaches the target node from each node in the graph,
-         * meaning that there are no alternative terminal nodes (or rather
-         * SCCs) to which the process can travel and get "stuck".
-         *
-         * Since this method necessarily returns a vector with floating-point
-         * quantities, which may not be accommodated by `IOType`, this method 
-         * allows the specification of a new output type, `FloatIOType`.
-         * Moreover, since Eigen's QR/LU solvers requires a floating-point 
-         * scalar type, this method also allows the specification of a new 
-         * internal type, `FloatInternalType`.
-         *
-         * @param target_id ID of target node. 
-         * @param method    Linear solver method for computing the vector of 
-         *                  first-passage time second moments.
-         * @returns Vector of first-passage time second moments to the target
-         *          node from every node in the graph.
-         * @throws std::invalid_argument if solver method is not recognized.
-         * @throws std::runtime_error    if target node does not exist. 
-         */
-        template <typename FloatInternalType = InternalType, typename FloatIOType = IOType>
-        Matrix<FloatIOType, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromSolver(std::string target_id, 
-                                                                                      const SolverMethod method = QRDecomposition)
-        {
-            // Get the index of the target node
-            Node* target = this->getNode(target_id);
-            if (target == nullptr)
-            {
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
-            }
-            int t = 0;  
-            for (auto it = this->order.begin(); it != this->order.end(); ++it)
-            {
-                if (*it == target)
-                {
-                    t = std::distance(this->order.begin(), it);
-                    break;
-                }
-            } 
-
-            // Get the row Laplacian matrix of the graph and drop the row and
-            // column corresponding to the target node 
-            Matrix<FloatInternalType, Dynamic, Dynamic> laplacian =
-                -this->getColumnLaplacianDense().transpose().template cast<FloatInternalType>();
-            Matrix<FloatInternalType, Dynamic, Dynamic> sublaplacian(this->numnodes - 1, this->numnodes - 1);
-            int z = this->numnodes - 1 - t;
-            if (t == 0)
-            {
-                sublaplacian = laplacian.block(1, 1, z, z);
-            }
-            else if (z == 0)
-            {
-                sublaplacian = laplacian.block(0, 0, t, t); 
+                A = forest2(Eigen::seq(0, n - 2), Eigen::seq(0, n - 2));
             }
             else 
-            { 
-                sublaplacian.block(0, 0, t, t) = laplacian.block(0, 0, t, t);
-                sublaplacian.block(0, t, t, z) = laplacian.block(0, t + 1, t, z); 
-                sublaplacian.block(t, 0, z, t) = laplacian.block(t + 1, 0, z, t); 
-                sublaplacian.block(t, t, z, z) = laplacian.block(t + 1, t + 1, z, z);
-            } 
-
-            // Get the left-hand matrix in the first-passage time linear system
-            Matrix<FloatInternalType, Dynamic, Dynamic> A = sublaplacian * sublaplacian * sublaplacian; 
-
-            // Get the right-hand vector in the first-passage time linear system 
-            Matrix<FloatInternalType, Dynamic, 1> b = Matrix<FloatInternalType, Dynamic, 1>::Zero(this->numnodes - 1); 
-            for (unsigned i = 0; i < t; ++i)
             {
-                if (this->hasEdge(this->order[i], target))
-                    b(i) = this->edges[this->order[i]][target];
+                auto seq1 = Eigen::seq(0, t - 1); 
+                auto lseq2 = Eigen::seq(t, n - 2); 
+                auto rseq2 = Eigen::seq(t + 1, n - 1);
+                A(seq1, seq1) = forest2(seq1, seq1);
+                A(seq1, lseq2) = forest2(seq1, rseq2);
+                A(lseq2, seq1) = forest2(rseq2, seq1); 
+                A(lseq2, lseq2) = forest2(rseq2, rseq2);
             }
-            for (unsigned i = t + 1; i < this->numnodes; ++i)
+
+            // Normalize the entries in the reduced two-root forest matrix 
+            // by the total weight of all trees, in which the target node 
+            // must be the lone root since it is terminal 
+            A /= forest1(t, t); 
+
+            // Get the r-th power of the normalized two-root forest matrix
+            //
+            // We assume here that r is small, so that iterated matrix
+            // multiplication is sufficient
+            MatrixInternalType Ar = MatrixInternalType::Ones(n - 1, n - 1);
+            for (int i = 0; i < r; ++i)
+                Ar *= A;
+
+            // Now read off the desired FPT moments 
+            VectorInternalType fpts = VectorInternalType::Zero(this->numnodes);
+            for (int i = 0; i < this->numnodes; ++i)
             {
-                if (this->hasEdge(this->order[i], target))
-                    b(i - 1) = this->edges[this->order[i]][target]; 
+                if (i != t)
+                    fpts(i) = Ar(i, t); 
             }
+            fpts *= boost::math::factorial<FloatInternalType>(r); 
 
-            // Solve the linear system with the specified method 
-            Matrix<FloatInternalType, Dynamic, 1> solution; 
-            if (method == QRDecomposition)
-            { 
-                solution = solveByQRD<FloatInternalType>(A, b);
-            }
-            else if (method == LUDecomposition)
-            { 
-                solution = solveByLUD<FloatInternalType>(A, b);
-            }
-            else
-            {
-                std::stringstream ss; 
-                ss << "Invalid linear system solution method specified: " << method; 
-                throw std::invalid_argument(ss.str());
-            } 
-
-            // Return an augmented vector with the zero mean FPT from the 
-            // target node to itself
-            Matrix<FloatInternalType, Dynamic, 1> fpt_vec = Matrix<FloatInternalType, Dynamic, 1>::Zero(this->numnodes);
-            for (unsigned i = 0; i < t; ++i)
-                fpt_vec(i) = solution(i); 
-            for (unsigned i = t + 1; i < this->numnodes; ++i)
-                fpt_vec(i) = solution(i - 1);
-
-            return (fpt_vec * 2).template cast<FloatIOType>(); 
+            return fpts.template cast<FloatIOType>(); 
         }
 
         /**
-         * Compute the vector of second moments of the *unconditional* 
-         * first-passage times in the Markov process associated with the
-         * graph from each node to the target node, using the recurrence 
-         * of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18).
+         * Compute the vector of *unconditional* mean FPTs in the Markov
+         * process associated with the graph from each node to the target
+         * node, using the recurrence of Chebotarev and Agaev (Lin Alg Appl,
+         * 2002, Eqs.\ 17-18).
          *
-         * This method assumes that the associated Markov process certainly 
-         * eventually reaches the target node from each node in the graph,
-         * meaning that there are no alternative terminal nodes (or rather
-         * SCCs) to which the process can travel and get "stuck".
-         *
-         * Since this method necessarily returns a vector with floating-point
-         * quantities, which may not be accommodated by `IOType`, this method 
-         * allows the specification of a third output type, `FloatIOType`. 
+         * This method calls `getFPTMomentsFromRecurrence()` and is subject to
+         * the same assumptions. 
          *
          * @param target_id ID of target node.
-         * @param sparse    If true, use a sparse Laplacian matrix in the calculations. 
-         * @returns Vector of first-passage time second moments to the target
-         *          node from every node in the graph.
-         * @throws std::runtime_error    if target node does not exist. 
+         * @param sparse    If true, use a sparse Laplacian matrix in the
+         *                  calculations. 
+         * @returns Vector of mean FPTs to the target node from every node in
+         *          the graph.
+         * @throws std::runtime_error if target node does not exist. 
          */
         template <typename FloatIOType = IOType>
-        Matrix<FloatIOType, Dynamic, 1> getSecondMomentsOfFirstPassageTimesFromRecurrence(std::string target_id,
-                                                                                          const bool sparse)
+        Matrix<FloatIOType, Dynamic, 1> getMeanFPTsFromRecurrence(std::string target_id,
+                                                                  const bool sparse)
         {
-            Node* target = this->getNode(target_id);
-            if (target == nullptr)
-            {
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
-            }
+            return getFPTMomentsFromRecurrence<FloatIOType>(target_id, 1, sparse); 
+        }
 
-            // Compute the required spanning forest matrices ...
-            Matrix<InternalType, Dynamic, Dynamic> forest_one_root, forest_two_roots;
-            if (sparse)
-            {
-                // Instantiate a *sparse row-major* sub-Laplacian matrix
-                SparseMatrix<InternalType, RowMajor> sublaplacian = this->getRowSublaplacianSparse(target);  
-                
-                // Then run the Chebotarev-Agaev recurrence to get the two-root
-                // forest matrix 
-                forest_two_roots = this->getSpanningForestMatrix(this->numnodes - 2, sublaplacian);
-
-                // Then run the Chebotarev-Agaev recurrence one more time to get 
-                // the one-root forest (tree) matrix  
-                forest_one_root = chebotarevAgaevRecurrence<InternalType>(this->numnodes - 2, sublaplacian, forest_two_roots);
-            }
-            else 
-            {
-                // Instantiate a *dense* sub-Laplacian matrix
-                Matrix<InternalType, Dynamic, Dynamic> sublaplacian = this->getRowSublaplacianDense(target); 
-
-                // Then run the Chebotarev-Agaev recurrence to get the two-root
-                // forest matrix 
-                forest_two_roots = this->getSpanningForestMatrix(this->numnodes - 2, sublaplacian);
-
-                // Then run the Chebotarev-Agaev recurrence one more time to get 
-                // the one-root forest (tree) matrix  
-                forest_one_root = chebotarevAgaevRecurrence<InternalType>(this->numnodes - 2, sublaplacian, forest_two_roots);
-            }
-
-            // Get the index of the target node
-            int t = 0;  
-            for (auto it = this->order.begin(); it != this->order.end(); ++it)
-            {
-                if (*it == target)
-                {
-                    t = std::distance(this->order.begin(), it);
-                    break;
-                }
-            } 
-            int z = this->numnodes - 1 - t; 
-
-            // Finally compute the desired second moments ...
-            Matrix<InternalType, Dynamic, 1> second_moments = Matrix<InternalType, Dynamic, 1>::Zero(this->numnodes);
-
-            // 1) Get the sub-matrix of the two-root forest matrix obtained by deleting 
-            // the row and column corresponding to the target node 
-            Matrix<InternalType, Dynamic, Dynamic> forest_two_roots_sub =
-                Matrix<InternalType, Dynamic, Dynamic>::Zero(this->numnodes - 1, this->numnodes - 1);
-            if (t == 0)
-            {
-                forest_two_roots_sub = forest_two_roots.block(1, 1, z, z); 
-            }
-            else if (z == 0)
-            {
-                forest_two_roots_sub = forest_two_roots.block(0, 0, t, t); 
-            }
-            else 
-            {
-                forest_two_roots_sub.block(0, 0, t, t) = forest_two_roots.block(0, 0, t, t); 
-                forest_two_roots_sub.block(0, t, t, z) = forest_two_roots.block(0, t + 1, t, z); 
-                forest_two_roots_sub.block(t, 0, z, t) = forest_two_roots.block(t + 1, 0, z, t); 
-                forest_two_roots_sub.block(t, t, z, z) = forest_two_roots.block(t + 1, t + 1, z, z); 
-            }
-
-            // 2) Get the square of this sub-matrix 
-            Matrix<InternalType, Dynamic, Dynamic> forest_two_roots_sub_squared = forest_two_roots_sub * forest_two_roots_sub;
-
-            // 3) The second moments of each FPT to the target node is given by the
-            // corresponding row sum in this squared sub-matrix
-            if (t == 0)
-            {
-                second_moments.tail(z) = forest_two_roots_sub_squared.block(1, 1, z, z).rowwise().sum(); 
-            }
-            else if (z == 0)
-            {
-                second_moments.head(t) = forest_two_roots_sub_squared.block(0, 0, t, t).rowwise().sum(); 
-            }
-            else 
-            {
-                second_moments.head(t) = forest_two_roots_sub_squared.block(0, 0, t, t).rowwise().sum(); 
-                second_moments.head(t) += forest_two_roots_sub_squared.block(0, t + 1, t, z).rowwise().sum(); 
-                second_moments.tail(z) = forest_two_roots_sub_squared.block(t + 1, 0, z, t).rowwise().sum(); 
-                second_moments.tail(z) += forest_two_roots_sub_squared.block(t + 1, t + 1, z, z).rowwise().sum();
-            } 
-
-            return (2 * second_moments).template cast<FloatIOType>() / (
-                static_cast<FloatIOType>(forest_one_root(t, t) * forest_one_root(t, t))
-            );
+        /**
+         * Compute the vector of variances of the *unconditional* FPTs in the
+         * Markov process associated with the graph from each node to the 
+         * target node, using the recurrence of Chebotarev and Agaev (Lin Alg
+         * Appl, 2002, Eqs.\ 17-18).
+         *
+         * This method calls `getFPTMomentsFromRecurrence()` and is subject to
+         * the same assumptions. 
+         *
+         * @param target_id ID of target node.
+         * @param sparse    If true, use a sparse Laplacian matrix in the
+         *                  calculations. 
+         * @returns Vector of first-passage time second moments to the target
+         *          node from every node in the graph.
+         * @throws std::runtime_error if target node does not exist. 
+         */
+        template <typename FloatIOType = IOType>
+        Matrix<FloatIOType, Dynamic, 1> getFPTVariancesFromRecurrence(std::string target_id,
+                                                                      const bool sparse)
+        {
+            Matrix<InternalType, Dynamic, 1> v
+                = this->getFPTMomentsFromRecurrence<InternalType, InternalType>(target_id, 1, sparse);
+            Matrix<InternalType, Dynamic, 1> w
+                = this->getFPTMomentsFromRecurrence<InternalType, InternalType>(target_id, 2, sparse);
+            return (w - (v.array() * v.array()).matrix()).template cast<FloatIOType>(); 
         }
 
         /**
