@@ -15,7 +15,7 @@
  *     Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  * **Last updated:**
- *     7/10/2024
+ *     8/3/2024
  */
 
 namespace py = pybind11;
@@ -379,8 +379,6 @@ void declareLabeledDigraphClass(py::module& m, const std::string& class_name)
     :type target_id: str
     :param r: Index of the desired moment.
     :type r: int
-    :param sparse: If True, use a sparse Laplacian matrix in the calculations.
-    :type sparse: bool
     :return: Vector of `r`-th moments for the FPT to the target node from
         every node in the graph.
     :rtype: numpy.ndarray 
@@ -388,8 +386,7 @@ void declareLabeledDigraphClass(py::module& m, const std::string& class_name)
     :raise RuntimeError: If target node does not exist.
 )delim",
             py::arg("target_id"),
-            py::arg("r"),
-            py::arg("sparse")
+            py::arg("r")
         )
         .def("get_mean_fpts_from_recurrence",
             &LabeledDigraph<T, double>::template getMeanFPTsFromRecurrence<double>,
@@ -405,15 +402,12 @@ void declareLabeledDigraphClass(py::module& m, const std::string& class_name)
 
     :param target_id: ID of target node.
     :type target_id: str
-    :param sparse: If True, use a sparse Laplacian matrix in the calculations.
-    :type sparse: bool
     :return: Vector of mean FPTs to the target node from every node in the
         graph.
     :rtype: numpy.ndarray 
     :raise RuntimeError: If target node does not exist.
 )delim",
-            py::arg("target_id"),
-            py::arg("sparse") 
+            py::arg("target_id")
         )
         .def("get_fpt_variances_from_recurrence",
             &LabeledDigraph<T, double>::template getFPTVariancesFromRecurrence<double>,
@@ -430,15 +424,12 @@ void declareLabeledDigraphClass(py::module& m, const std::string& class_name)
 
     :param target_id: ID of target node.
     :type target_id: str
-    :param sparse: If True, use a sparse Laplacian matrix in the calculations.
-    :type sparse: bool
     :return: Vector of variances of the FPTs to the target node from every 
         node in the graph.
     :rtype: numpy.ndarray 
     :raise RuntimeError: If target node does not exist.
 )delim",
-            py::arg("target_id"),
-            py::arg("sparse") 
+            py::arg("target_id")
         )
         .def("simulate",
             &LabeledDigraph<T, double>::simulate,
