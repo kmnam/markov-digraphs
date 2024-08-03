@@ -6,7 +6,7 @@
  *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  *  **Last updated:** 
- *      7/10/2024
+ *      8/3/2024
  */
 
 #ifndef LABELED_DIGRAPHS_HPP
@@ -184,9 +184,13 @@ class LabeledDigraph
 
             // Check that both nodes exist 
             if (source == nullptr)
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
+                throw std::runtime_error(
+                    "Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node"
+                );
             if (target == nullptr)
-                throw std::runtime_error("Specified target node does not exist; use LabeledDigraph<...>::addNode() to add node");
+                throw std::runtime_error(
+                    "Specified target node does not exist; use LabeledDigraph<...>::addNode() to add node"
+                );
 
             // Check that the edge exists 
             auto it = this->edges[source].find(target);
@@ -245,7 +249,9 @@ class LabeledDigraph
 
             // Check that the given node exists
             if (source == nullptr)
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
+                throw std::runtime_error(
+                    "Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node"
+                );
 
             // Run through all nodes in this->order ...
             for (auto&& node : this->order)
@@ -331,35 +337,32 @@ class LabeledDigraph
         }
 
         /**
-         * Return the *column Laplacian* matrix, with the nodes ordered
-         * according to the graph's canonical ordering of nodes, as a *dense*
-         * matrix.
+         * Return the *row Laplacian* matrix, according to the graph's canonical
+         * ordering of nodes, as a *dense* matrix.
          *
-         * @returns Laplacian matrix of the graph (as a dense matrix). 
+         * @returns Laplacian matrix of the graph (as a dense matrix).  
          */
-        Matrix<InternalType, Dynamic, Dynamic> getColumnLaplacianDense()
+        Matrix<InternalType, Dynamic, Dynamic> getRowLaplacianDense()
         {
             // Initialize a zero matrix with #rows = #cols = #nodes
             Matrix<InternalType, Dynamic, Dynamic> laplacian
                 = Matrix<InternalType, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
 
             // Populate the off-diagonal entries of the matrix first: 
-            // (i,j)-th entry is the label of the edge j -> i
-            unsigned i = 0;
+            // (i, j)-th entry is the *negative* of the label of the edge i -> j
+            int i = 0;
             for (auto&& v : this->order)
             {
-                unsigned j = 0;
+                int j = 0;
                 for (auto&& w : this->order)
                 {
                     if (i != j)
                     {
-                        // Get the edge label for j -> i
-                        if (this->edges[w].find(v) != this->edges[w].end())
+                        // Get the edge label for i -> j
+                        if (this->edges[v].find(w) != this->edges[v].end())
                         {
-                            InternalType label = this->edges[w][v];
-                            laplacian(i,j) = label;
-                            if (laplacian(i,j) < 0)
-                                throw std::runtime_error("Negative edge label found");
+                            InternalType label = this->edges[v][w];
+                            laplacian(i, j) = -label;
                         }
                     }
                     j++;
@@ -368,26 +371,25 @@ class LabeledDigraph
             }
 
             // Populate diagonal entries as negative sums of the off-diagonal
-            // entries in each column
-            for (unsigned i = 0; i < this->numnodes; ++i)
-                laplacian(i, i) = -(laplacian.col(i).sum()); 
+            // entries in each row
+            for (int i = 0; i < this->numnodes; ++i)
+                laplacian(i, i) = -(laplacian.row(i).sum()); 
 
-            return laplacian;
+            return laplacian; 
         }
 
         /**
          * Return the *row Laplacian* matrix, according to the graph's canonical
          * ordering of nodes, as a *compressed row-major sparse* matrix. 
          *
-         * @returns      Laplacian matrix of the graph (as a sparse row-major
-         *               matrix). 
+         * @returns Laplacian matrix of the graph (as a sparse row-major matrix). 
          */
         SparseMatrix<InternalType, RowMajor> getRowLaplacianSparse()
         {
             // Initialize a zero matrix with #rows = #cols = #nodes
             SparseMatrix<InternalType, RowMajor> laplacian(this->numnodes, this->numnodes); 
 
-            // Populate the entries of the matrix: the off-diagonal (i,j)-th  
+            // Populate the entries of the matrix: the off-diagonal (i, j)-th  
             // entry is the *negative* of the label of the edge i -> j, and 
             // the diagonal entries are set so that each *row* sum is zero 
             std::vector<Triplet<InternalType> > laplacian_triplets; 
@@ -432,89 +434,25 @@ class LabeledDigraph
          */
         Matrix<InternalType, Dynamic, Dynamic> getRowSublaplacianDense(Node* target)
         {
-            // Initialize a zero matrix with #rows = #cols = #nodes
-            Matrix<InternalType, Dynamic, Dynamic> laplacian
-                = Matrix<InternalType, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
+            // Get the row Laplacian matrix ... 
+            Matrix<InternalType, Dynamic, Dynamic> laplacian = this->getRowLaplacianDense();
 
-            // Populate the off-diagonal entries of the matrix first: 
-            // (i,j)-th entry is the *negative* of the label of the edge i -> j
-            unsigned i = 0;
-            for (auto&& v : this->order)
-            {
-                unsigned j = 0;
-                for (auto&& w : this->order)
-                {
-                    if (i != j)
-                    {
-                        // Get the edge label for i -> j, omitting all edges
-                        // for which i is the given target node 
-                        if (v != target && this->edges[v].find(w) != this->edges[v].end())
-                        {
-                            InternalType label = this->edges[v][w];
-                            laplacian(i, j) = -label;
-                        }
-                    }
-                    j++;
-                }
-                i++;
-            }
+            // ... identify the index of the target node ... 
+            const int t = std::distance(
+                this->order.begin(), std::find(this->order.begin(), this->order.end(), target)
+            );
 
-            // Populate diagonal entries as negative sums of the off-diagonal
-            // entries in each row
-            for (unsigned i = 0; i < this->numnodes; ++i)
-                laplacian(i, i) = -(laplacian.row(i).sum()); 
+            // ... and take the corresponding sub-matrix 
+            Matrix<InternalType, Dynamic, Dynamic> sublaplacian(this->numnodes - 1, this->numnodes - 1);
+            auto seq1 = Eigen::seq(0, t - 1); 
+            auto lseq2 = Eigen::seq(t, this->numnodes - 2); 
+            auto rseq2 = Eigen::seq(t + 1, this->numnodes - 1); 
+            sublaplacian(seq1, seq1) = laplacian(seq1, seq1);
+            sublaplacian(seq1, lseq2) = laplacian(seq1, rseq2); 
+            sublaplacian(lseq2, seq1) = laplacian(rseq2, seq1); 
+            sublaplacian(lseq2, lseq2) = laplacian(rseq2, rseq2);
 
-            return laplacian; 
-        }
-
-        /**
-         * Return the *row "sub-Laplacian"* matrix obtained by removing the 
-         * edges outgoing from the given "target" node, according to the graph's
-         * canonical ordering of nodes, as a *compressed row-major sparse* matrix.
-         *
-         * @param target Pointer to node whose outgoing edges are to be removed. 
-         * @returns      Laplacian matrix of the graph (as a compressed row-major
-         *               sparse matrix). 
-         */
-        SparseMatrix<InternalType, RowMajor> getRowSublaplacianSparse(Node* target)
-        {
-            // Initialize a zero matrix with #rows = #cols = #nodes
-            SparseMatrix<InternalType, RowMajor> laplacian(this->numnodes, this->numnodes); 
-
-            // Populate the entries of the matrix: the off-diagonal (i,j)-th  
-            // entry is the *negative* of the label of the edge i -> j, and 
-            // the diagonal entries are set so that each *row* sum is zero 
-            std::vector<Triplet<InternalType> > laplacian_triplets; 
-            unsigned i = 0;
-            for (auto&& v : this->order)
-            {
-                std::vector<InternalType> row_entries;    // All nonzero off-diagonal entries in i-th row
-                unsigned j = 0;
-                for (auto&& w : this->order)
-                {
-                    if (i != j)
-                    {
-                        // Get the edge label for i -> j, omitting all edges 
-                        // for which i is the given target node 
-                        if (v != target && this->edges[v].find(w) != this->edges[v].end())
-                        {
-                            InternalType label = this->edges[v][w]; 
-                            laplacian_triplets.push_back(Triplet<InternalType>(i, j, -label));
-                            row_entries.push_back(label);  
-                        }
-                    }
-                    j++;
-                }
-                // Compute the negative of the i-th row sum
-                InternalType row_sum = 0;
-                for (const InternalType entry : row_entries)
-                    row_sum += entry;
-                laplacian_triplets.push_back(Triplet<InternalType>(i, i, row_sum)); 
-                i++;
-            }
-            laplacian.setFromTriplets(laplacian_triplets.begin(), laplacian_triplets.end());
-
-            return laplacian; 
+            return sublaplacian; 
         }
 
     public:
@@ -986,7 +924,7 @@ class LabeledDigraph
                 = Matrix<InternalType, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
 
             // Populate the off-diagonal entries of the matrix first: 
-            // (i,j)-th entry is the label of the edge j -> i
+            // (i, j)-th entry is the label of the edge j -> i
             unsigned i = 0;
             for (auto&& v : this->order)
             {
@@ -999,8 +937,8 @@ class LabeledDigraph
                         if (this->edges[w].find(v) != this->edges[w].end())
                         {
                             InternalType label = this->edges[w][v];
-                            laplacian(i,j) = label;
-                            if (laplacian(i,j) < 0)
+                            laplacian(i, j) = label;
+                            if (laplacian(i, j) < 0)
                                 throw std::runtime_error("Negative edge label found");
                         }
                     }
@@ -1036,7 +974,7 @@ class LabeledDigraph
                 = Matrix<InternalType, Dynamic, Dynamic>::Zero(this->numnodes, this->numnodes);
 
             // Populate the off-diagonal entries of the matrix first: 
-            // (i,j)-th entry is the *negative* of the label of the edge i -> j
+            // (i, j)-th entry is the *negative* of the label of the edge i -> j
             unsigned i = 0;
             for (auto&& v : this->order)
             {
@@ -1087,7 +1025,7 @@ class LabeledDigraph
             // Initialize a zero matrix with #rows = #cols = #nodes
             SparseMatrix<InternalType, RowMajor> laplacian(this->numnodes, this->numnodes); 
 
-            // Populate the entries of the matrix: the off-diagonal (i,j)-th  
+            // Populate the entries of the matrix: the off-diagonal (i, j)-th  
             // entry is the *negative* of the label of the edge i -> j, and 
             // the diagonal entries are set so that each *row* sum is zero 
             std::vector<Triplet<InternalType> > laplacian_triplets; 
@@ -1152,7 +1090,7 @@ class LabeledDigraph
         template <typename FloatInternalType = InternalType, typename FloatIOType = IOType>
         Matrix<FloatIOType, Dynamic, 1> getSteadyStateFromSVD()
         {
-            Matrix<FloatInternalType, Dynamic, Dynamic> laplacian = this->getColumnLaplacianDense().template cast<FloatInternalType>();
+            Matrix<FloatInternalType, Dynamic, Dynamic> laplacian = this->getLaplacian().template cast<FloatInternalType>(); 
             
             // Obtain the steady-state vector of the Laplacian matrix
             Matrix<FloatInternalType, Dynamic, 1> steady_state;
@@ -1202,7 +1140,7 @@ class LabeledDigraph
             } 
             else
             {
-                Matrix<InternalType, Dynamic, Dynamic> laplacian = -this->getColumnLaplacianDense().transpose(); 
+                Matrix<InternalType, Dynamic, Dynamic> laplacian = this->getRowLaplacianDense(); 
                 tree_matrix = this->getSpanningForestMatrix(this->numnodes - 1, laplacian);  
             } 
 
@@ -1248,44 +1186,19 @@ class LabeledDigraph
             // Get the index of the target node
             Node* target = this->getNode(target_id);
             if (target == nullptr)
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
-            int t = 0;  
-            for (auto it = this->order.begin(); it != this->order.end(); ++it)
-            {
-                if (*it == target)
-                {
-                    t = std::distance(this->order.begin(), it);
-                    break;
-                }
-            }
+                throw std::runtime_error(
+                    "Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node"
+                );
+            const int t = std::distance(
+                this->order.begin(), std::find(this->order.begin(), this->order.end(), target)
+            );
 
             // Get the Laplacian matrix of the graph and drop the row and column
             // corresponding to the target node
-            const int n = this->numnodes; 
-            MatrixInternalType laplacian = this->getColumnLaplacianDense().template cast<FloatInternalType>();
-            MatrixInternalType A(n - 1, n - 1);
-            if (t == 0)
-            {
-                A = laplacian(Eigen::seq(1, n - 1), Eigen::seq(1, n - 1));
-            }
-            else if (t == n - 1)
-            {
-                A = laplacian(Eigen::seq(0, n - 2), Eigen::seq(0, n - 2));
-            }
-            else 
-            {
-                auto seq1 = Eigen::seq(0, t - 1); 
-                auto lseq2 = Eigen::seq(t, n - 2); 
-                auto rseq2 = Eigen::seq(t + 1, n - 1);
-                A(seq1, seq1) = laplacian(seq1, seq1);
-                A(seq1, lseq2) = laplacian(seq1, rseq2);
-                A(lseq2, seq1) = laplacian(rseq2, seq1); 
-                A(lseq2, lseq2) = laplacian(rseq2, rseq2);
-            }
-            A = A.transpose().eval();
+            MatrixInternalType A = this->getRowSublaplacianDense(target).template cast<FloatInternalType>(); 
 
             // Solve the linear system with the specified method 
-            VectorInternalType solution = VectorInternalType::Ones(n - 1);
+            VectorInternalType solution = VectorInternalType::Ones(this->numnodes - 1);
             if (method == LUDecomposition)
             {
                 // Obtain a full-pivot LU decomposition of the left-hand matrix
@@ -1312,13 +1225,18 @@ class LabeledDigraph
             } 
             solution *= boost::math::factorial<FloatInternalType>(r); 
 
-            // Return an augmented vector with the zero FPT from the target
+            // Return an augmented vector with the FPT moment from the target
             // node to itself
-            VectorInternalType fpts = VectorInternalType::Zero(n);
+            //
+            // Note that, if r == 0, then the moment from the target node to
+            // itself is 1, not 0
+            VectorInternalType fpts = VectorInternalType::Zero(this->numnodes);
             for (int i = 0; i < t; ++i)
-                fpts(i) = solution(i); 
-            for (int i = t + 1; i < n; ++i)
+                fpts(i) = solution(i);
+            for (int i = t + 1; i < this->numnodes; ++i)
                 fpts(i) = solution(i - 1);
+            if (r == 0)
+                fpts(t) = 1;
 
             return fpts.template cast<FloatIOType>(); 
         }
@@ -1390,80 +1308,60 @@ class LabeledDigraph
          *
          * @param target_id ID of target node.
          * @param r         Index of the desired moment.
-         * @param sparse    If true, use a sparse Laplacian matrix in the
-         *                  calculations. 
          * @returns Vector of FPT moments to the target node from every node
          *          in the graph. 
          * @throws std::runtime_error if target node does not exist. 
          */
         template <typename FloatIOType = IOType>
         Matrix<FloatIOType, Dynamic, 1> getFPTMomentsFromRecurrence(std::string target_id,
-                                                                    const int r,
-                                                                    const bool sparse)
+                                                                    const int r)
         {
             typedef Matrix<InternalType, Dynamic, Dynamic> MatrixInternalType; 
-            typedef Matrix<InternalType, Dynamic, 1>       VectorInternalType; 
+            typedef Matrix<InternalType, Dynamic, 1>       VectorInternalType;
 
+            // If r == 0, then return the all-ones vector 
+            if (r == 0)
+                return Matrix<FloatIOType, Dynamic, 1>::Ones(this->numnodes);
+
+            // Assuming that r > 0, get the target node 
             Node* target = this->getNode(target_id);
             if (target == nullptr)
-            {
-                throw std::runtime_error("Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node");
-            }
+                throw std::runtime_error(
+                    "Specified source node does not exist; use LabeledDigraph<...>::addNode() to add node"
+                );
 
             // Compute the required spanning forest matrices ...
+            //
+            // Instantiate the corresponding Laplacian matrix
+            MatrixInternalType laplacian = this->getRowLaplacianDense();
+
+            // Then run the Chebotarev-Agaev recurrence to get the two-root
+            // forest matrix
             const int n = this->numnodes; 
-            MatrixInternalType forest1, forest2;
-            if (sparse)
-            {
-                // Instantiate a *sparse row-major* sub-Laplacian matrix
-                SparseMatrix<InternalType, RowMajor> sublaplacian = this->getRowSublaplacianSparse(target);  
+            MatrixInternalType forest2 = this->getSpanningForestMatrix(n - 2, laplacian);
 
-                // Then run the Chebotarev-Agaev recurrence to get the two-root
-                // spanning forest matrix
-                forest2 = this->getSpanningForestMatrix(n - 2, sublaplacian);
-
-                // Then run the Chebotarev-Agaev recurrence one more time to get 
-                // the one-root spanning forest (tree) matrix  
-                forest1 = chebotarevAgaevRecurrence<InternalType>(n - 2, sublaplacian, forest2); 
-            }
-            else 
-            {
-                // Instantiate a *dense* sub-Laplacian matrix
-                MatrixInternalType sublaplacian = this->getRowSublaplacianDense(target); 
-
-                // Then run the Chebotarev-Agaev recurrence to get the two-root
-                // forest matrix 
-                forest2 = this->getSpanningForestMatrix(n - 2, sublaplacian);
-
-                // Then run the Chebotarev-Agaev recurrence one more time to get 
-                // the one-root forest (tree) matrix  
-                forest1 = chebotarevAgaevRecurrence<InternalType>(n - 2, sublaplacian, forest2); 
-            }
+            // Then run the Chebotarev-Agaev recurrence one more time to get 
+            // the one-root forest (tree) matrix  
+            MatrixInternalType forest1 = chebotarevAgaevRecurrence<InternalType>(n - 2, laplacian, forest2);
 
             // Get the index of the target node
-            int t = 0;  
-            for (auto it = this->order.begin(); it != this->order.end(); ++it)
-            {
-                if (*it == target)
-                {
-                    t = std::distance(this->order.begin(), it);
-                    break;
-                }
-            }
+            const int t = std::distance(
+                this->order.begin(), std::find(this->order.begin(), this->order.end(), target)
+            );
 
-            // The (i,j)-th entry in the two-root forest matrix is the total 
+            // The (i, j)-th entry in the two-root forest matrix is the total 
             // weight of all two-root forests in which j is a root and there
             // is a path from i to j
             //
             // Since we assume that the target node is terminal, one of the
             // roots must indeed be the target node
             //
-            // This means that, for any i != t, the (i,t)-th entry in the
+            // This means that, for any i != t, the (i, t)-th entry in the
             // matrix is the total weight of all two-root forests, and the
-            // (t,i)-th entry in the matrix is zero
+            // (t, i)-th entry in the matrix is zero
             //
             // On the other hand, we are merely concerned with the forests
-            // in which the source node, i, has a path to the other root 
+            // in which the source node, i, has a path to the other root, j 
             //
             // Therefore, we remove the t-th row and column from the matrix
             MatrixInternalType A(n - 1, n - 1); 
@@ -1489,24 +1387,31 @@ class LabeledDigraph
             // Normalize the entries in the reduced two-root forest matrix 
             // by the total weight of all trees, in which the target node 
             // must be the lone root since it is terminal 
-            A /= forest1(t, t); 
+            A /= forest1(t, t);
 
             // Get the r-th power of the normalized two-root forest matrix
             //
             // We assume here that r is small, so that iterated matrix
             // multiplication is sufficient
-            MatrixInternalType Ar = MatrixInternalType::Ones(n - 1, n - 1);
+            MatrixInternalType Ar = MatrixInternalType::Identity(n - 1, n - 1);
             for (int i = 0; i < r; ++i)
                 Ar *= A;
 
-            // Now read off the desired FPT moments 
+            // The FPT moment from i to t is the i-th row sum in Ar
+            //
+            // Now read off the FPT moments, plus the FPT moment from the
+            // target node to itself (note that, here, r > 0 and so this 
+            // moment is zero)
             VectorInternalType fpts = VectorInternalType::Zero(this->numnodes);
             for (int i = 0; i < this->numnodes; ++i)
             {
-                if (i != t)
-                    fpts(i) = Ar(i, t); 
+                if (i < t)
+                    fpts(i) = Ar.row(i).sum();
+                else if (i > t)    // Account for index mismatch with Ar
+                    fpts(i) = Ar.row(i - 1).sum(); 
+                // Do nothing if i == t
             }
-            fpts *= boost::math::factorial<InternalType>(r); 
+            fpts *= boost::math::factorial<InternalType>(r);
 
             return fpts.template cast<FloatIOType>(); 
         }
