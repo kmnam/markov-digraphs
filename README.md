@@ -1,6 +1,6 @@
 # MarkovDigraphs and PyGraph
 
-## Directed graphs as representations of Markov processes in the linear framework
+## Directed labeled graphs as representations of Markov processes in the linear framework
 
 **Author: Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School**
 
@@ -16,6 +16,8 @@ for further background and a survey of its capabilities.
 The classes that comprise **MarkovDigraphs** are further available for use in
 Python 3, as [**PyGraph**](https://kmnam.github.io/pygraph-docs/), through 
 bindings implemented using [pybind11](https://pybind11.readthedocs.io/en/stable/).
+
+## Installation
 
 MarkovDigraphs requires the following:
 - [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) (version >= 3.4)
