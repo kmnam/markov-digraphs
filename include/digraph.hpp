@@ -1433,10 +1433,9 @@ class LabeledDigraph
          * @throws std::runtime_error if target node does not exist. 
          */
         template <typename FloatIOType = IOType>
-        Matrix<FloatIOType, Dynamic, 1> getMeanFPTsFromRecurrence(std::string target_id,
-                                                                  const bool sparse)
+        Matrix<FloatIOType, Dynamic, 1> getMeanFPTsFromRecurrence(std::string target_id)
         {
-            return getFPTMomentsFromRecurrence<FloatIOType>(target_id, 1, sparse); 
+            return getFPTMomentsFromRecurrence<FloatIOType>(target_id, 1); 
         }
 
         /**
@@ -1449,20 +1448,17 @@ class LabeledDigraph
          * the same assumptions. 
          *
          * @param target_id ID of target node.
-         * @param sparse    If true, use a sparse Laplacian matrix in the
-         *                  calculations. 
          * @returns Vector of first-passage time second moments to the target
          *          node from every node in the graph.
          * @throws std::runtime_error if target node does not exist. 
          */
         template <typename FloatIOType = IOType>
-        Matrix<FloatIOType, Dynamic, 1> getFPTVariancesFromRecurrence(std::string target_id,
-                                                                      const bool sparse)
+        Matrix<FloatIOType, Dynamic, 1> getFPTVariancesFromRecurrence(std::string target_id)
         {
             Matrix<InternalType, Dynamic, 1> v
-                = this->getFPTMomentsFromRecurrence<InternalType>(target_id, 1, sparse);
+                = this->getFPTMomentsFromRecurrence<InternalType>(target_id, 1);
             Matrix<InternalType, Dynamic, 1> w
-                = this->getFPTMomentsFromRecurrence<InternalType>(target_id, 2, sparse);
+                = this->getFPTMomentsFromRecurrence<InternalType>(target_id, 2);
             return (w - (v.array() * v.array()).matrix()).template cast<FloatIOType>(); 
         }
 
