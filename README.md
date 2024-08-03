@@ -30,8 +30,8 @@ for multiple-precision arithmetic, which are exposed to C++/Python via Boost.
 MarkovDigraphs is a header-only library, and therefore requires no separate
 installation. To install PyGraph, you can do the following:
 1. The script ``setup.py`` is written to compile PyGraph under ``build/``.
-   If you are re-installing PyGraph, you can simply remove ``build/`` before
-   proceeding as described below. 
+   If you would like to overwrite a previously installed version PyGraph, you
+   can simply remove ``build/`` before proceeding as described below. 
 2. Edit the include paths in ``setup.py`` according to your installations of 
    GMP, MPFR, Eigen, Boost, and Graphviz.
 3. Run the script, as 
