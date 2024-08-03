@@ -21,6 +21,7 @@ MarkovDigraphs requires the following:
 - [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) (version >= 3.4)
 - [Boost](https://www.boost.org/)
 - [Graphviz](https://www.graphviz.org/)
+
 PyGraph additionally requires pybind11 and [GMP](https://gmplib.org)/[MPFR](https://mpfr.org)
 for multiple-precision arithmetic, which are exposed to C++/Python via Boost.
 
@@ -33,7 +34,7 @@ installation. To install PyGraph, you can do the following:
    GMP, MPFR, Eigen, Boost, and Graphviz.
 3. Run the script, as 
    ```
-   python setup.py build_ext
+   $ python setup.py build_ext
    ```
 4. This will yield a directory, ``build/``, with a sub-directory containing
    the compiled library, which (on a Mac) should be named as something like,
