@@ -1,3 +1,4 @@
+import os
 from setuptools import setup
 from pybind11.setup_helpers import Pybind11Extension, build_ext
 
@@ -9,9 +10,9 @@ EIGEN_INCLUDE = '/opt/homebrew/Cellar/eigen/3.4.0_1/include/eigen3'
 GRAPHVIZ_INCLUDE = '/opt/homebrew/Cellar/graphviz/12.0.0/include'
 
 # Infer LIB paths from INCLUDE paths (which should end with /include)
-GMP_LIB = GMP_INCLUDE[:-8] + '/lib'
-MPFR_LIB = MPFR_INCLUDE[:-8] + '/lib'
-GRAPHVIZ_LIB = GRAPHVIZ_INCLUDE[:-8] + '/lib'
+GMP_LIB = os.path.join(os.path.dirname(GMP_INCLUDE), 'lib')
+MPFR_LIB = os.path.join(os.path.dirname(MPFR_INCLUDE), 'lib')
+GRAPHVIZ_LIB = os.path.join(os.path.dirname(GRAPHVIZ_INCLUDE), 'lib')
 
 ext_modules = [
     Pybind11Extension(
