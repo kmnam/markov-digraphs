@@ -14,7 +14,7 @@ for modeling a wide range of biochemical processes. See the
 for further background and a survey of its capabilities.  
 
 The classes that comprise **MarkovDigraphs** are further available for use in
-Python 3, as [**PyGraph**](https://kmnam.github.io/pygraph-docs/), through 
+Python 3, as [**PyGraph**](https://kmnam.github.io/pygraph-docs/_build/html/), through 
 bindings implemented using [pybind11](https://pybind11.readthedocs.io/en/stable/).
 
 ## Installation
