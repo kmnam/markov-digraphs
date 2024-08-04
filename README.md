@@ -20,12 +20,14 @@ bindings implemented using [pybind11](https://pybind11.readthedocs.io/en/stable/
 ## Installation
 
 MarkovDigraphs requires the following:
-- [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) (version >= 3.4)
-- [Boost](https://www.boost.org/)
-- [Graphviz](https://www.graphviz.org/)
+- [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) (version >= 3.4),
+- [Boost](https://www.boost.org/), and
+- [Graphviz](https://www.graphviz.org/).
 
-PyGraph additionally requires pybind11 and [GMP](https://gmplib.org)/[MPFR](https://mpfr.org)
-for multiple-precision arithmetic, which are exposed to C++/Python via Boost.
+PyGraph additionally requires:
+- pybind11; and
+- [GMP](https://gmplib.org)/[MPFR](https://mpfr.org) for multiple-precision
+  arithmetic.
 
 MarkovDigraphs is a header-only library, and therefore requires no separate
 installation. You need only download the code, as follows:
@@ -56,3 +58,8 @@ To install PyGraph, you can do the following:
    >> import pygraph    # This should not raise an error
    ```
 
+## Documentation
+
+The documentation for MarkovDigraphs is available [here](https://kmnam.github.io/markov-digraphs/).
+
+The documentation for PyGraph is available [here](https://kmnam.github.io/pygraph-docs/_build/html/).
