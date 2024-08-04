@@ -6,7 +6,7 @@
  *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  *  **Last updated:** 
- *      8/3/2024
+ *      8/4/2024
  */
 
 #ifndef LABELED_DIGRAPHS_HPP
@@ -123,7 +123,7 @@ class LabeledDigraph
         //                       ATTRIBUTES                      //
         // ----------------------------------------------------- //
         /** Number of nodes in the graph. */ 
-        unsigned numnodes = 0;
+        int numnodes = 0;
 
         /** Canonical ordering of nodes. */ 
         std::vector<Node*> order;
@@ -304,7 +304,7 @@ class LabeledDigraph
                 = Matrix<InternalType, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes);
 
             // Apply the recurrence ...
-            for (unsigned i = 0; i < k; ++i)
+            for (int i = 0; i < k; ++i)
                 curr = chebotarevAgaevRecurrence<InternalType>(i, laplacian, curr);
 
             return curr; 
@@ -330,7 +330,7 @@ class LabeledDigraph
                 = Matrix<InternalType, Dynamic, Dynamic>::Identity(this->numnodes, this->numnodes); 
 
             // Apply the recurrence ...
-            for (unsigned i = 0; i < k; ++i)
+            for (int i = 0; i < k; ++i)
                 curr = chebotarevAgaevRecurrence<InternalType>(i, laplacian, curr); 
 
             return curr; 
@@ -393,11 +393,11 @@ class LabeledDigraph
             // entry is the *negative* of the label of the edge i -> j, and 
             // the diagonal entries are set so that each *row* sum is zero 
             std::vector<Triplet<InternalType> > laplacian_triplets; 
-            unsigned i = 0;
+            int i = 0;
             for (auto&& v : this->order)
             {
                 std::vector<InternalType> row_entries;    // All nonzero off-diagonal entries in i-th row
-                unsigned j = 0;
+                int j = 0;
                 for (auto&& w : this->order)
                 {
                     if (i != j)
@@ -476,7 +476,7 @@ class LabeledDigraph
          *
          * @returns Number of nodes in the graph.  
          */
-        unsigned getNumNodes() const 
+        int getNumNodes() const 
         {
             return this->numnodes; 
         }
@@ -925,10 +925,10 @@ class LabeledDigraph
 
             // Populate the off-diagonal entries of the matrix first: 
             // (i, j)-th entry is the label of the edge j -> i
-            unsigned i = 0;
+            int i = 0;
             for (auto&& v : this->order)
             {
-                unsigned j = 0;
+                int j = 0;
                 for (auto&& w : this->order)
                 {
                     if (i != j)
@@ -949,7 +949,7 @@ class LabeledDigraph
 
             // Populate diagonal entries as negative sums of the off-diagonal
             // entries in each column
-            for (unsigned i = 0; i < this->numnodes; ++i)
+            for (int i = 0; i < this->numnodes; ++i)
                 laplacian(i, i) = -(laplacian.col(i).sum()); 
 
             return laplacian.template cast<IOType>();
@@ -975,10 +975,10 @@ class LabeledDigraph
 
             // Populate the off-diagonal entries of the matrix first: 
             // (i, j)-th entry is the *negative* of the label of the edge i -> j
-            unsigned i = 0;
+            int i = 0;
             for (auto&& v : this->order)
             {
-                unsigned j = 0;
+                int j = 0;
                 for (auto&& w : this->order)
                 {
                     if (i != j)
@@ -997,11 +997,11 @@ class LabeledDigraph
 
             // Populate diagonal entries as negative sums of the off-diagonal
             // entries in each row
-            for (unsigned i = 0; i < this->numnodes; ++i)
+            for (int i = 0; i < this->numnodes; ++i)
                 laplacian(i, i) = -(laplacian.row(i).sum()); 
 
             // Apply the recurrence ...
-            for (unsigned i = 0; i < k; ++i)
+            for (int i = 0; i < k; ++i)
                 curr = chebotarevAgaevRecurrence<InternalType>(i, laplacian, curr);
 
             return curr.template cast<IOType>();
@@ -1029,11 +1029,11 @@ class LabeledDigraph
             // entry is the *negative* of the label of the edge i -> j, and 
             // the diagonal entries are set so that each *row* sum is zero 
             std::vector<Triplet<InternalType> > laplacian_triplets; 
-            unsigned i = 0;
+            int i = 0;
             for (auto&& v : this->order)
             {
                 std::vector<InternalType> row_entries;    // All nonzero off-diagonal entries in i-th row
-                unsigned j = 0;
+                int j = 0;
                 for (auto&& w : this->order)
                 {
                     if (i != j)
@@ -1059,7 +1059,7 @@ class LabeledDigraph
             laplacian.setFromTriplets(laplacian_triplets.begin(), laplacian_triplets.end());
 
             // Apply the recurrence ...
-            for (unsigned i = 0; i < k; ++i)
+            for (int i = 0; i < k; ++i)
                 curr = chebotarevAgaevRecurrence<InternalType>(i, laplacian, curr); 
 
             return curr.template cast<IOType>(); 
