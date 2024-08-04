@@ -1473,16 +1473,12 @@ TEST_CASE("Tests for getFPTMomentsFromSolver()")
         sixNodeGraph<T, T>,
         oneExitPipelineGraph<T, T>
     };
-    std::vector<std::string> terminal_node_ids {
-        "sixth",
-        "eleventh"
-    }; 
     for (int i = 0; i < terminal_node_graph_funcs.size(); ++i)
     {
         auto result = terminal_node_graph_funcs[i](); 
         LabeledDigraph<T, T>* graph = std::get<0>(result); 
         testGetFPTMomentsFromSolver<T, T>(
-            graph, std::get<1>(result), std::get<2>(result), terminal_node_ids[i],
+            graph, std::get<1>(result), std::get<2>(result), std::get<8>(result)[0],
             std::get<6>(result), 1e-50
         );
         delete graph;
@@ -1498,16 +1494,12 @@ TEST_CASE("Tests for getFPTMomentsFromRecurrence()")
         sixNodeGraph<T, T>,
         oneExitPipelineGraph<T, T>
     };
-    std::vector<std::string> terminal_node_ids {
-        "sixth",
-        "eleventh"
-    };
     for (int i = 0; i < terminal_node_graph_funcs.size(); ++i)
     {
         auto result = terminal_node_graph_funcs[i](); 
         LabeledDigraph<T, T>* graph = std::get<0>(result); 
         testGetFPTMomentsFromRecurrence<T, T>(
-            graph, std::get<1>(result), std::get<2>(result), terminal_node_ids[i],
+            graph, std::get<1>(result), std::get<2>(result), std::get<8>(result)[0],
             std::get<6>(result), 1e-50
         );
         delete graph;
