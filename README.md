@@ -28,7 +28,14 @@ PyGraph additionally requires pybind11 and [GMP](https://gmplib.org)/[MPFR](http
 for multiple-precision arithmetic, which are exposed to C++/Python via Boost.
 
 MarkovDigraphs is a header-only library, and therefore requires no separate
-installation. To install PyGraph, you can do the following:
+installation. You need only download the code, as follows:
+```
+$ git clone https://github.com/kmnam/markov-digraphs.git
+```
+and include the necessary header files to begin using the classes implemented
+therein. 
+
+To install PyGraph, you can do the following:
 1. The script ``setup.py`` is written to compile PyGraph under ``build/``.
    If you would like to overwrite a previously installed version PyGraph, you
    can simply remove ``build/`` before proceeding as described below. 
