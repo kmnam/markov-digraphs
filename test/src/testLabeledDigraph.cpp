@@ -499,11 +499,23 @@ void testGetSpanningTreeMatrixStronglyConnected(LabeledDigraph<T, U>* graph,
 template <typename T, typename U>
 void testGetSpanningForestMatrixTerminalNodes(LabeledDigraph<T, U>* graph,
                                               const int num_nodes,
+                                              std::vector<std::string>& node_ids, 
                                               const Ref<const Matrix<U, Dynamic, Dynamic> >& laplacian,
-                                              const int num_terminal_nodes,
+                                              std::vector<std::string>& terminal_node_ids,
                                               const double eps)
 {
-    const int k = num_nodes - num_terminal_nodes; 
+    const int num_terminal_nodes = terminal_node_ids.size(); 
+    const int k = num_nodes - num_terminal_nodes;
+
+    // Get the indices of the non-terminal and terminal nodes 
+    std::vector<int> nonterminal_nodes, terminal_nodes; 
+    for (int i = 0; i < num_nodes; ++i)
+    {
+        if (std::find(terminal_node_ids.begin(), terminal_node_ids.end(), node_ids[i]) == terminal_node_ids.end())
+            nonterminal_nodes.push_back(i);
+        else
+            terminal_nodes.push_back(i); 
+    }
 
     // Compute and check the (N - T - p)-th spanning forest matrix, for
     // p = 0, 1, 2, ... 
@@ -527,9 +539,9 @@ void testGetSpanningForestMatrixTerminalNodes(LabeledDigraph<T, U>* graph,
         std::vector<std::vector<int> > subsets = choose(k, p);
 
         // We first check the entries for which i and j are non-terminal ...
-        for (int i = 0; i < k; ++i)
+        for (const int& i : nonterminal_nodes)
         {
-            for (int j = 0; j < k; ++j)
+            for (const int& j : nonterminal_nodes)
             {
                 if (i != j)
                 {
@@ -541,23 +553,30 @@ void testGetSpanningForestMatrixTerminalNodes(LabeledDigraph<T, U>* graph,
                     U total = 0; 
                     for (auto&& subset : subsets)
                     {
-                        if (std::find(subset.begin(), subset.end(), j) != subset.end() &&
-                            std::find(subset.begin(), subset.end(), i) == subset.end()
+                        // Get the indices of the chosen non-terminal nodes
+                        std::vector<int> nonterminal_subset; 
+                        for (const int& m : subset)
+                            nonterminal_subset.push_back(nonterminal_nodes[m]);
+                        // If i is not in the chosen set and j is, then the
+                        // corresponding Laplacian minor contributes to the
+                        // total 
+                        if (std::find(nonterminal_subset.begin(), nonterminal_subset.end(), j) != nonterminal_subset.end() &&
+                            std::find(nonterminal_subset.begin(), nonterminal_subset.end(), i) == nonterminal_subset.end()
                         )
                         {
                             std::unordered_set<int> rows, cols; 
-                            for (int m = k; m < num_nodes; ++m)
+                            for (const int& m : terminal_nodes) 
                             {
                                 rows.insert(m); 
                                 cols.insert(m); 
                             }
-                            for (const int& m : subset)
+                            for (const int& m : nonterminal_subset)
                             {
-                                rows.insert(m); 
-                                cols.insert(m); 
+                                rows.insert(m);
+                                cols.insert(m);
                             }
-                            cols.erase(j); 
-                            cols.insert(i); 
+                            cols.erase(j);
+                            cols.insert(i);
                             Matrix<U, Dynamic, Dynamic> sublaplacian = getSubmatrix<U>(laplacian, rows, cols);
                             total += abs(sublaplacian.determinant()); 
                         }
@@ -572,13 +591,19 @@ void testGetSpanningForestMatrixTerminalNodes(LabeledDigraph<T, U>* graph,
                     U total = 0; 
                     for (auto&& subset : subsets)
                     {
-                        if (std::find(subset.begin(), subset.end(), j) != subset.end())
+                        // Get the indices of the chosen non-terminal nodes
+                        std::vector<int> nonterminal_subset; 
+                        for (const int& m : subset)
+                            nonterminal_subset.push_back(nonterminal_nodes[m]);
+                        // If j is in the chosen subset, then the corresponding
+                        // Laplacian minor contributes to the total 
+                        if (std::find(nonterminal_subset.begin(), nonterminal_subset.end(), j) != nonterminal_subset.end())
                         {
                             std::unordered_set<int> rows; 
-                            for (int m = k; m < num_nodes; ++m)
+                            for (const int& m : terminal_nodes)
                                 rows.insert(m); 
-                            for (const int& m : subset)
-                                rows.insert(m); 
+                            for (const int& m : nonterminal_subset)
+                                rows.insert(m);
                             Matrix<U, Dynamic, Dynamic> sublaplacian = getSubmatrix<U>(laplacian, rows, rows);
                             total += abs(sublaplacian.determinant()); 
                         }
@@ -589,9 +614,9 @@ void testGetSpanningForestMatrixTerminalNodes(LabeledDigraph<T, U>* graph,
         }
 
         // We then check the entries for which i is non-terminal and j is terminal ... 
-        for (int i = 0; i < k; ++i)
+        for (const int& i : nonterminal_nodes)
         {
-            for (int j = k; j < num_nodes; ++j)
+            for (const int& j : terminal_nodes)
             {
                 // Here, we collect the Laplacian minors obtained by removing
                 // the rows corresponding to the terminal nodes plus p
@@ -601,15 +626,22 @@ void testGetSpanningForestMatrixTerminalNodes(LabeledDigraph<T, U>* graph,
                 U total = 0;
                 for (auto&& subset : subsets)
                 {
-                    if (std::find(subset.begin(), subset.end(), i) == subset.end())
+                    // Get the indices of the chosen non-terminal nodes
+                    std::vector<int> nonterminal_subset; 
+                    for (const int& m : subset)
+                        nonterminal_subset.push_back(nonterminal_nodes[m]);
+                    // If i is in not the chosen subset, then the corresponding
+                    // Laplacian minor contributes to the total (note that j 
+                    // is terminal here)
+                    if (std::find(nonterminal_subset.begin(), nonterminal_subset.end(), i) == nonterminal_subset.end())
                     {
                         std::unordered_set<int> rows, cols; 
-                        for (int m = k; m < num_nodes; ++m)
+                        for (const int& m : terminal_nodes)
                         {
                             rows.insert(m); 
                             cols.insert(m); 
                         }
-                        for (const int& m : subset)
+                        for (const int& m : nonterminal_subset)
                         {
                             rows.insert(m); 
                             cols.insert(m); 
@@ -625,7 +657,7 @@ void testGetSpanningForestMatrixTerminalNodes(LabeledDigraph<T, U>* graph,
         }
 
         // We then check the entries for which i is terminal and i != j ... 
-        for (int i = k; i < num_nodes; ++i)
+        for (const int& i : terminal_nodes)
         {
             for (int j = 0; j < num_nodes; ++j)
             {
@@ -635,7 +667,7 @@ void testGetSpanningForestMatrixTerminalNodes(LabeledDigraph<T, U>* graph,
         }
 
         // We then check the entries for which i is terminal and i == j ... 
-        for (int i = k; i < num_nodes; ++i)
+        for (const int& i : terminal_nodes)
         {
             // Here, we collect the Laplacian minors obtained by removing
             // the rows and columns corresponding to the terminal nodes plus
@@ -643,10 +675,15 @@ void testGetSpanningForestMatrixTerminalNodes(LabeledDigraph<T, U>* graph,
             U total = 0;
             for (auto&& subset : subsets)
             {
-                std::unordered_set<int> rows;  
-                for (int m = k; m < num_nodes; ++m)
-                    rows.insert(m); 
+                // Get the indices of the chosen non-terminal nodes
+                std::vector<int> nonterminal_subset; 
                 for (const int& m : subset)
+                    nonterminal_subset.push_back(nonterminal_nodes[m]);
+                // Compute the corresponding Laplacian minor 
+                std::unordered_set<int> rows;
+                for (const int& m : terminal_nodes)
+                    rows.insert(m); 
+                for (const int& m : nonterminal_subset)
                     rows.insert(m); 
                 Matrix<U, Dynamic, Dynamic> sublaplacian = getSubmatrix<U>(laplacian, rows, rows);
                 total += abs(sublaplacian.determinant()); 
@@ -818,7 +855,8 @@ using GraphData = std::tuple<LabeledDigraph<T, U>*,
                              std::vector<U>, 
                              std::pair<std::string, std::string>,
                              Matrix<U, Dynamic, Dynamic>,
-                             int>;
+                             int,
+                             std::vector<std::string> >;
 
 /**
  * Return an instance of the five-node reversible cycle graph, with integer 
@@ -869,7 +907,8 @@ GraphData<T, U> cycleGraph()
         },
         std::vector<U>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
         std::make_pair("second", "fourth"),
-        laplacian, 1
+        laplacian, 1,
+        std::vector<std::string>{}
     ); 
 }
 
@@ -924,7 +963,8 @@ GraphData<T, U> fiveNodeGraph()
         },
         std::vector<U>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
         std::make_pair("first", "fifth"),
-        laplacian, 1
+        laplacian, 1,
+        std::vector<std::string>{}
     ); 
 }
 
@@ -985,7 +1025,190 @@ GraphData<T, U> sixNodeGraph()
         },
         std::vector<U>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
         std::make_pair("fifth", "fourth"),
-        laplacian, 1
+        laplacian, 1,
+        std::vector<std::string>{"sixth"}
+    ); 
+}
+
+/**
+ * Return an instance of a one-exit pipeline graph on 11 nodes (10 non-terminal
+ * and one terminal), with integer values for the edge labels (in the given
+ * scalar types), together with all required information regarding the graph 
+ * (nodes, edges, Laplacian matrix, etc.). 
+ */
+template <typename T, typename U>
+GraphData<T, U> oneExitPipelineGraph()
+{
+    LabeledDigraph<T, U>* graph = new LabeledDigraph<T, U>(); 
+    graph->addNode("first"); 
+    graph->addNode("second");
+    graph->addNode("third"); 
+    graph->addNode("fourth"); 
+    graph->addNode("fifth");
+    graph->addNode("sixth");
+    graph->addNode("seventh");
+    graph->addNode("eighth"); 
+    graph->addNode("ninth"); 
+    graph->addNode("tenth"); 
+    graph->addNode("eleventh"); 
+    graph->addEdge("first", "second", 1);
+    graph->addEdge("second", "first", 2); 
+    graph->addEdge("second", "third", 3);
+    graph->addEdge("third", "second", 4); 
+    graph->addEdge("third", "fourth", 5); 
+    graph->addEdge("fourth", "third", 6); 
+    graph->addEdge("fourth", "fifth", 7);
+    graph->addEdge("fifth", "fourth", 8);
+    graph->addEdge("fifth", "sixth", 9);
+    graph->addEdge("sixth", "fifth", 10);
+    graph->addEdge("sixth", "seventh", 11);
+    graph->addEdge("seventh", "sixth", 12);
+    graph->addEdge("seventh", "eighth", 13);
+    graph->addEdge("eighth", "seventh", 14);
+    graph->addEdge("eighth", "ninth", 15);
+    graph->addEdge("ninth", "eighth", 16);
+    graph->addEdge("ninth", "tenth", 17);
+    graph->addEdge("tenth", "ninth", 18);
+    graph->addEdge("tenth", "eleventh", 19);
+    Matrix<U, Dynamic, Dynamic> laplacian = Matrix<U, Dynamic, Dynamic>::Zero(11, 11);
+    U label = 1;
+    for (int i = 0; i < 10; ++i)
+    {
+        U row_sum = 0; 
+        if (i > 0)
+        {
+            laplacian(i, i - 1) = -label;
+            row_sum += label; 
+            label += 1;
+        }
+        laplacian(i, i + 1) = -label; 
+        row_sum += label; 
+        label += 1;
+        laplacian(i, i) = row_sum; 
+    }
+
+    return std::make_tuple(
+        graph, 11,
+        std::vector<std::string>{
+            "first", "second", "third", "fourth", "fifth", "sixth", "seventh",
+            "eighth", "ninth", "tenth", "eleventh"
+        },
+        std::vector<std::pair<std::string, std::string> >{
+            std::make_pair("first", "second"),
+            std::make_pair("second", "first"), 
+            std::make_pair("second", "third"),
+            std::make_pair("third", "second"), 
+            std::make_pair("third", "fourth"), 
+            std::make_pair("fourth", "third"), 
+            std::make_pair("fourth", "fifth"),
+            std::make_pair("fifth", "fourth"),
+            std::make_pair("fifth", "sixth"),
+            std::make_pair("sixth", "fifth"),
+            std::make_pair("sixth", "seventh"),
+            std::make_pair("seventh", "sixth"),
+            std::make_pair("seventh", "eighth"),
+            std::make_pair("eighth", "seventh"),
+            std::make_pair("eighth", "ninth"),
+            std::make_pair("ninth", "eighth"),
+            std::make_pair("ninth", "tenth"),
+            std::make_pair("tenth", "ninth"),
+            std::make_pair("tenth", "eleventh")
+        },
+        std::vector<U>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19},
+        std::make_pair("fifth", "ninth"),
+        laplacian, 1,
+        std::vector<std::string>{"eleventh"}
+    ); 
+}
+
+/**
+ * Return an instance of a two-exit pipeline graph on 12 nodes (10 non-terminal
+ * and two terminal), with integer values for the edge labels (in the given
+ * scalar types), together with all required information regarding the graph 
+ * (nodes, edges, Laplacian matrix, etc.). 
+ */
+template <typename T, typename U>
+GraphData<T, U> twoExitPipelineGraph()
+{
+    LabeledDigraph<T, U>* graph = new LabeledDigraph<T, U>();
+    graph->addNode("zeroth"); 
+    graph->addNode("first"); 
+    graph->addNode("second");
+    graph->addNode("third"); 
+    graph->addNode("fourth"); 
+    graph->addNode("fifth");
+    graph->addNode("sixth");
+    graph->addNode("seventh");
+    graph->addNode("eighth"); 
+    graph->addNode("ninth"); 
+    graph->addNode("tenth"); 
+    graph->addNode("eleventh");
+    graph->addEdge("first", "zeroth", 1); 
+    graph->addEdge("first", "second", 2);
+    graph->addEdge("second", "first", 3); 
+    graph->addEdge("second", "third", 4);
+    graph->addEdge("third", "second", 5); 
+    graph->addEdge("third", "fourth", 6); 
+    graph->addEdge("fourth", "third", 7); 
+    graph->addEdge("fourth", "fifth", 8);
+    graph->addEdge("fifth", "fourth", 9);
+    graph->addEdge("fifth", "sixth", 10);
+    graph->addEdge("sixth", "fifth", 11);
+    graph->addEdge("sixth", "seventh", 12);
+    graph->addEdge("seventh", "sixth", 13);
+    graph->addEdge("seventh", "eighth", 14);
+    graph->addEdge("eighth", "seventh", 15);
+    graph->addEdge("eighth", "ninth", 16);
+    graph->addEdge("ninth", "eighth", 17);
+    graph->addEdge("ninth", "tenth", 18);
+    graph->addEdge("tenth", "ninth", 19);
+    graph->addEdge("tenth", "eleventh", 20);
+    Matrix<U, Dynamic, Dynamic> laplacian = Matrix<U, Dynamic, Dynamic>::Zero(12, 12);
+    U label = 1;
+    for (int i = 1; i < 11; ++i)
+    {
+        U row_sum = 0; 
+        laplacian(i, i - 1) = -label;
+        row_sum += label; 
+        label += 1;
+        laplacian(i, i + 1) = -label; 
+        row_sum += label; 
+        label += 1;
+        laplacian(i, i) = row_sum; 
+    }
+
+    return std::make_tuple(
+        graph, 12,
+        std::vector<std::string>{
+            "zeroth", "first", "second", "third", "fourth", "fifth", "sixth",
+            "seventh", "eighth", "ninth", "tenth", "eleventh"
+        },
+        std::vector<std::pair<std::string, std::string> >{
+            std::make_pair("first", "zeroth"),
+            std::make_pair("first", "second"),
+            std::make_pair("second", "first"), 
+            std::make_pair("second", "third"),
+            std::make_pair("third", "second"), 
+            std::make_pair("third", "fourth"), 
+            std::make_pair("fourth", "third"), 
+            std::make_pair("fourth", "fifth"),
+            std::make_pair("fifth", "fourth"),
+            std::make_pair("fifth", "sixth"),
+            std::make_pair("sixth", "fifth"),
+            std::make_pair("sixth", "seventh"),
+            std::make_pair("seventh", "sixth"),
+            std::make_pair("seventh", "eighth"),
+            std::make_pair("eighth", "seventh"),
+            std::make_pair("eighth", "ninth"),
+            std::make_pair("ninth", "eighth"),
+            std::make_pair("ninth", "tenth"),
+            std::make_pair("tenth", "ninth"),
+            std::make_pair("tenth", "eleventh")
+        },
+        std::vector<U>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20},
+        std::make_pair("tenth", "zeroth"),
+        laplacian, 2,
+        std::vector<std::string>{"zeroth", "eleventh"}
     ); 
 }
 
@@ -1052,7 +1275,8 @@ GraphData<T, U> butterflyGraph()
         },
         std::vector<U>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
         std::make_pair("first", "seventh"),
-        laplacian, 2
+        laplacian, 2,
+        std::vector<std::string>{"sixth", "seventh"}
     ); 
 }
 
@@ -1068,6 +1292,8 @@ TEST_CASE("Tests for node methods")
         cycleGraph<T, T>,
         fiveNodeGraph<T, T>,
         sixNodeGraph<T, T>,
+        oneExitPipelineGraph<T, T>,
+        twoExitPipelineGraph<T, T>, 
         butterflyGraph<T, T>
     }; 
     for (auto&& func : graph_funcs)
@@ -1088,6 +1314,8 @@ TEST_CASE("Tests for edge methods")
         cycleGraph<T, T>,
         fiveNodeGraph<T, T>,
         sixNodeGraph<T, T>,
+        oneExitPipelineGraph<T, T>,
+        twoExitPipelineGraph<T, T>, 
         butterflyGraph<T, T>
     }; 
     for (auto&& func : graph_funcs)
@@ -1111,6 +1339,8 @@ TEST_CASE("Tests for clear()")
         cycleGraph<T, T>,
         fiveNodeGraph<T, T>,
         sixNodeGraph<T, T>,
+        oneExitPipelineGraph<T, T>,
+        twoExitPipelineGraph<T, T>,
         butterflyGraph<T, T>
     }; 
     for (auto&& func : graph_funcs)
@@ -1131,6 +1361,8 @@ TEST_CASE("Tests for getLaplacian()")
         cycleGraph<T, T>,
         fiveNodeGraph<T, T>,
         sixNodeGraph<T, T>,
+        oneExitPipelineGraph<T, T>,
+        twoExitPipelineGraph<T, T>,
         butterflyGraph<T, T>
     }; 
     for (auto&& func : graph_funcs)
@@ -1154,7 +1386,7 @@ TEST_CASE("Tests for getSpanningForestMatrix()")
     // - testGetSpanningForestMatrixTerminalNodes() for all graphs with terminal
     //   nodes
     //
-    // The cycle graph and five-node graphs are strongly connected
+    // For all strongly connected graphs ... 
     std::vector<std::function<GraphData<T, T>()> > strongly_connected_graph_funcs {
         cycleGraph<T, T>,
         fiveNodeGraph<T, T>
@@ -1173,9 +1405,11 @@ TEST_CASE("Tests for getSpanningForestMatrix()")
         delete graph;
     }
     
-    // The six-node and butterfly graphs have terminal nodes
+    // For all graphs with terminal nodes ... 
     std::vector<std::function<GraphData<T, T>()> > terminal_node_graph_funcs {
-        sixNodeGraph<T, T>, 
+        sixNodeGraph<T, T>,
+        oneExitPipelineGraph<T, T>,
+        twoExitPipelineGraph<T, T>,
         butterflyGraph<T, T>
     };
     for (auto&& func : terminal_node_graph_funcs)
@@ -1187,8 +1421,8 @@ TEST_CASE("Tests for getSpanningForestMatrix()")
             1e-50
         ); 
         testGetSpanningForestMatrixTerminalNodes<T, T>(
-            graph, std::get<1>(result), std::get<6>(result), std::get<7>(result),
-            1e-50
+            graph, std::get<1>(result), std::get<2>(result), std::get<6>(result),
+            std::get<8>(result), 1e-50
         );
         delete graph;
     }
@@ -1236,10 +1470,12 @@ TEST_CASE("Tests for getFPTMomentsFromSolver()")
 
     // Run the tests for all graphs with a single terminal node ...
     std::vector<std::function<GraphData<T, T>()> > terminal_node_graph_funcs {
-        sixNodeGraph<T, T>
+        sixNodeGraph<T, T>,
+        oneExitPipelineGraph<T, T>
     };
     std::vector<std::string> terminal_node_ids {
-        "sixth"
+        "sixth",
+        "eleventh"
     }; 
     for (int i = 0; i < terminal_node_graph_funcs.size(); ++i)
     {
@@ -1259,10 +1495,12 @@ TEST_CASE("Tests for getFPTMomentsFromRecurrence()")
 
     // Run the tests for all graphs with a single terminal node ...
     std::vector<std::function<GraphData<T, T>()> > terminal_node_graph_funcs {
-        sixNodeGraph<T, T>
+        sixNodeGraph<T, T>,
+        oneExitPipelineGraph<T, T>
     };
     std::vector<std::string> terminal_node_ids {
-        "sixth"
+        "sixth",
+        "eleventh"
     };
     for (int i = 0; i < terminal_node_graph_funcs.size(); ++i)
     {
