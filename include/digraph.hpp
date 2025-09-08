@@ -1590,9 +1590,9 @@ class LabeledDigraph
 
         /**
          * Compute the matrix, F, in which F[i, j] is the r-th moment of the 
-         * conditional FPT from i to j, where i can be any node and j is a 
-         * terminal node (i.e., a node without outgoing edges), using the
-         * given linear solver method. 
+         * *conditional* first-passage time (FPT) from i to j, where i can be
+         * any node and j is a terminal node (i.e., a node without outgoing
+         * edges), using the given linear solver method. 
          *
          * Since this method necessarily returns a vector with floating-point
          * quantities, which may not be accommodated by `IOType`, this method
@@ -1715,9 +1715,10 @@ class LabeledDigraph
 
         /**
          * Compute the matrix, F, in which F[i, j] is the r-th moment of the 
-         * conditional FPT from i to j, where i can be any node and j is a 
-         * terminal node (i.e., a node without outgoing edges), using the
-         * recurrence of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18).
+         * *conditional* first-passage time (FPT) from i to j, where i can be
+         * any node and j is a terminal node (i.e., a node without outgoing
+         * edges), using the recurrence of Chebotarev and Agaev (Lin Alg Appl,
+         * 2002, Eqs.\ 17-18).
          *
          * Since this method necessarily returns a vector with floating-point
          * quantities, which may not be accommodated by `IOType`, this method
