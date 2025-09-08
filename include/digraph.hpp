@@ -1443,8 +1443,8 @@ class LabeledDigraph
          * scalar type, this method also allows the specification of a new 
          * internal type, `FloatInternalType`.
          *
-         * @param method Linear solver method for computing the r-th FPT
-         *               moment vector. 
+         * @param method Linear solver method for computing the splitting
+         *               probabilities. 
          * @returns Matrix of splitting probabilities from each node to each
          *          terminal node. 
          * @throws std::invalid_argument if solver method is not recognized.
