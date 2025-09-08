@@ -1514,7 +1514,7 @@ class LabeledDigraph
                         b(i) = -laplacian(nonterminal[i], terminal[z]); 
 
                     // Solve for the splitting probabilities 
-                    VectorInternalType x = lu.solve(b); 
+                    VectorInternalType x = qr.solve(b); 
                     for (int i = 0; i < nonterminal.size(); ++i)
                         probs(nonterminal[i], z) = x(i);
                     probs(terminal[z], z) = 1;  
@@ -1547,7 +1547,6 @@ class LabeledDigraph
         Matrix<FloatIOType, Dynamic, Dynamic> getSplittingProbsFromRecurrence()
         {
             typedef Matrix<InternalType, Dynamic, Dynamic> MatrixInternalType; 
-            typedef Matrix<InternalType, Dynamic, 1>       VectorInternalType;
 
             // Otherwise, get the indices of all terminal nodes
             std::vector<int> terminal, nonterminal; 
@@ -1574,13 +1573,13 @@ class LabeledDigraph
             MatrixInternalType probs = MatrixInternalType::Zero(this->numnodes, terminal.size());  
             for (int z = 0; z < terminal.size(); ++z)
             {
+                int jz = terminal[z];  
                 for (int i = 0; i < nonterminal.size(); ++i)
                 {
                     // Divide the weight of all T-rooted spanning forests in which
                     // there is a path from i to z by the weight of all T-rooted
                     // spanning forests
                     int ji = nonterminal[i]; 
-                    int jz = terminal[z];  
                     probs(ji, z) = Q(ji, jz) / Q(jz, jz); 
                 }
                 probs(jz, z) = 1; 
