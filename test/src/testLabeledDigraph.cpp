@@ -5,7 +5,7 @@
  *     Kee-Myoung Nam
  *
  * Last updated:
- *     8/3/2024
+ *     9/8/2025
  */
 
 #include <string>
@@ -735,46 +735,47 @@ void testGetSteadyStateFromRecurrence(LabeledDigraph<T, U>* graph,
 
 /**
  * Test `LabeledDigraph<...>::getFPTMomentsFromSolver()`.
- *
- * Since this method assumes that the input graph has a single terminal node, 
- * this test function assumes the same. 
  */
 template <typename T, typename U>
 void testGetFPTMomentsFromSolver(LabeledDigraph<T, U>* graph, const int num_nodes,
                                  std::vector<std::string>& node_ids, 
-                                 std::string target_id,
+                                 std::unordered_set<int>& terminal_idx, 
                                  const Ref<const Matrix<U, Dynamic, Dynamic> >& laplacian, 
                                  const double eps)
 {
     // Compute the 0-th moments with QR decomposition and check that they are
     // all one 
-    Matrix<U, Dynamic, 1> mu0 = graph->template getFPTMomentsFromSolver<T, U>(target_id, 0);
+    Matrix<U, Dynamic, 1> mu0 = graph->template getFPTMomentsFromSolver<T, U>(0);
     for (int i = 0; i < num_nodes; ++i)
         REQUIRE_THAT(static_cast<double>(mu0(i)), Catch::Matchers::WithinAbs(1.0, eps));
 
     // Compute the 0-th moments with LU decomposition and check that they are
     // all one 
-    mu0 = graph->template getFPTMomentsFromSolver<T, U>(target_id, 0, SolverMethod::LUDecomposition);
+    mu0 = graph->template getFPTMomentsFromSolver<T, U>(0, SolverMethod::LUDecomposition);
     for (int i = 0; i < num_nodes; ++i)
         REQUIRE_THAT(static_cast<double>(mu0(i)), Catch::Matchers::WithinAbs(1.0, eps));
 
     // Compute the r-th moments with QR decomposition, for r = 1, ..., 10, and
     // check that they satisfy the corresponding linear equation
-    const int t = std::distance(
-        node_ids.begin(), std::find(node_ids.begin(), node_ids.end(), target_id)
-    );
     Matrix<U, Dynamic, Dynamic> sublaplacian = getSubmatrix<U>(
-        laplacian, std::unordered_set<int>{t}, std::unordered_set<int>{t}
+        laplacian, terminal_idx, terminal_idx
     );
     for (int r = 1; r < 11; ++r)
     {
-        Matrix<U, Dynamic, 1> mu = graph->template getFPTMomentsFromSolver<T, U>(target_id, r);
-        Matrix<U, Dynamic, 1> mu_sub(num_nodes - 1);
-        mu_sub(Eigen::seq(0, t - 1)) = mu(Eigen::seq(0, t - 1)); 
-        mu_sub(Eigen::seq(t, num_nodes - 2)) = mu(Eigen::seq(t + 1, num_nodes - 1)); 
+        Matrix<U, Dynamic, 1> mu = graph->template getFPTMomentsFromSolver<T, U>(r);
+        Matrix<U, Dynamic, 1> mu_sub(num_nodes - terminal_idx.size());
+        int j = 0; 
+        for (int i = 0; i < num_nodes; ++i)
+        {
+            if (terminal_idx.find(i) == terminal_idx.end())
+            {
+                mu_sub(j) = mu(i); 
+                j++; 
+            }
+        }
         for (int i = 0; i < r; ++i)
             mu_sub = (sublaplacian * mu_sub).eval();
-        for (int i = 0; i < num_nodes - 1; ++i)
+        for (int i = 0; i < num_nodes - terminal_idx.size(); ++i)
             REQUIRE_THAT(
                 static_cast<double>(mu_sub(i)),
                 Catch::Matchers::WithinAbs(boost::math::factorial<double>(r), eps)
@@ -786,14 +787,21 @@ void testGetFPTMomentsFromSolver(LabeledDigraph<T, U>* graph, const int num_node
     for (int r = 1; r < 11; ++r)
     {
         Matrix<U, Dynamic, 1> mu = graph->template getFPTMomentsFromSolver<T, U>(
-            target_id, r, SolverMethod::LUDecomposition
+            r, SolverMethod::LUDecomposition
         );
-        Matrix<U, Dynamic, 1> mu_sub(num_nodes - 1);
-        mu_sub(Eigen::seq(0, t - 1)) = mu(Eigen::seq(0, t - 1)); 
-        mu_sub(Eigen::seq(t, num_nodes - 2)) = mu(Eigen::seq(t + 1, num_nodes - 1)); 
+        Matrix<U, Dynamic, 1> mu_sub(num_nodes - terminal_idx.size());
+        int j = 0; 
+        for (int i = 0; i < num_nodes; ++i)
+        {
+            if (terminal_idx.find(i) == terminal_idx.end())
+            {
+                mu_sub(j) = mu(i); 
+                j++; 
+            }
+        }
         for (int i = 0; i < r; ++i)
             mu_sub = (sublaplacian * mu_sub).eval();
-        for (int i = 0; i < num_nodes - 1; ++i)
+        for (int i = 0; i < num_nodes - terminal_idx.size(); ++i)
             REQUIRE_THAT(
                 static_cast<double>(mu_sub(i)),
                 Catch::Matchers::WithinAbs(boost::math::factorial<double>(r), eps)
@@ -810,38 +818,146 @@ void testGetFPTMomentsFromSolver(LabeledDigraph<T, U>* graph, const int num_node
 template <typename T, typename U>
 void testGetFPTMomentsFromRecurrence(LabeledDigraph<T, U>* graph,
                                      const int num_nodes,
-                                     std::vector<std::string>& node_ids, 
-                                     std::string target_id,
+                                     std::vector<std::string>& node_ids,
+                                     std::unordered_set<int>& terminal_idx, 
                                      const Ref<const Matrix<U, Dynamic, Dynamic> >& laplacian, 
                                      const double eps)
 {
     // Compute the 0-th moments and check that they are all one 
-    Matrix<U, Dynamic, 1> mu0 = graph->template getFPTMomentsFromRecurrence<U>(target_id, 0);
+    Matrix<U, Dynamic, 1> mu0 = graph->template getFPTMomentsFromRecurrence<U>(0);
     for (int i = 0; i < num_nodes; ++i)
         REQUIRE_THAT(static_cast<double>(mu0(i)), Catch::Matchers::WithinAbs(1.0, eps));
 
     // Compute the r-th moments, for r = 1, ..., 10, and check that they
     // satisfy the corresponding linear equation
-    const int t = std::distance(
-        node_ids.begin(), std::find(node_ids.begin(), node_ids.end(), target_id)
-    );
     Matrix<U, Dynamic, Dynamic> sublaplacian = getSubmatrix<U>(
-        laplacian, std::unordered_set<int>{t}, std::unordered_set<int>{t}
+        laplacian, terminal_idx, terminal_idx
     );
     for (int r = 1; r < 11; ++r)
     {
-        Matrix<U, Dynamic, 1> mu = graph->template getFPTMomentsFromRecurrence<U>(target_id, r);
-        Matrix<U, Dynamic, 1> mu_sub(num_nodes - 1);
-        mu_sub(Eigen::seq(0, t - 1)) = mu(Eigen::seq(0, t - 1)); 
-        mu_sub(Eigen::seq(t, num_nodes - 2)) = mu(Eigen::seq(t + 1, num_nodes - 1)); 
+        Matrix<U, Dynamic, 1> mu = graph->template getFPTMomentsFromRecurrence<U>(r);
+        Matrix<U, Dynamic, 1> mu_sub(num_nodes - terminal_idx.size());
+        int j = 0; 
+        for (int i = 0; i < num_nodes; ++i)
+        {
+            if (terminal_idx.find(i) == terminal_idx.end())
+            {
+                mu_sub(j) = mu(i); 
+                j++; 
+            }
+        }
         for (int i = 0; i < r; ++i)
             mu_sub = (sublaplacian * mu_sub).eval();
-        for (int i = 0; i < num_nodes - 1; ++i)
+        for (int i = 0; i < num_nodes - terminal_idx.size(); ++i)
             REQUIRE_THAT(
                 static_cast<double>(mu_sub(i)),
                 Catch::Matchers::WithinAbs(boost::math::factorial<double>(r), eps)
             );
     }
+}
+
+/**
+ * Test `LabeledDigraph<...>::getSplittingProbsFromSolver()`. 
+ */
+template <typename T, typename U>
+void testGetSplittingProbsFromSolver(LabeledDigraph<T, U>* graph, const int num_nodes,
+                                     std::vector<std::string>& node_ids, 
+                                     std::unordered_set<int>& terminal_idx, 
+                                     const Ref<const Matrix<U, Dynamic, Dynamic> >& laplacian, 
+                                     const double eps)
+{
+    // Compute the splitting probabilities with QR decomposition and check that
+    // they satisfy the corresponding linear equation
+    Matrix<U, Dynamic, Dynamic> probs = graph->template getSplittingProbsFromSolver<T, U>();
+    Matrix<U, Dynamic, Dynamic> sublaplacian = getSubmatrix<U>(
+        laplacian, terminal_idx, terminal_idx
+    );
+    Matrix<U, Dynamic, 1> x(num_nodes - terminal_idx.size()); 
+    Matrix<U, Dynamic, 1> b(num_nodes - terminal_idx.size());
+    std::vector<int> terminal_sorted(terminal_idx.begin(), terminal_idx.end()); 
+    std::sort(terminal_sorted.begin(), terminal_sorted.end()); 
+    for (int z = 0; z < terminal_idx.size(); ++z)
+    {
+        int j = 0; 
+        for (int i = 0; i < num_nodes; ++i)
+        {
+            if (terminal_idx.find(i) == terminal_idx.end())
+            {
+                x(j) = probs(i, z); 
+                b(j) = -laplacian(i, terminal_sorted[z]);
+                j++; 
+            } 
+        }
+        Matrix<U, Dynamic, 1> v = sublaplacian * x;
+        for (int i = 0; i < v.size(); ++i)
+            REQUIRE_THAT(
+                static_cast<double>(v(i)),
+                Catch::Matchers::WithinAbs(static_cast<double>(b(i)), eps)
+            ); 
+    }
+
+    // Re-do the same computations with LU decomposition 
+    probs = graph->template getSplittingProbsFromSolver<T, U>(SolverMethod::LUDecomposition);
+    for (int z = 0; z < terminal_idx.size(); ++z)
+    {
+        int j = 0; 
+        for (int i = 0; i < num_nodes; ++i)
+        {
+            if (terminal_idx.find(i) == terminal_idx.end())
+            {
+                x(j) = probs(i, z); 
+                b(j) = -laplacian(i, terminal_sorted[z]);
+                j++; 
+            } 
+        }
+        Matrix<U, Dynamic, 1> v = sublaplacian * x;
+        for (int i = 0; i < v.size(); ++i)
+            REQUIRE_THAT(
+                static_cast<double>(v(i)),
+                Catch::Matchers::WithinAbs(static_cast<double>(b(i)), eps)
+            ); 
+    } 
+}
+
+/**
+ * Test `LabeledDigraph<...>::getSplittingProbsFromRecurrence()`. 
+ */
+template <typename T, typename U>
+void testGetSplittingProbsFromRecurrence(LabeledDigraph<T, U>* graph, const int num_nodes,
+                                         std::vector<std::string>& node_ids, 
+                                         std::unordered_set<int>& terminal_idx, 
+                                         const Ref<const Matrix<U, Dynamic, Dynamic> >& laplacian, 
+                                         const double eps)
+{
+    // Compute the splitting probabilities with the Chebotarev-Agaev recurrence
+    // and check that they satisfy the corresponding linear equation
+    Matrix<U, Dynamic, Dynamic> probs = graph->template getSplittingProbsFromRecurrence<U>();
+    Matrix<U, Dynamic, Dynamic> sublaplacian = getSubmatrix<U>(
+        laplacian, terminal_idx, terminal_idx
+    );
+    Matrix<U, Dynamic, 1> x(num_nodes - terminal_idx.size()); 
+    Matrix<U, Dynamic, 1> b(num_nodes - terminal_idx.size());
+    std::vector<int> terminal_sorted(terminal_idx.begin(), terminal_idx.end()); 
+    std::sort(terminal_sorted.begin(), terminal_sorted.end()); 
+    for (int z = 0; z < terminal_idx.size(); ++z)
+    {
+        int j = 0; 
+        for (int i = 0; i < num_nodes; ++i)
+        {
+            if (terminal_idx.find(i) == terminal_idx.end())
+            {
+                x(j) = probs(i, z); 
+                b(j) = -laplacian(i, terminal_sorted[z]);
+                j++; 
+            } 
+        }
+        Matrix<U, Dynamic, 1> v = sublaplacian * x;
+        for (int i = 0; i < v.size(); ++i)
+            REQUIRE_THAT(
+                static_cast<double>(v(i)),
+                Catch::Matchers::WithinAbs(static_cast<double>(b(i)), eps)
+            ); 
+    } 
 }
 
 // ----------------------------------------------------------------------- // 
@@ -856,6 +972,7 @@ using GraphData = std::tuple<LabeledDigraph<T, U>*,
                              std::pair<std::string, std::string>,
                              Matrix<U, Dynamic, Dynamic>,
                              int,
+                             std::unordered_set<int>, 
                              std::vector<std::string> >;
 
 /**
@@ -908,7 +1025,8 @@ GraphData<T, U> cycleGraph()
         std::vector<U>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
         std::make_pair("second", "fourth"),
         laplacian, 1,
-        std::vector<std::string>{}
+        std::unordered_set<int>(),
+        std::vector<std::string>()
     ); 
 }
 
@@ -964,7 +1082,8 @@ GraphData<T, U> fiveNodeGraph()
         std::vector<U>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
         std::make_pair("first", "fifth"),
         laplacian, 1,
-        std::vector<std::string>{}
+        std::unordered_set<int>(),
+        std::vector<std::string>()
     ); 
 }
 
@@ -1026,6 +1145,7 @@ GraphData<T, U> sixNodeGraph()
         std::vector<U>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
         std::make_pair("fifth", "fourth"),
         laplacian, 1,
+        std::unordered_set<int>{5},
         std::vector<std::string>{"sixth"}
     ); 
 }
@@ -1117,6 +1237,7 @@ GraphData<T, U> oneExitPipelineGraph()
         std::vector<U>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19},
         std::make_pair("fifth", "ninth"),
         laplacian, 1,
+        std::unordered_set<int>{10},
         std::vector<std::string>{"eleventh"}
     ); 
 }
@@ -1208,6 +1329,7 @@ GraphData<T, U> twoExitPipelineGraph()
         std::vector<U>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20},
         std::make_pair("tenth", "zeroth"),
         laplacian, 2,
+        std::unordered_set<int>{0, 11},
         std::vector<std::string>{"zeroth", "eleventh"}
     ); 
 }
@@ -1276,6 +1398,7 @@ GraphData<T, U> butterflyGraph()
         std::vector<U>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
         std::make_pair("first", "seventh"),
         laplacian, 2,
+        std::unordered_set<int>{5, 6},
         std::vector<std::string>{"sixth", "seventh"}
     ); 
 }
@@ -1422,7 +1545,7 @@ TEST_CASE("Tests for getSpanningForestMatrix()")
         ); 
         testGetSpanningForestMatrixTerminalNodes<T, T>(
             graph, std::get<1>(result), std::get<2>(result), std::get<6>(result),
-            std::get<8>(result), 1e-50
+            std::get<9>(result), 1e-50
         );
         delete graph;
     }
@@ -1468,17 +1591,19 @@ TEST_CASE("Tests for getFPTMomentsFromSolver()")
 {
     typedef PreciseType T; 
 
-    // Run the tests for all graphs with a single terminal node ...
+    // Run the tests for all graphs with terminal nodes ... 
     std::vector<std::function<GraphData<T, T>()> > terminal_node_graph_funcs {
         sixNodeGraph<T, T>,
-        oneExitPipelineGraph<T, T>
+        oneExitPipelineGraph<T, T>,
+        twoExitPipelineGraph<T, T>,
+        butterflyGraph<T, T>
     };
     for (int i = 0; i < terminal_node_graph_funcs.size(); ++i)
     {
         auto result = terminal_node_graph_funcs[i](); 
         LabeledDigraph<T, T>* graph = std::get<0>(result); 
         testGetFPTMomentsFromSolver<T, T>(
-            graph, std::get<1>(result), std::get<2>(result), std::get<8>(result)[0],
+            graph, std::get<1>(result), std::get<2>(result), std::get<8>(result),
             std::get<6>(result), 1e-50
         );
         delete graph;
@@ -1489,17 +1614,65 @@ TEST_CASE("Tests for getFPTMomentsFromRecurrence()")
 {
     typedef PreciseType T; 
 
-    // Run the tests for all graphs with a single terminal node ...
+    // Run the tests for all graphs with terminal nodes ... 
     std::vector<std::function<GraphData<T, T>()> > terminal_node_graph_funcs {
         sixNodeGraph<T, T>,
-        oneExitPipelineGraph<T, T>
+        oneExitPipelineGraph<T, T>,
+        twoExitPipelineGraph<T, T>,
+        butterflyGraph<T, T>
     };
     for (int i = 0; i < terminal_node_graph_funcs.size(); ++i)
     {
         auto result = terminal_node_graph_funcs[i](); 
         LabeledDigraph<T, T>* graph = std::get<0>(result); 
         testGetFPTMomentsFromRecurrence<T, T>(
-            graph, std::get<1>(result), std::get<2>(result), std::get<8>(result)[0],
+            graph, std::get<1>(result), std::get<2>(result), std::get<8>(result),
+            std::get<6>(result), 1e-50
+        );
+        delete graph;
+    }
+}
+
+TEST_CASE("Tests for getSplittingProbsFromSolver()")
+{
+    typedef PreciseType T; 
+
+    // Run the tests for all graphs with terminal nodes ... 
+    std::vector<std::function<GraphData<T, T>()> > terminal_node_graph_funcs {
+        sixNodeGraph<T, T>,
+        oneExitPipelineGraph<T, T>,
+        twoExitPipelineGraph<T, T>,
+        butterflyGraph<T, T>
+    };
+    for (int i = 0; i < terminal_node_graph_funcs.size(); ++i)
+    {
+        auto result = terminal_node_graph_funcs[i](); 
+        LabeledDigraph<T, T>* graph = std::get<0>(result); 
+        testGetSplittingProbsFromSolver<T, T>(
+            graph, std::get<1>(result), std::get<2>(result), std::get<8>(result),
+            std::get<6>(result), 1e-50
+        );
+        delete graph;
+    }
+}
+
+TEST_CASE("Tests for getSplittingProbsFromRecurrence()")
+{
+    typedef PreciseType T; 
+
+    // Run the tests for all graphs with terminal nodes ... 
+    std::vector<std::function<GraphData<T, T>()> > terminal_node_graph_funcs {
+        sixNodeGraph<T, T>,
+        oneExitPipelineGraph<T, T>,
+        twoExitPipelineGraph<T, T>,
+        butterflyGraph<T, T>
+    };
+    for (int i = 0; i < terminal_node_graph_funcs.size(); ++i)
+    {
+        auto result = terminal_node_graph_funcs[i](); 
+        LabeledDigraph<T, T>* graph = std::get<0>(result); 
+        testGetSplittingProbsFromRecurrence<T, T>(
+            graph, std::get<1>(result), std::get<2>(result), std::get<8>(result),
             std::get<6>(result), 1e-50
         );
         delete graph;
