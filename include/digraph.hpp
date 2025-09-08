@@ -1450,7 +1450,7 @@ class LabeledDigraph
          * @throws std::invalid_argument if solver method is not recognized.
          */
         template <typename FloatInternalType = InternalType, typename FloatIOType = IOType>
-        Matrix<FloatIOType, Dynamic, 1> getSplittingProbsFromSolver(const SolverMethod method = QRDecomposition)
+        Matrix<FloatIOType, Dynamic, Dynamic> getSplittingProbsFromSolver(const SolverMethod method = QRDecomposition)
         {
             typedef Matrix<FloatInternalType, Dynamic, Dynamic> MatrixInternalType; 
             typedef Matrix<FloatInternalType, Dynamic, 1>       VectorInternalType; 
@@ -1479,7 +1479,7 @@ class LabeledDigraph
             
             // Solve the linear system corresponding to each terminal node, 
             // with the specified method
-            MatrixInternalType probs(nonterminal.size(), terminal.size());
+            MatrixInternalType probs = MatrixInternalType::Zero(this->numnodes, terminal.size()); 
             if (method == LUDecomposition)
             {
                 // Obtain a full-pivot LU decomposition of the left-hand matrix
@@ -1491,12 +1491,13 @@ class LabeledDigraph
                     // Define the right-hand vector  
                     VectorInternalType b(nonterminal.size());
                     for (int i = 0; i < nonterminal.size(); ++i)
-                    {
                         b(i) = -laplacian(nonterminal[i], terminal[z]); 
-                    }
 
-                    // Solve for the splitting probabilities 
-                    probs.col(z) = lu.solve(b); 
+                    // Solve for the splitting probabilities
+                    VectorInternalType x = lu.solve(b); 
+                    for (int i = 0; i < nonterminal.size(); ++i)
+                        probs(nonterminal[i], z) = x(i);
+                    probs(terminal[z], z) = 1;  
                 }
             }
             else if (method == QRDecomposition)
@@ -1510,12 +1511,13 @@ class LabeledDigraph
                     // Define the right-hand vector  
                     VectorInternalType b(nonterminal.size());
                     for (int i = 0; i < nonterminal.size(); ++i)
-                    {
                         b(i) = -laplacian(nonterminal[i], terminal[z]); 
-                    }
 
                     // Solve for the splitting probabilities 
-                    probs.col(z) = lu.solve(b); 
+                    VectorInternalType x = lu.solve(b); 
+                    for (int i = 0; i < nonterminal.size(); ++i)
+                        probs(nonterminal[i], z) = x(i);
+                    probs(terminal[z], z) = 1;  
                 }
             }
             else 
@@ -1523,6 +1525,65 @@ class LabeledDigraph
                 std::stringstream ss; 
                 ss << "Invalid linear system solution method specified: " << method; 
                 throw std::invalid_argument(ss.str());
+            }
+
+            return probs.template cast<FloatIOType>(); 
+        }
+
+        /**
+         * Compute the matrix, P, in which P[i, j] is the splitting probability
+         * from i to j, where i can be any node and j is a terminal node (i.e.,
+         * a node without outgoing edges), using the recurrence of Chebotarev
+         * and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18).
+         *
+         * Since this method necessarily returns a vector with floating-point
+         * quantities, which may not be accommodated by `IOType`, this method
+         * allows the specification of a new output type, `FloatIOType`.
+         *
+         * @returns Matrix of splitting probabilities from each node to each
+         *          terminal node. 
+         */
+        template <typename FloatIOType = IOType>
+        Matrix<FloatIOType, Dynamic, Dynamic> getSplittingProbsFromRecurrence()
+        {
+            typedef Matrix<InternalType, Dynamic, Dynamic> MatrixInternalType; 
+            typedef Matrix<InternalType, Dynamic, 1>       VectorInternalType;
+
+            // Otherwise, get the indices of all terminal nodes
+            std::vector<int> terminal, nonterminal; 
+            for (int i = 0; i < this->numnodes; ++i)
+            {
+                if (this->getAllEdgesFromNode(i).size() == 0)
+                    terminal.push_back(i);
+                else 
+                    nonterminal.push_back(i); 
+            }
+
+            // Compute the required spanning forest matrices ...
+            //
+            // Instantiate the corresponding Laplacian matrix
+            MatrixInternalType laplacian = this->getRowLaplacianDense();
+
+            // Then run the Chebotarev-Agaev recurrence to get the T-rooted 
+            // forest matrix, where T is the number of terminal nodes 
+            const int n = this->numnodes;
+            const int nt = terminal.size();  
+            MatrixInternalType Q = this->getSpanningForestMatrix(n - nt, laplacian);
+
+            // For each nonterminal node i and terminal node z ...
+            MatrixInternalType probs = MatrixInternalType::Zero(this->numnodes, terminal.size());  
+            for (int z = 0; z < terminal.size(); ++z)
+            {
+                for (int i = 0; i < nonterminal.size(); ++i)
+                {
+                    // Divide the weight of all T-rooted spanning forests in which
+                    // there is a path from i to z by the weight of all T-rooted
+                    // spanning forests
+                    int ji = nonterminal[i]; 
+                    int jz = terminal[z];  
+                    probs(ji, z) = Q(ji, jz) / Q(jz, jz); 
+                }
+                probs(jz, z) = 1; 
             }
 
             return probs.template cast<FloatIOType>(); 
