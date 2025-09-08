@@ -1589,6 +1589,129 @@ class LabeledDigraph
         }
 
         /**
+         * Compute the matrix, F, in which F[i, j] is the r-th moment of the 
+         * conditional FPT from i to j, where i can be any node and j is a 
+         * terminal node (i.e., a node without outgoing edges), using the
+         * given linear solver method. 
+         *
+         * Since this method necessarily returns a vector with floating-point
+         * quantities, which may not be accommodated by `IOType`, this method
+         * allows the specification of a new output type, `FloatIOType`.
+         * Moreover, since Eigen's QR/LU solvers require a floating-point 
+         * scalar type, this method also allows the specification of a new 
+         * internal type, `FloatInternalType`.
+         *
+         * @param r Index of the desired moment.
+         * @param method Linear solver method for computing the r-th FPT
+         *               moment vector. 
+         * @returns Matrix of splitting probabilities from each node to each
+         *          terminal node. 
+         * @throws std::invalid_argument if solver method is not recognized.
+         */
+        template <typename FloatInternalType = InternalType, typename FloatIOType = IOType>
+        Matrix<FloatIOType, Dynamic, Dynamic> getConditionalFPTMomentsFromSolver(const int r, 
+                                                                                 const SolverMethod method = QRDecomposition)
+        {
+            typedef Matrix<FloatInternalType, Dynamic, Dynamic> MatrixInternalType; 
+            typedef Matrix<FloatInternalType, Dynamic, 1>       VectorInternalType;
+
+            // Get the indices of all terminal nodes
+            std::vector<int> terminal, nonterminal; 
+            for (int i = 0; i < this->numnodes; ++i)
+            {
+                if (this->getAllEdgesFromNode(i).size() == 0)
+                    terminal.push_back(i);
+                else 
+                    nonterminal.push_back(i); 
+            }
+
+            // Store -1 as a default value for when a terminal node is inaccessible
+            // from a given initial node 
+            MatrixInternalType fpts = -MatrixInternalType::Ones(this->numnodes, terminal.size());
+
+            // Get the splitting probabilities 
+            MatrixInternalType probs
+                = this->getSplittingProbsFromSolver<FloatInternalType, FloatInternalType>(method);
+
+            // Run the Chebotarev-Agaev recurrence to get the T-rooted forest
+            // matrix, where T is the number of terminal nodes 
+            const int n = this->numnodes;
+            const int nt = terminal.size(); 
+            MatrixInternalType laplacian = this->getRowLaplacianDense().template cast<FloatInternalType>(); 
+            MatrixInternalType Q = this->getSpanningForestMatrix(n - nt, laplacian);
+
+            // For each terminal node ... 
+            for (int z = 0; z < nt; ++z)
+            {
+                // Identify the non-terminal nodes that have a path to z
+                std::vector<int> nonterminal_to_z; 
+                for (int i = 0; i < nonterminal.size(); ++i)
+                {
+                    if (Q(nonterminal[i], terminal[z]) > 0)
+                        nonterminal_to_z.push_back(nonterminal[i]); 
+                }
+
+                // Get the Laplacian matrix of the graph and keep only the 
+                // rows and columns corresponding to these non-terminal nodes
+                int nz = nonterminal_to_z.size(); 
+                MatrixInternalType sublaplacian(nz, nz); 
+                for (int i = 0; i < nz; ++i)
+                {
+                    for (int j = 0; j < nz; ++j)
+                    {
+                        sublaplacian(i, j) = laplacian(nonterminal_to_z[i], nonterminal_to_z[j]); 
+                    }
+                }
+
+                // Define the r-th power of the submatrix of the Laplacian matrix
+                MatrixInternalType Ar = MatrixInternalType::Identity(nz, nz); 
+                for (int i = 0; i < r; ++i)
+                    Ar *= sublaplacian;
+
+                // Define the right-hand and solution vectors 
+                VectorInternalType b(nz), x(nz); 
+                for (int i = 0; i < nz; ++i)
+                    b(i) = probs(nonterminal_to_z[i], z); 
+
+                // Solve the linear system corresponding to each terminal node, 
+                // with the specified method
+                if (method == LUDecomposition)
+                {
+                    // Obtain a full-pivot LU decomposition of the left-hand matrix 
+                    FullPivLU<MatrixInternalType> lu(Ar); 
+
+                    // Solve the linear system 
+                    x = lu.solve(b); 
+                }
+                else if (method == QRDecomposition)
+                {
+                    // Obtain a QR decomposition of the left-hand matrix
+                    ColPivHouseholderQR<MatrixInternalType> qr(Ar); 
+
+                    // Solve the linear system 
+                    x = qr.solve(b); 
+                }
+                else 
+                {
+                    std::stringstream ss; 
+                    ss << "Invalid linear system solution method specified: " << method; 
+                    throw std::invalid_argument(ss.str());
+                }
+
+                // Calculate the conditional FPT moments 
+                for (int i = 0; i < nz; ++i)
+                {
+                    fpts(nonterminal_to_z[i], z) = (
+                        boost::math::factorial<FloatInternalType>(r) * x(i) / probs(nonterminal_to_z[i], z)
+                    );
+                }
+                fpts(terminal[z], z) = 0;  
+            }
+
+            return fpts.template cast<FloatIOType>(); 
+        }
+
+        /**
          * Simulate the Markov process associated with the graph up to a 
          * given maximum time.
          *
