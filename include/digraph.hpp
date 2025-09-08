@@ -6,7 +6,7 @@
  *      Kee-Myoung Nam, Department of Systems Biology, Harvard Medical School
  *
  *  **Last updated:** 
- *      9/7/2025
+ *      9/8/2025
  */
 
 #ifndef LABELED_DIGRAPHS_HPP
@@ -1184,8 +1184,8 @@ class LabeledDigraph
                     nonterminal.push_back(i); 
             }
 
-            // Get the Laplacian matrix of the graph and drop the row and column
-            // corresponding to the target nodes
+            // Get the Laplacian matrix of the graph and drop the rows and columns
+            // corresponding to the terminal nodes 
             MatrixInternalType laplacian = this->getRowLaplacianDense().template cast<FloatInternalType>(); 
             MatrixInternalType sublaplacian(nonterminal.size(), nonterminal.size()); 
             for (int i = 0; i < nonterminal.size(); ++i)
@@ -1197,7 +1197,7 @@ class LabeledDigraph
             }
             
             // Solve the linear system with the specified method 
-            VectorInternalType solution = VectorInternalType::Ones(this->numnodes - 1);
+            VectorInternalType solution = VectorInternalType::Ones(nonterminal.size()); 
             if (method == LUDecomposition)
             {
                 // Obtain a full-pivot LU decomposition of the left-hand matrix
@@ -1379,8 +1379,8 @@ class LabeledDigraph
             // The FPT moment from i to the terminal nodes is the i-th row sum
             // in Ar
             //
-            // Now read off the FPT moments, plus the FPT moment from the
-            // target node to itself (note that, here, r > 0 and so this 
+            // Now read off the FPT moments, plus the FPT moment from each
+            // terminal node to itself (note that, here, r > 0 and so this 
             // moment is zero)
             VectorInternalType fpts = VectorInternalType::Zero(this->numnodes);
             for (int i = 0; i < nonterminal.size(); ++i)
@@ -1402,7 +1402,6 @@ class LabeledDigraph
          * the same assumptions. 
          *
          * @returns Vector of mean FPTs from each node to any terminal node.
-         * @throws std::runtime_error if target node does not exist. 
          */
         template <typename FloatIOType = IOType>
         Matrix<FloatIOType, Dynamic, 1> getMeanFPTsFromRecurrence()
@@ -1421,7 +1420,6 @@ class LabeledDigraph
          *
          * @returns Vector of variances for the FPT from each node to any
          *          terminal node.
-         * @throws std::runtime_error if target node does not exist. 
          */
         template <typename FloatIOType = IOType>
         Matrix<FloatIOType, Dynamic, 1> getFPTVariancesFromRecurrence()
@@ -1431,6 +1429,103 @@ class LabeledDigraph
             Matrix<InternalType, Dynamic, 1> w
                 = this->getFPTMomentsFromRecurrence<InternalType>(2);
             return (w - (v.array() * v.array()).matrix()).template cast<FloatIOType>(); 
+        }
+
+        /**
+         * Compute the matrix, P, in which P[i, j] is the splitting probability
+         * from i to j, where i can be any node and j is a terminal node (i.e.,
+         * a node without outgoing edges), using the given linear solver method. 
+         *
+         * Since this method necessarily returns a vector with floating-point
+         * quantities, which may not be accommodated by `IOType`, this method
+         * allows the specification of a new output type, `FloatIOType`.
+         * Moreover, since Eigen's QR/LU solvers require a floating-point 
+         * scalar type, this method also allows the specification of a new 
+         * internal type, `FloatInternalType`.
+         *
+         * @param method Linear solver method for computing the r-th FPT
+         *               moment vector. 
+         * @returns Matrix of splitting probabilities from each node to each
+         *          terminal node. 
+         * @throws std::invalid_argument if solver method is not recognized.
+         */
+        template <typename FloatInternalType = InternalType, typename FloatIOType = IOType>
+        Matrix<FloatIOType, Dynamic, 1> getSplittingProbsFromSolver(const SolverMethod method = QRDecomposition)
+        {
+            typedef Matrix<FloatInternalType, Dynamic, Dynamic> MatrixInternalType; 
+            typedef Matrix<FloatInternalType, Dynamic, 1>       VectorInternalType; 
+
+            // Get the indices of all terminal nodes
+            std::vector<int> terminal, nonterminal; 
+            for (int i = 0; i < this->numnodes; ++i)
+            {
+                if (this->getAllEdgesFromNode(i).size() == 0)
+                    terminal.push_back(i);
+                else 
+                    nonterminal.push_back(i); 
+            }
+
+            // Get the Laplacian matrix of the graph and drop the rows and columns
+            // corresponding to the terminal nodes
+            MatrixInternalType laplacian = this->getRowLaplacianDense().template cast<FloatInternalType>(); 
+            MatrixInternalType sublaplacian(nonterminal.size(), nonterminal.size()); 
+            for (int i = 0; i < nonterminal.size(); ++i)
+            {
+                for (int j = 0; j < nonterminal.size(); ++j)
+                {
+                    sublaplacian(i, j) = laplacian(nonterminal[i], nonterminal[j]); 
+                }
+            }
+            
+            // Solve the linear system corresponding to each terminal node, 
+            // with the specified method
+            MatrixInternalType probs(nonterminal.size(), terminal.size());
+            if (method == LUDecomposition)
+            {
+                // Obtain a full-pivot LU decomposition of the left-hand matrix
+                FullPivLU<MatrixInternalType> lu(sublaplacian);
+
+                // For each terminal node ... 
+                for (int z = 0; z < terminal.size(); ++z)
+                {
+                    // Define the right-hand vector  
+                    VectorInternalType b(nonterminal.size());
+                    for (int i = 0; i < nonterminal.size(); ++i)
+                    {
+                        b(i) = -laplacian(nonterminal[i], terminal[z]); 
+                    }
+
+                    // Solve for the splitting probabilities 
+                    probs.col(z) = lu.solve(b); 
+                }
+            }
+            else if (method == QRDecomposition)
+            {
+                // Obtain a QR decomposition of the left-hand matrix
+                ColPivHouseholderQR<MatrixInternalType> qr(sublaplacian);
+
+                // For each terminal node ... 
+                for (int z = 0; z < terminal.size(); ++z)
+                {
+                    // Define the right-hand vector  
+                    VectorInternalType b(nonterminal.size());
+                    for (int i = 0; i < nonterminal.size(); ++i)
+                    {
+                        b(i) = -laplacian(nonterminal[i], terminal[z]); 
+                    }
+
+                    // Solve for the splitting probabilities 
+                    probs.col(z) = lu.solve(b); 
+                }
+            }
+            else 
+            {
+                std::stringstream ss; 
+                ss << "Invalid linear system solution method specified: " << method; 
+                throw std::invalid_argument(ss.str());
+            }
+
+            return probs.template cast<FloatIOType>(); 
         }
 
         /**
