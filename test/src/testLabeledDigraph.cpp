@@ -960,6 +960,128 @@ void testGetSplittingProbsFromRecurrence(LabeledDigraph<T, U>* graph, const int 
     } 
 }
 
+/**
+ * Test `LabeledDigraph<...>::getConditionalFPTMomentsFromSolver()`. 
+ */
+template <typename T, typename U>
+void testGetConditionalFPTMomentsFromSolver(LabeledDigraph<T, U>* graph,
+                                            const int num_nodes,
+                                            std::vector<std::string>& node_ids, 
+                                            std::unordered_set<int>& terminal_idx, 
+                                            const Ref<const Matrix<U, Dynamic, Dynamic> >& laplacian, 
+                                            const double eps)
+{
+    // Sort the terminal nodes
+    int nt = terminal_idx.size();  
+    std::vector<int> terminal_sorted(terminal_idx.begin(), terminal_idx.end()); 
+    std::sort(terminal_sorted.begin(), terminal_sorted.end()); 
+
+    // Compute the conditional FPT moments, for r = 0, ..., 10, with QR
+    // decomposition and check that they satisfy the corresponding linear
+    // equation
+    Matrix<U, Dynamic, Dynamic> probs = graph->template getSplittingProbsFromSolver<T, U>();
+    for (int r = 0; r < 11; ++r)
+    {
+        Matrix<U, Dynamic, Dynamic> fpts = graph->template getConditionalFPTMomentsFromSolver<T, U>(r);
+
+        // For each terminal node ... 
+        for (int z = 0; z < nt; ++z)
+        {
+            // Get the submatrix of the Laplacian matrix that pertains to 
+            // the nodes from which the terminal node is reachable 
+            std::vector<int> nonterminal_to_z;
+            Matrix<U, Dynamic, Dynamic> Q = graph->getSpanningForestMatrix(num_nodes - nt); 
+            for (int i = 0; i < num_nodes; ++i)
+            {
+                if (terminal_idx.find(i) == terminal_idx.end() && Q(i, terminal_sorted[z]) > 0)
+                {
+                    nonterminal_to_z.push_back(i); 
+                }
+            }
+            int nz = nonterminal_to_z.size(); 
+            Matrix<U, Dynamic, Dynamic> sublaplacian(nz, nz); 
+            for (int i = 0; i < nz; ++i)
+            {
+                for (int j = 0; j < nz; ++j)
+                {
+                    sublaplacian(i, j) = laplacian(nonterminal_to_z[i], nonterminal_to_z[j]); 
+                }
+            }
+
+            // Define the r-th power of this matrix 
+            Matrix<U, Dynamic, Dynamic> Ar = Matrix<U, Dynamic, Dynamic>::Identity(nz, nz); 
+            for (int i = 0; i < r; ++i)
+                Ar *= sublaplacian; 
+
+            // Define the solution and right-hand vector for this linear system
+            Matrix<U, Dynamic, 1> x(nz), b(nz);
+            for (int i = 0; i < nz; ++i)
+            {
+                x(i) = fpts(nonterminal_to_z[i], z) * probs(nonterminal_to_z[i], z); 
+                b(i) = probs(nonterminal_to_z[i], z); 
+            }
+            Matrix<U, Dynamic, 1> v = Ar * x / boost::math::factorial<U>(r);
+            for (int i = 0; i < v.size(); ++i)
+                REQUIRE_THAT(
+                    static_cast<double>(v(i)),
+                    Catch::Matchers::WithinAbs(static_cast<double>(b(i)), eps)
+                ); 
+        }
+    } 
+
+    // Re-do the same computations with LU decomposition 
+    for (int r = 0; r < 11; ++r)
+    {
+        Matrix<U, Dynamic, Dynamic> fpts = graph->template getConditionalFPTMomentsFromSolver<T, U>(
+            r, SolverMethod::LUDecomposition
+        );
+
+        // For each terminal node ... 
+        for (int z = 0; z < nt; ++z)
+        {
+            // Get the submatrix of the Laplacian matrix that pertains to 
+            // the nodes from which the terminal node is reachable 
+            std::vector<int> nonterminal_to_z;
+            Matrix<U, Dynamic, Dynamic> Q = graph->getSpanningForestMatrix(num_nodes - nt); 
+            for (int i = 0; i < num_nodes; ++i)
+            {
+                if (terminal_idx.find(i) == terminal_idx.end() && Q(i, terminal_sorted[z]) > 0)
+                {
+                    nonterminal_to_z.push_back(i); 
+                }
+            }
+            int nz = nonterminal_to_z.size(); 
+            Matrix<U, Dynamic, Dynamic> sublaplacian(nz, nz); 
+            for (int i = 0; i < nz; ++i)
+            {
+                for (int j = 0; j < nz; ++j)
+                {
+                    sublaplacian(i, j) = laplacian(nonterminal_to_z[i], nonterminal_to_z[j]); 
+                }
+            }
+
+            // Define the r-th power of this matrix 
+            Matrix<U, Dynamic, Dynamic> Ar = Matrix<U, Dynamic, Dynamic>::Identity(nz, nz); 
+            for (int i = 0; i < r; ++i)
+                Ar *= sublaplacian; 
+
+            // Define the solution and right-hand vector for this linear system
+            Matrix<U, Dynamic, 1> x(nz), b(nz);
+            for (int i = 0; i < nz; ++i)
+            {
+                x(i) = fpts(nonterminal_to_z[i], z) * probs(nonterminal_to_z[i], z); 
+                b(i) = probs(nonterminal_to_z[i], z); 
+            }
+            Matrix<U, Dynamic, 1> v = Ar * x / boost::math::factorial<U>(r);
+            for (int i = 0; i < v.size(); ++i)
+                REQUIRE_THAT(
+                    static_cast<double>(v(i)),
+                    Catch::Matchers::WithinAbs(static_cast<double>(b(i)), eps)
+                ); 
+        }
+    } 
+}
+
 // ----------------------------------------------------------------------- // 
 //                           SOME EXAMPLE GRAPHS                           //
 // ----------------------------------------------------------------------- //
@@ -1672,6 +1794,29 @@ TEST_CASE("Tests for getSplittingProbsFromRecurrence()")
         auto result = terminal_node_graph_funcs[i](); 
         LabeledDigraph<T, T>* graph = std::get<0>(result); 
         testGetSplittingProbsFromRecurrence<T, T>(
+            graph, std::get<1>(result), std::get<2>(result), std::get<8>(result),
+            std::get<6>(result), 1e-50
+        );
+        delete graph;
+    }
+}
+
+TEST_CASE("Tests for getConditionalFPTMomentsFromSolver()")
+{
+    typedef PreciseType T; 
+
+    // Run the tests for all graphs with terminal nodes ... 
+    std::vector<std::function<GraphData<T, T>()> > terminal_node_graph_funcs {
+        sixNodeGraph<T, T>,
+        oneExitPipelineGraph<T, T>,
+        twoExitPipelineGraph<T, T>,
+        butterflyGraph<T, T>
+    };
+    for (int i = 0; i < terminal_node_graph_funcs.size(); ++i)
+    {
+        auto result = terminal_node_graph_funcs[i](); 
+        LabeledDigraph<T, T>* graph = std::get<0>(result); 
+        testGetConditionalFPTMomentsFromSolver<T, T>(
             graph, std::get<1>(result), std::get<2>(result), std::get<8>(result),
             std::get<6>(result), 1e-50
         );
