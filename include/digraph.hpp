@@ -1604,8 +1604,10 @@ class LabeledDigraph
          * @param r Index of the desired moment.
          * @param method Linear solver method for computing the r-th FPT
          *               moment vector. 
-         * @returns Matrix of splitting probabilities from each node to each
-         *          terminal node. 
+         * @returns Matrix of conditional FPT moments from each node to each
+         *          terminal node. If the terminal node is not reachable from 
+         *          the initial node, then the corresponding entry is given
+         *          as -1. 
          * @throws std::invalid_argument if solver method is not recognized.
          */
         template <typename FloatInternalType = InternalType, typename FloatIOType = IOType>
@@ -1711,6 +1713,99 @@ class LabeledDigraph
             return fpts.template cast<FloatIOType>(); 
         }
 
+        /**
+         * Compute the matrix, F, in which F[i, j] is the r-th moment of the 
+         * conditional FPT from i to j, where i can be any node and j is a 
+         * terminal node (i.e., a node without outgoing edges), using the
+         * recurrence of Chebotarev and Agaev (Lin Alg Appl, 2002, Eqs.\ 17-18).
+         *
+         * Since this method necessarily returns a vector with floating-point
+         * quantities, which may not be accommodated by `IOType`, this method
+         * allows the specification of a new output type, `FloatIOType`.
+         *
+         * @param r Index of the desired moment.
+         * @returns Matrix of conditional FPT moments from each node to each
+         *          terminal node. If the terminal node is not reachable from 
+         *          the initial node, then the corresponding entry is given
+         *          as -1. 
+         */
+        template <typename FloatIOType = IOType>
+        Matrix<FloatIOType, Dynamic, Dynamic> getConditionalFPTMomentsFromRecurrence(const int r) 
+        {
+            typedef Matrix<InternalType, Dynamic, Dynamic> MatrixInternalType; 
+            typedef Matrix<InternalType, Dynamic, 1>       VectorInternalType;
+
+            // Get the indices of all terminal nodes
+            std::vector<int> terminal, nonterminal; 
+            for (int i = 0; i < this->numnodes; ++i)
+            {
+                if (this->getAllEdgesFromNode(i).size() == 0)
+                    terminal.push_back(i);
+                else 
+                    nonterminal.push_back(i); 
+            }
+
+            // Store -1 as a default value for when a terminal node is inaccessible
+            // from a given initial node 
+            MatrixInternalType fpts = -MatrixInternalType::Ones(this->numnodes, terminal.size());
+
+            // Get the splitting probabilities 
+            MatrixInternalType probs = this->getSplittingProbsFromRecurrence<InternalType>(); 
+
+            // Run the Chebotarev-Agaev recurrence to get the (T + 1)-rooted
+            // forest matrix, where T is the number of terminal nodes 
+            const int n = this->numnodes;
+            const int nt = terminal.size(); 
+            MatrixInternalType laplacian = this->getRowLaplacianDense().template cast<InternalType>(); 
+            MatrixInternalType Q2 = this->getSpanningForestMatrix(n - nt - 1, laplacian);
+
+            // Then run the Chebotarev-Agaev recurrence one more time to get 
+            // the T-rooted forest matrix
+            MatrixInternalType Q1 = this->getSpanningForestMatrix(n - nt, laplacian);
+
+            // For each terminal node ... 
+            for (int z = 0; z < nt; ++z)
+            {
+                // Identify the non-terminal nodes that have a path to z
+                std::vector<int> nonterminal_to_z; 
+                for (int i = 0; i < nonterminal.size(); ++i)
+                {
+                    if (Q1(nonterminal[i], terminal[z]) > 0)
+                        nonterminal_to_z.push_back(nonterminal[i]); 
+                }
+
+                // Get the submatrix of the (T + 1)-rooted forest matrix with 
+                // the rows and columns corresponding to these non-terminal nodes
+                int nz = nonterminal_to_z.size(); 
+                MatrixInternalType Q2_sub(nz, nz); 
+                for (int i = 0; i < nz; ++i)
+                {
+                    for (int j = 0; j < nz; ++j)
+                    {
+                        Q2_sub(i, j) = Q2(nonterminal_to_z[i], nonterminal_to_z[j]); 
+                    }
+                }
+
+                // Divide by the weight of all T-rooted forests, then raise 
+                // to the r-th power
+                Q2_sub /= Q1(terminal[z], terminal[z]);
+                MatrixInternalType Ar = MatrixInternalType::Identity(nz, nz); 
+                for (int i = 0; i < r; ++i)
+                    Ar *= Q2_sub;
+
+                // Calculate the conditional FPT moments 
+                VectorInternalType b(nz);
+                for (int i = 0; i < nz; ++i)
+                    b(i) = probs(nonterminal_to_z[i], z);
+                VectorInternalType moments = boost::math::factorial<InternalType>(r) * Ar * b;
+                for (int i = 0; i < nz; ++i)
+                    fpts(nonterminal_to_z[i], z) = moments(i) / probs(nonterminal_to_z[i], z);
+                fpts(terminal[z], z) = 0;  
+            }
+
+            return fpts.template cast<FloatIOType>(); 
+        }
+        
         /**
          * Simulate the Markov process associated with the graph up to a 
          * given maximum time.
